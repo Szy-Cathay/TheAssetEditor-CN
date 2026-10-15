@@ -1,55 +1,40 @@
-﻿<UserControl x:Class="Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.MetalRough.MetalRoughView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.MetalRough" xmlns:userinterface="clr-namespace:GameWorld.Core.Utility.UserInterface;assembly=GameWorld.Core"
-             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
-             mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+<UserControl x:Class="Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.MetalRough.MetalRoughView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:inspector="clr-namespace:KitbasherEditor.Views" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.MetalRough" xmlns:userinterface="clr-namespace:GameWorld.Core.Utility.UserInterface;assembly=GameWorld.Core" xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui" mc:Ignorable="d" d:DesignHeight="450" d:DesignWidth="800">
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="..\ModelMaterialResources.xaml"/>
+                <ResourceDictionary Source="..\ModelMaterialResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-
     <ContentControl x:Name="Shared" DockPanel.Dock="Top">
-        <Expander DockPanel.Dock="Top" IsExpanded="True" Margin="{StaticResource MaterialSubsectionMargin}" Background="Transparent" BorderThickness="0">
-            <Expander.Header>
-                <DockPanel DockPanel.Dock="Top" ToolTip="{loc:Loc MetalRough.ToolTip}">
-                    <TextBlock Text="{loc:Loc MetalRough.Header}" FontWeight="Normal" Margin="3"/>
+        <StackPanel DockPanel.Dock="Top">
+            <Border Margin="0">
+                <DockPanel Style="{DynamicResource Kitbash.InspectorSectionHeader}" Margin="0,0,0,4">
+                    <DockPanel DockPanel.Dock="Left" ToolTip="{loc:Loc MetalRough.ToolTip}">
+                        <TextBlock Text="{loc:Loc MetalRough.Header}" Margin="0" TextWrapping="Wrap" Style="{DynamicResource Kitbash.InspectorHeading}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <Separator Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" />
                 </DockPanel>
-            </Expander.Header>
-
+            </Border>
             <DockPanel LastChildFill="False">
-
-                <DockPanel LastChildFill="True" DockPanel.Dock="Top">
-                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.UseAlpha}"/>
-                    <CheckBox Margin="2,0,2,0" IsChecked="{Binding UseAlpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center"/>
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top">
-                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.BaseColour}"/>
-                    <userinterface:ShaderTextureView DataContext="{Binding BaseColour}"/>
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top">
-                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.MaterialMap}"/>
-                    <userinterface:ShaderTextureView DataContext="{Binding MaterialMap}"/>
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top">
-                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.NormalMap}"/>
-                    <userinterface:ShaderTextureView DataContext="{Binding NormalMap}"/>
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top">
-                    <Label Style="{StaticResource AeForm.Label}" Width ="{StaticResource labelWidth}" DockPanel.Dock="Left" Content="{loc:Loc MetalRough.Mask}"/>
-                    <userinterface:ShaderTextureView DataContext="{Binding Mask}"/>
-                </DockPanel>
+                <CheckBox IsChecked="{Binding UseAlpha, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" ToolTip="{loc:Loc MetalRough.UseAlpha.ToolTip}" HorizontalAlignment="Left" VerticalAlignment="Center" AutomationProperties.Name="{loc:Loc MetalRough.UseAlpha}" Content="{loc:Loc MetalRough.UseAlpha}" Style="{DynamicResource Kitbash.InspectorCheckBox}" DockPanel.Dock="Top" />
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                    <CheckBox DataContext="{Binding BaseColour}" IsChecked="{Binding ShouldRenderTexture, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}" AutomationProperties.Name="{loc:Loc MetalRough.BaseColour}" Content="{loc:Loc MetalRough.BaseColour}" Style="{DynamicResource Kitbash.InspectorCheckBox}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding BaseColour}" ShowRenderToggle="False" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                    <CheckBox DataContext="{Binding MaterialMap}" IsChecked="{Binding ShouldRenderTexture, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}" AutomationProperties.Name="{loc:Loc MetalRough.MaterialMap}" Content="{loc:Loc MetalRough.MaterialMap}" Style="{DynamicResource Kitbash.InspectorCheckBox}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding MaterialMap}" ShowRenderToggle="False" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                    <CheckBox DataContext="{Binding NormalMap}" IsChecked="{Binding ShouldRenderTexture, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}" AutomationProperties.Name="{loc:Loc MetalRough.NormalMap}" Content="{loc:Loc MetalRough.NormalMap}" Style="{DynamicResource Kitbash.InspectorCheckBox}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding NormalMap}" ShowRenderToggle="False" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                    <CheckBox DataContext="{Binding Mask}" IsChecked="{Binding ShouldRenderTexture, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}" AutomationProperties.Name="{loc:Loc MetalRough.Mask}" Content="{loc:Loc MetalRough.Mask}" Style="{DynamicResource Kitbash.InspectorCheckBox}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding Mask}" ShowRenderToggle="False" />
+                </StackPanel>
             </DockPanel>
-        </Expander>
+        </StackPanel>
     </ContentControl>
 </UserControl>

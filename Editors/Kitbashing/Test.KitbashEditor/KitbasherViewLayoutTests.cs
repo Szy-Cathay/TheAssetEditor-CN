@@ -123,7 +123,7 @@ namespace Test.KitbashEditor
 
             Assert.Multiple(() =>
             {
-                Assert.That(buttons, Has.Count.EqualTo(3));
+                Assert.That(buttons, Has.Count.EqualTo(2));
                 Assert.That(
                     buttons.All(element =>
                         (string?)element.Attribute("Focusable") ==
@@ -140,7 +140,6 @@ namespace Test.KitbashEditor
                         (string?)element.Attribute("IsChecked")),
                     Is.EquivalentTo(new[]
                     {
-                        "{Binding ViewportShading.IsWireframe, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}",
                         "{Binding ViewportShading.IsSolid, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}",
                         "{Binding ViewportShading.IsMaterialPreview, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}",
                     }));
@@ -390,7 +389,7 @@ namespace Test.KitbashEditor
         }
 
         [Test]
-        public void WeightedMaterialDiagnostics_AreCollapsedAndReadOnly()
+        public void WeightedMaterialDiagnostics_ShowAllReadOnlyListsWithoutFolding()
         {
             var document = XDocument.Load(GetRepositoryFilePath(
                 "Editors",
@@ -404,34 +403,18 @@ namespace Test.KitbashEditor
                 "WeightedMaterialView.xaml"));
             XNamespace presentation =
                 "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
-            var rootExpander = document
-                .Descendants(presentation + "Expander")
-                .First();
-            var header = rootExpander
-                .Elements(presentation + "Expander.Header")
-                .Descendants(presentation + "StackPanel")
-                .First();
-
             Assert.Multiple(() =>
             {
-                Assert.That(
-                    (string?)rootExpander.Attribute("IsExpanded"),
-                    Is.EqualTo("False"));
-                Assert.That(
-                    rootExpander.Attribute("ToolTip"),
-                    Is.Null);
-                Assert.That(
-                    (string?)header.Attribute("ToolTip"),
-                    Is.EqualTo(
-                        "{loc:Loc WeightedMaterial.ToolTip}"));
-                Assert.That(
-                    rootExpander.Descendants(presentation + "Button"),
-                    Is.Empty);
+                Assert.That(document.Descendants(presentation + "Expander"), Is.Empty);
+                Assert.That(document.Descendants(presentation + "ListView").Count(), Is.EqualTo(6));
+                Assert.That(document.Descendants().Any(element =>
+                    (string?)element.Attribute("ToolTip") == "{loc:Loc WeightedMaterial.ToolTip}"), Is.True);
+                Assert.That(document.Descendants(presentation + "Button"), Is.Empty);
             });
         }
 
         [Test]
-        public void MeshAdvancedSettings_StartCollapsedWithGuidance()
+        public void MeshFields_HaveDirectContentAndFieldSpecificGuidance()
         {
             var document = XDocument.Load(GetRepositoryFilePath(
                 "Editors",
@@ -445,31 +428,14 @@ namespace Test.KitbashEditor
                 "MeshView.xaml"));
             XNamespace presentation =
                 "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
-            var advancedExpander = document
-                .Descendants(presentation + "Expander")
-                .Single(expander =>
-                    expander
-                        .Elements(presentation + "Expander.Header")
-                        .Descendants(presentation + "TextBlock")
-                        .Any(text =>
-                            (string?)text.Attribute("Text") ==
-                            "{loc:Loc Mesh.Advanced}"));
-            var header = advancedExpander
-                .Elements(presentation + "Expander.Header")
-                .Descendants(presentation + "TextBlock")
-                .Single();
-
             Assert.Multiple(() =>
             {
-                Assert.That(
-                    (string?)advancedExpander.Attribute("IsExpanded"),
-                    Is.EqualTo("False"));
-                Assert.That(
-                    advancedExpander.Attribute("ToolTip"),
-                    Is.Null);
-                Assert.That(
-                    (string?)header.Attribute("ToolTip"),
-                    Is.EqualTo("{loc:Loc Mesh.Advanced.ToolTip}"));
+                Assert.That(document.Descendants(presentation + "Expander"), Is.Empty);
+                Assert.That(document.Descendants(presentation + "TextBox"), Is.Empty, "The shared header owns the name editor.");
+                foreach (var key in new[] { "Mesh.IndexCount", "Mesh.VertexType", "Mesh.ReduceLods", "Mesh.RenderBbox", "Mesh.ShowPivot", "Mesh.Pivot" })
+                    Assert.That(document.Descendants().Where(element => element.Name == presentation + "Label" || element.Name == presentation + "CheckBox").Single(element =>
+                        (string?)element.Attribute("Content") == $"{{loc:Loc {key}}}").Attribute("ToolTip")?.Value,
+                        Is.EqualTo($"{{loc:Loc {key}.ToolTip}}"));
             });
         }
 
@@ -483,9 +449,7 @@ namespace Test.KitbashEditor
             {
                 "{loc:Loc AdvancedRmvMaterial.ToolTip}",
                 "{loc:Loc Emissive.ToolTip}",
-                "{loc:Loc Mesh.Advanced.ToolTip}",
                 "{loc:Loc MetalRough.ToolTip}",
-                "{loc:Loc ModelMaterial.SelectedShader.ToolTip}",
                 "{loc:Loc SpecGloss.ToolTip}",
                 "{loc:Loc Tint.ToolTip}",
                 "{loc:Loc WeightedMaterial.ToolTip}"
@@ -501,7 +465,11 @@ namespace Test.KitbashEditor
             Assert.That(sectionOwners.Select(element => (string)element.Attribute("ToolTip")!),
                 Is.EquivalentTo(sectionGuidance));
             foreach (var owner in sectionOwners)
-                Assert.That(owner.Ancestors(presentation + "Expander.Header").Any(), Is.True);
+                Assert.That(owner.Ancestors(presentation + "Border").Any(), Is.True);
+
+            Assert.That(tooltipOwners.Where(element => (string)element.Attribute("ToolTip")! ==
+                "{loc:Loc ModelMaterial.SelectedShader.ToolTip}").Select(element => element.Name.LocalName),
+                Is.EquivalentTo(new[] { "TextBlock", "ComboBox" }));
 
             var matrixHelp = tooltipOwners
                 .Where(element => (string)element.Attribute("ToolTip")! == "{loc:Loc MeshAnim.AnimationMatrix.ToolTip}")

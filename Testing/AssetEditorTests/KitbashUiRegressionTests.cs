@@ -874,20 +874,25 @@ public class KitbashUiRegressionTests
                 {
                     Source = new Uri($"pack://application:,,,/{typeof(KitbasherView).Assembly.GetName().Name};component/KitbashUiStyles.xaml"),
                 });
-                WithWindow(view, 400, window =>
+                PlaybackAndViewportRefinementTests.Layout(view, 400, 600);
+                if (view is KitbasherEditor.Views.EditorViews.MainEditableNodeView)
                 {
-                    for (var depth = 0; depth < 3; depth++)
-                    {
-                        foreach (var expander in Descendants<Expander>(view))
-                            expander.IsExpanded = true;
-                        window.UpdateLayout();
-                    }
-                    var table = Descendants<ItemsControl>(view).First(item => item is ListView or DataGrid);
-                    var labels = Descendants<TextBlock>(table).Select(label => label.Text).ToArray();
-                    NUnitAssert.That(labels, Does.Contain("bip_spine_1"), view.GetType().Name);
-                    NUnitAssert.That(labels, Does.Contain("17"), view.GetType().Name);
-                    NUnitAssert.That(labels, Has.None.Contains("AnimatedBone"), view.GetType().Name);
-                });
+                    var categories = Descendants<TabControl>(view).Single();
+                    categories.SelectedItem = categories.Items.OfType<TabItem>()
+                        .Single(item => Equals(item.Tag, "AttachmentPoints"));
+                }
+                for (var depth = 0; depth < 3; depth++)
+                {
+                    PlaybackAndViewportRefinementTests.Layout(view, 400, 600);
+                    foreach (var expander in Descendants<Expander>(view))
+                        expander.IsExpanded = true;
+                }
+                PlaybackAndViewportRefinementTests.Layout(view, 400, 600);
+                var table = Descendants<ItemsControl>(view).First(item => item is ListView or DataGrid);
+                var labels = Descendants<TextBlock>(table).Select(label => label.Text).ToArray();
+                NUnitAssert.That(labels, Does.Contain("bip_spine_1"), view.GetType().Name);
+                NUnitAssert.That(labels, Does.Contain("17"), view.GetType().Name);
+                NUnitAssert.That(labels, Has.None.Contains("AnimatedBone"), view.GetType().Name);
             }
         });
     }

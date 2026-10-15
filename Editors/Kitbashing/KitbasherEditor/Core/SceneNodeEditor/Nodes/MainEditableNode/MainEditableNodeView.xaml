@@ -1,68 +1,52 @@
-﻿<UserControl x:Class="KitbasherEditor.Views.EditorViews.MainEditableNodeView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:filterdialog="clr-namespace:CommonControls.FilterDialog;assembly=Shared.Ui" 
-             xmlns:System="clr-namespace:System;assembly=System.Runtime"
-             xmlns:s="http://schemas.singulink.com/xaml"
-             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
-             xmlns:converters="clr-namespace:KitbasherEditor.ValueConverters"
-             mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+<UserControl x:Class="KitbasherEditor.Views.EditorViews.MainEditableNodeView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:filterdialog="clr-namespace:CommonControls.FilterDialog;assembly=Shared.Ui" xmlns:System="clr-namespace:System;assembly=System.Runtime" xmlns:s="http://schemas.singulink.com/xaml" xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui" xmlns:converters="clr-namespace:KitbasherEditor.ValueConverters" xmlns:inspector="clr-namespace:KitbasherEditor.Views" mc:Ignorable="d" d:DesignHeight="450" d:DesignWidth="800">
     <UserControl.Resources>
-        <converters:SceneNodeEditorDisplayConverter x:Key="SceneNodeDisplayConverter"/>
+        <converters:SceneNodeEditorDisplayConverter x:Key="SceneNodeDisplayConverter" />
     </UserControl.Resources>
-
-    <StackPanel>
-        <TextBlock Text="{loc:Loc MainNode.Header}" Style="{DynamicResource Kitbash.PropertyTitle}"/>
-        <Expander IsExpanded="True" Header="{loc:Loc MainNode.General}">
+    <inspector:InspectorTabs x:Name="InspectorCategories" inspector:InspectorViewState.Key="Main" Style="{DynamicResource Kitbash.InspectorTabs}">
+        <TabItem Header="{loc:Loc MainNode.General}" Tag="General">
             <StackPanel>
-                <filterdialog:CollapsableFilterControl
-                    SelectedItem="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
-                    SearchItems="{Binding SkeletonNameList, UpdateSourceTrigger=PropertyChanged}"
-                    OnSearch="{Binding FilterByFullPath, UpdateSourceTrigger=PropertyChanged}"
-                    IsManipulationEnabled="False"
-                    LabelTotalWidth="96"
-                    MaxHeight="320"
-                    ShowLabel="True"
-                    LabelText="{loc:Loc MainNode.Skeleton}"
-                    ToolTip="{Binding SkeletonName}"/>
-                <DockPanel Margin="0,4,0,0">
-                    <Label Style="{StaticResource AeForm.Label}" Width="96" DockPanel.Dock="Left"
-                           Content="{loc:Loc MainNode.CopyTexturesToPack}"/>
-                    <Button Content="{loc:Loc General.Copy}" HorizontalAlignment="Left"
-                            Click="{s:MethodBinding CopyTexturesToOutputPack}"
-                            ToolTip="{loc:Loc MainNode.CopyTextures.ToolTip}"/>
-                </DockPanel>
-            </StackPanel>
-        </Expander>
-
-        <Expander Margin="0,4,0,0">
-            <Expander.Header>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="{loc:Loc MainNode.AttachmentPoints}" FontWeight="Bold" Margin="3"/>
-                    <TextBlock Text="{Binding AttachmentPointList.Count, StringFormat={loc:Loc Kitbash.Sidebar.ItemCountFormat}}"
-                               Style="{StaticResource AeText.Caption}" VerticalAlignment="Center" Margin="4,0,0,0"/>
+                <StackPanel>
+                    <Label Content="{loc:Loc MainNode.Skeleton}" Style="{DynamicResource Kitbash.InspectorStackedLabel}" />
+                    <filterdialog:CollapsableFilterControl SelectedItem="{Binding SkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" SearchItems="{Binding SkeletonNameList, UpdateSourceTrigger=PropertyChanged}" OnSearch="{Binding FilterByFullPath, UpdateSourceTrigger=PropertyChanged}" IsManipulationEnabled="False" LabelTotalWidth="96" MaxHeight="320" ShowLabel="False" LabelText="{loc:Loc MainNode.Skeleton}" ToolTip="{Binding SkeletonName}" Margin="0,0,0,4" />
+                    <Grid Style="{DynamicResource Kitbash.InspectorRow}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="136" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Label Style="{DynamicResource Kitbash.InspectorLabel}" Content="{loc:Loc MainNode.CopyTexturesToPack}" />
+                        <Button Content="{loc:Loc General.Copy}" Click="{s:MethodBinding CopyTexturesToOutputPack}" ToolTip="{loc:Loc MainNode.CopyTextures.ToolTip}" Grid.Column="1" Style="{DynamicResource Kitbash.InspectorAction}" Margin="0" />
+                    </Grid>
                 </StackPanel>
-            </Expander.Header>
-            <StackPanel>
-                <DataGrid ItemsSource="{Binding AttachmentPointList, UpdateSourceTrigger=PropertyChanged}"
-                          Style="{StaticResource AeTable.Grid}"
-                          AutoGenerateColumns="False" IsReadOnly="True"
-                          CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False"
-                          SelectionMode="Single" HeadersVisibility="Column" MaxHeight="240"
-                          AutomationProperties.Name="{loc:Loc MainNode.AttachmentPoints}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="{loc:Loc MainNode.BoneId}" Binding="{Binding BoneIndex}" Width="64"/>
-                        <DataGridTextColumn Header="{loc:Loc MainNode.Name}" Binding="{Binding Name}" Width="*" MinWidth="100"/>
-                        <DataGridTextColumn Header="{loc:Loc MainNode.UseBoneOrientation}"
-                                            Binding="{Binding IsIdentiy, Converter={StaticResource SceneNodeDisplayConverter}}" Width="100"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-                <Button Content="{loc:Loc MainNode.CreateAttachmentPointsFromSkeleton}" Margin="0,4,0,0"
-                        HorizontalAlignment="Right" Command="{Binding ResetAttachmentPointListCommand}"/>
             </StackPanel>
-        </Expander>
-    </StackPanel>
+        </TabItem>
+        <TabItem Header="{loc:Loc MainNode.AttachmentPoints}" Tag="AttachmentPoints">
+            <StackPanel>
+                <Border Margin="0">
+                    <DockPanel Style="{DynamicResource Kitbash.InspectorSectionHeader}" Margin="0,0,0,4">
+                        <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
+                            <TextBlock Text="{loc:Loc MainNode.AttachmentPoints}" Margin="0" TextWrapping="Wrap" Style="{DynamicResource Kitbash.InspectorHeading}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding AttachmentPointList.Count, StringFormat={loc:Loc Kitbash.Sidebar.ItemCountFormat}}" Style="{DynamicResource Kitbash.InspectorHeading}" VerticalAlignment="Center" Margin="8,0,0,0" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Separator Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" />
+                    </DockPanel>
+                </Border>
+                <StackPanel>
+                    <DataGrid ItemsSource="{Binding AttachmentPointList, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource AeTable.Grid}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" CanUserResizeRows="False" SelectionMode="Single" HeadersVisibility="Column" MaxHeight="240" AutomationProperties.Name="{loc:Loc MainNode.AttachmentPoints}" ColumnHeaderStyle="{DynamicResource Kitbash.InspectorTableHeader}" Margin="0,0,0,4">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="{loc:Loc MainNode.BoneId}" Binding="{Binding BoneIndex}" Width="72" />
+                            <DataGridTextColumn Header="{loc:Loc MainNode.Name}" Binding="{Binding Name}" Width="*" MinWidth="72">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="{loc:Loc MainNode.UseBoneOrientation}" Binding="{Binding IsIdentiy, Converter={StaticResource SceneNodeDisplayConverter}}" Width="96" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <Button Content="{loc:Loc MainNode.CreateAttachmentPointsFromSkeleton}" Margin="0,0,0,4" Command="{Binding ResetAttachmentPointListCommand}" Style="{DynamicResource Kitbash.InspectorAction}" />
+                </StackPanel>
+            </StackPanel>
+        </TabItem>
+    </inspector:InspectorTabs>
 </UserControl>

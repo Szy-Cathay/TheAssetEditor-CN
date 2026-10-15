@@ -792,7 +792,7 @@ public class UiModelKitbashFamilyTests
     }
 
     [Test]
-    public void MainEditableSkeletonSelector_KeepsLabelOnTheInputRowWhenExpanded()
+    public void MainEditableSkeletonSelector_KeepsFullWidthInputAndOneLabelWhenExpanded()
     {
         WpfTestApplicationHost.InvokeWithThemeResources(
             WpfTestApplicationHost.EmptyServices,
@@ -812,60 +812,45 @@ public class UiModelKitbashFamilyTests
                 try
                 {
                     var view = new MainEditableNodeView();
-                    var window = new Window
+                    view.Resources.MergedDictionaries.Add(new ResourceDictionary
                     {
-                        Content = view,
-                        Width = 400,
-                        Height = 720,
-                        ShowActivated = false,
-                        ShowInTaskbar = false,
-                    };
-                    try
+                        Source = new Uri("/Editors.KitbasherEditor;component/KitbashUiStyles.xaml", UriKind.Relative),
+                    });
+                    PlaybackAndViewportRefinementTests.Layout(view, 300, 720);
+
+                    var selector = FindVisualDescendants<
+                            CollapsableFilterControl>(view)
+                        .Single();
+                    var browseButton = FindVisualDescendants<Button>(selector)
+                        .First(button => button.Name == "BrowseButton");
+                    browseButton.RaiseEvent(new RoutedEventArgs(
+                        Button.ClickEvent));
+                    PlaybackAndViewportRefinementTests.Layout(view, 300, 720);
+
+                    var visibleLabels = FindVisualDescendants<Label>(view)
+                        .Where(label =>
+                            label.Visibility == Visibility.Visible &&
+                            Equals(label.Content, selector.LabelText))
+                        .ToArray();
+                    var selectedFileName = FindVisualDescendants<TextBox>(selector)
+                        .Single(textBox => textBox.Name == "SelectedFileName");
+                    var labelBottom = visibleLabels.Single().TransformToAncestor(view)
+                        .Transform(new Point(0, visibleLabels.Single().ActualHeight)).Y;
+                    var inputTop = selectedFileName.TransformToAncestor(view)
+                        .Transform(new Point()).Y;
+
+                    NUnitAssert.Multiple(() =>
                     {
-                        window.Show();
-                        window.UpdateLayout();
-
-                        var selector = FindVisualDescendants<
-                                CollapsableFilterControl>(view)
-                            .Single();
-                        var browseButton = FindVisualDescendants<Button>(selector)
-                            .First(button => button.Name == "BrowseButton");
-                        browseButton.RaiseEvent(new RoutedEventArgs(
-                            Button.ClickEvent));
-                        window.UpdateLayout();
-
-                        var visibleLabels = FindVisualDescendants<Label>(view)
-                            .Where(label =>
-                                label.Visibility == Visibility.Visible &&
-                                Equals(label.Content, selector.LabelText))
-                            .ToArray();
-                        var selectorLabel = FindVisualDescendants<Label>(selector)
-                            .Single(label =>
-                                Equals(label.Content, selector.LabelText));
-                        var selectedFileName = FindVisualDescendants<TextBox>(selector)
-                            .Single(textBox => textBox.Name == "SelectedFileName");
-                        var labelTop = selectorLabel.TransformToAncestor(selector)
-                            .Transform(new Point()).Y;
-                        var inputTop = selectedFileName.TransformToAncestor(selector)
-                            .Transform(new Point()).Y;
-
-                        NUnitAssert.Multiple(() =>
-                        {
-                            NUnitAssert.That(selector.ShowLabel, Is.True);
-                            NUnitAssert.That(selectedFileName.ActualWidth,
-                                Is.GreaterThanOrEqualTo(160));
-                            NUnitAssert.That(visibleLabels,
-                                Has.Length.EqualTo(1));
-                            NUnitAssert.That(selectorLabel.Visibility,
-                                Is.EqualTo(Visibility.Visible));
-                            NUnitAssert.That(labelTop,
-                                Is.EqualTo(inputTop).Within(1));
-                        });
-                    }
-                    finally
-                    {
-                        window.Close();
-                    }
+                        NUnitAssert.That(selector.ShowLabel, Is.False);
+                        NUnitAssert.That(selectedFileName.ActualWidth,
+                            Is.GreaterThanOrEqualTo(160));
+                        NUnitAssert.That(visibleLabels,
+                            Has.Length.EqualTo(1));
+                        NUnitAssert.That(labelBottom,
+                            Is.LessThanOrEqualTo(inputTop));
+                        NUnitAssert.That(FindVisualDescendants<Button>(selector)
+                            .Any(button => button.Name == "ClearButton"), Is.True);
+                    });
                 }
                 finally
                 {

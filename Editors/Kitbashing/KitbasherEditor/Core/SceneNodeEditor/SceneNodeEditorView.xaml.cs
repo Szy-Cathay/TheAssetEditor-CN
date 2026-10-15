@@ -10,6 +10,7 @@ namespace KitbasherEditor.Views
         public SceneItemEditorView()
         {
             InitializeComponent();
+            InspectorViewState.SetState(this, new InspectorViewState());
         }
     }
 }

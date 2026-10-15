@@ -1,79 +1,50 @@
-﻿<UserControl x:Class="Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.DirtAndDecal.AdvancedRmvMaterialView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:userinterface="clr-namespace:GameWorld.Core.Utility.UserInterface;assembly=GameWorld.Core" 
-             xmlns:mathviews1="clr-namespace:Shared.Ui.BaseDialogs.MathViews;assembly=Shared.Ui"
-             xmlns:mathviews11="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui"
-             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
-             mc:Ignorable="d"
-             d:DesignHeight="450" d:DesignWidth="800">
+<UserControl x:Class="Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.DirtAndDecal.AdvancedRmvMaterialView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:inspector="clr-namespace:KitbasherEditor.Views" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:userinterface="clr-namespace:GameWorld.Core.Utility.UserInterface;assembly=GameWorld.Core" xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui" mc:Ignorable="d" d:DesignHeight="450" d:DesignWidth="800">
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="..\ModelMaterialResources.xaml"/>
+                <ResourceDictionary Source="..\ModelMaterialResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-
     <ContentControl DockPanel.Dock="Top">
-
-        <Expander DockPanel.Dock="Top" IsExpanded="False" Margin="{StaticResource MaterialSubsectionMargin}" Background="Transparent" BorderThickness="0">
-            <Expander.Header>
-                <DockPanel DockPanel.Dock="Top" ToolTip="{loc:Loc AdvancedRmvMaterial.ToolTip}">
-                    <TextBlock Text="{loc:Loc AdvancedRmvMaterial.Header}" FontWeight="Normal" Margin="3"/>
+        <StackPanel DockPanel.Dock="Top">
+            <Border Margin="0">
+                <DockPanel Style="{DynamicResource Kitbash.InspectorSectionHeader}" Margin="0,0,0,4">
+                    <DockPanel DockPanel.Dock="Left" ToolTip="{loc:Loc AdvancedRmvMaterial.ToolTip}">
+                        <TextBlock Text="{loc:Loc AdvancedRmvMaterial.Header}" Margin="0" TextWrapping="Wrap" Style="{DynamicResource Kitbash.InspectorHeading}" VerticalAlignment="Center" />
+                    </DockPanel>
+                    <Separator Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" />
                 </DockPanel>
-            </Expander.Header>
-
+            </Border>
             <DockPanel LastChildFill="False">
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc AdvancedRmvMaterial.UseDirt}" Style="{StaticResource AeForm.Label}" />
-                    <CheckBox IsChecked="{Binding UseDirt, UpdateSourceTrigger=PropertyChanged}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc AdvancedRmvMaterial.UseDecal}" Style="{StaticResource AeForm.Label}" />
-                    <CheckBox IsChecked="{Binding UseDecal, UpdateSourceTrigger=PropertyChanged}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc AdvancedRmvMaterial.UseSkin}" Style="{StaticResource AeForm.Label}" />
-                    <CheckBox IsChecked="{Binding UseSkin, UpdateSourceTrigger=PropertyChanged}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True" IsEnabled="{Binding ShowDirtMap, UpdateSourceTrigger=PropertyChanged}">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc AdvancedRmvMaterial.DirtMap}" Style="{StaticResource AeForm.Label}" />
-                    <userinterface:ShaderTextureView DataContext="{Binding DirtMap}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True" IsEnabled="{Binding ShowDirtMask, UpdateSourceTrigger=PropertyChanged}">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc AdvancedRmvMaterial.DirtMask}" Style="{StaticResource AeForm.Label}" />
-                    <userinterface:ShaderTextureView DataContext="{Binding DirtMask}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True" IsEnabled="{Binding ShowSkinMask, UpdateSourceTrigger=PropertyChanged}">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc AdvancedRmvMaterial.SkinMask}" Style="{StaticResource AeForm.Label}" />
-                    <userinterface:ShaderTextureView DataContext="{Binding SkinMask}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True" IsEnabled="{Binding ShowDecalMask, UpdateSourceTrigger=PropertyChanged}">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc AdvancedRmvMaterial.DecalMask}" Style="{StaticResource AeForm.Label}" />
-                    <userinterface:ShaderTextureView DataContext="{Binding DecalMask}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True" IsEnabled="{Binding ShowUvScale, UpdateSourceTrigger=PropertyChanged}">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc AdvancedRmvMaterial.UvScale}" Style="{StaticResource AeForm.Label}" />
-                    <mathviews1:Vector2View DataContext="{Binding UvScale}" />
-                </DockPanel>
-
-                <DockPanel DockPanel.Dock="Top" LastChildFill="True" IsEnabled="{Binding ShowTextureTransform, UpdateSourceTrigger=PropertyChanged}">
-                    <Label DockPanel.Dock="Left" Width="{StaticResource labelWidth}" Content="{loc:Loc AdvancedRmvMaterial.TextureTransform}" Style="{StaticResource AeForm.Label}" />
-                    <mathviews11:Vector4View Vector4="{Binding TextureTransform}" />
-                </DockPanel>
-                
+                <CheckBox IsChecked="{Binding UseDirt, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Left" VerticalAlignment="Center" AutomationProperties.Name="{loc:Loc AdvancedRmvMaterial.UseDirt}" Content="{loc:Loc AdvancedRmvMaterial.UseDirt}" Style="{DynamicResource Kitbash.InspectorCheckBox}" DockPanel.Dock="Top" />
+                <CheckBox IsChecked="{Binding UseDecal, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Left" VerticalAlignment="Center" AutomationProperties.Name="{loc:Loc AdvancedRmvMaterial.UseDecal}" Content="{loc:Loc AdvancedRmvMaterial.UseDecal}" Style="{DynamicResource Kitbash.InspectorCheckBox}" DockPanel.Dock="Top" />
+                <CheckBox IsChecked="{Binding UseSkin, UpdateSourceTrigger=PropertyChanged}" HorizontalAlignment="Left" VerticalAlignment="Center" AutomationProperties.Name="{loc:Loc AdvancedRmvMaterial.UseSkin}" Content="{loc:Loc AdvancedRmvMaterial.UseSkin}" Style="{DynamicResource Kitbash.InspectorCheckBox}" DockPanel.Dock="Top" />
+                <StackPanel DockPanel.Dock="Top" IsEnabled="{Binding ShowDirtMap, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,4">
+                    <CheckBox DataContext="{Binding DirtMap}" IsChecked="{Binding ShouldRenderTexture, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}" AutomationProperties.Name="{loc:Loc AdvancedRmvMaterial.DirtMap}" Content="{loc:Loc AdvancedRmvMaterial.DirtMap}" Style="{DynamicResource Kitbash.InspectorCheckBox}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding DirtMap}" ShowRenderToggle="False" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Top" IsEnabled="{Binding ShowDirtMask, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,4">
+                    <CheckBox DataContext="{Binding DirtMask}" IsChecked="{Binding ShouldRenderTexture, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}" AutomationProperties.Name="{loc:Loc AdvancedRmvMaterial.DirtMask}" Content="{loc:Loc AdvancedRmvMaterial.DirtMask}" Style="{DynamicResource Kitbash.InspectorCheckBox}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding DirtMask}" ShowRenderToggle="False" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Top" IsEnabled="{Binding ShowSkinMask, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,4">
+                    <CheckBox DataContext="{Binding SkinMask}" IsChecked="{Binding ShouldRenderTexture, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}" AutomationProperties.Name="{loc:Loc AdvancedRmvMaterial.SkinMask}" Content="{loc:Loc AdvancedRmvMaterial.SkinMask}" Style="{DynamicResource Kitbash.InspectorCheckBox}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding SkinMask}" ShowRenderToggle="False" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Top" IsEnabled="{Binding ShowDecalMask, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,4">
+                    <CheckBox DataContext="{Binding DecalMask}" IsChecked="{Binding ShouldRenderTexture, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" VerticalAlignment="Center" ToolTip="{loc:Loc ShaderTexture.ApplyTexture}" AutomationProperties.Name="{loc:Loc AdvancedRmvMaterial.DecalMask}" Content="{loc:Loc AdvancedRmvMaterial.DecalMask}" Style="{DynamicResource Kitbash.InspectorCheckBox}" />
+                    <userinterface:ShaderTextureView DataContext="{Binding DecalMask}" ShowRenderToggle="False" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Top" IsEnabled="{Binding ShowUvScale, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,4">
+                    <Label Content="{loc:Loc AdvancedRmvMaterial.UvScale}" Style="{DynamicResource Kitbash.InspectorStackedLabel}" />
+                    <ContentControl DataContext="{Binding UvScale}" Content="{Binding}" ContentTemplate="{DynamicResource Kitbash.InspectorVector2}" HorizontalContentAlignment="Stretch" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Top" IsEnabled="{Binding ShowTextureTransform, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,4">
+                    <Label Content="{loc:Loc AdvancedRmvMaterial.TextureTransform}" Style="{DynamicResource Kitbash.InspectorStackedLabel}" />
+                    <ContentControl Content="{Binding TextureTransform}" ContentTemplate="{DynamicResource Kitbash.InspectorVector4}" HorizontalContentAlignment="Stretch" />
+                </StackPanel>
             </DockPanel>
-        </Expander>
+        </StackPanel>
     </ContentControl>
 </UserControl>

@@ -1,93 +1,69 @@
-﻿<UserControl x:Class="Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews.WsModelMaterial.ModelMaterialView"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
-             xmlns:local="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews.WsModelMaterial" 
-             xmlns:System="clr-namespace:System;assembly=mscorlib" 
-             xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui"
-             xmlns:blood="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.Blood" 
-             xmlns:tint="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.Tint" 
-             xmlns:emissive="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.Emissive" 
-             xmlns:metalrough="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.MetalRough" 
-             xmlns:specgloss="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.SpecGloss" 
-             xmlns:dirtanddecal="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.DirtAndDecal"
-             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
-             xmlns:converters="clr-namespace:KitbasherEditor.ValueConverters"
-             mc:Ignorable="d"
-             d:DesignHeight="1200" d:DesignWidth="800">
+<UserControl x:Class="Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews.WsModelMaterial.ModelMaterialView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:inspector="clr-namespace:KitbasherEditor.Views" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.MeshSubViews.WsModelMaterial" xmlns:System="clr-namespace:System;assembly=mscorlib" xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui" xmlns:blood="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.Blood" xmlns:tint="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.Tint" xmlns:emissive="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.Emissive" xmlns:metalrough="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.MetalRough" xmlns:specgloss="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.SpecGloss" xmlns:dirtanddecal="clr-namespace:Editors.KitbasherEditor.ViewModels.SceneNodeEditor.Nodes.MeshNode.Mesh.WsMaterial.DirtAndDecal" xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui" xmlns:converters="clr-namespace:KitbasherEditor.ValueConverters" mc:Ignorable="d" d:DesignHeight="1200" d:DesignWidth="800">
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="ModelMaterialResources.xaml"/>
+                <ResourceDictionary Source="ModelMaterialResources.xaml" />
             </ResourceDictionary.MergedDictionaries>
-            <converters:SceneNodeEditorDisplayConverter x:Key="SceneNodeDisplayConverter"/>
+            <converters:SceneNodeEditorDisplayConverter x:Key="SceneNodeDisplayConverter" />
         </ResourceDictionary>
     </UserControl.Resources>
-
-    <Expander DockPanel.Dock="Top" IsExpanded="True">
-        <Expander.Header>
-            <StackPanel Orientation="Horizontal" ToolTip="{loc:Loc ModelMaterial.SelectedShader.ToolTip}">
-                <TextBlock Text="{loc:Loc ModelMaterial.Header}" FontWeight="Bold" Margin="3"/>
-            </StackPanel>
-        </Expander.Header>
-
+    <StackPanel DockPanel.Dock="Top">
         <DockPanel LastChildFill="False">
-
-            <DockPanel DockPanel.Dock="Top" LastChildFill="True">
-                <Label Style="{StaticResource AeForm.Label}" Width="120" DockPanel.Dock="Left" Content="{loc:Loc ModelMaterial.SelectedShader}"/>
-                <ComboBox ItemsSource="{Binding PossibleMaterialTypes}" SelectedItem="{Binding CurrentMaterialType}" VerticalAlignment="Center" HorizontalAlignment="Stretch">
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                <DockPanel Style="{DynamicResource Kitbash.InspectorSectionHeader}" Margin="0,0,0,4">
+                    <TextBlock Text="{loc:Loc ModelMaterial.SelectedShader}" ToolTip="{loc:Loc ModelMaterial.SelectedShader.ToolTip}" DockPanel.Dock="Left" Style="{DynamicResource Kitbash.InspectorHeading}" VerticalAlignment="Center" />
+                    <Separator Margin="8,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False" />
+                </DockPanel>
+                <ComboBox ItemsSource="{Binding PossibleMaterialTypes}" SelectedItem="{Binding CurrentMaterialType}" VerticalAlignment="Center" HorizontalAlignment="Stretch" ToolTip="{loc:Loc ModelMaterial.SelectedShader.ToolTip}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Converter={StaticResource SceneNodeDisplayConverter}}"/>
+                            <TextBlock Text="{Binding Converter={StaticResource SceneNodeDisplayConverter}}" TextWrapping="Wrap" />
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                 </ComboBox>
-            </DockPanel>
-
-            <ContentControl DockPanel.Dock="Top" Content="{Binding MetalRough}" Visibility="{Binding MetalRough, Converter={StaticResource NullToVisibilityConverter}}">
+            </StackPanel>
+            <ContentControl DockPanel.Dock="Top" Content="{Binding MetalRough}" Visibility="{Binding MetalRough, Converter={StaticResource NullToVisibilityConverter}}" Margin="0,4,0,0">
                 <ContentControl.ContentTemplate>
                     <DataTemplate>
                         <metalrough:MetalRoughView />
                     </DataTemplate>
                 </ContentControl.ContentTemplate>
             </ContentControl>
-            <ContentControl DockPanel.Dock="Top" Content="{Binding SpecGloss}" Visibility="{Binding SpecGloss, Converter={StaticResource NullToVisibilityConverter}}">
+            <ContentControl DockPanel.Dock="Top" Content="{Binding SpecGloss}" Visibility="{Binding SpecGloss, Converter={StaticResource NullToVisibilityConverter}}" Margin="0,4,0,0">
                 <ContentControl.ContentTemplate>
                     <DataTemplate>
                         <specgloss:SpecGlossView />
                     </DataTemplate>
                 </ContentControl.ContentTemplate>
             </ContentControl>
-            <ContentControl DockPanel.Dock="Top" Content="{Binding AdvanceRvmMaterial}" Visibility="{Binding AdvanceRvmMaterial, Converter={StaticResource NullToVisibilityConverter}}">
+            <ContentControl DockPanel.Dock="Top" Content="{Binding AdvanceRvmMaterial}" Visibility="{Binding AdvanceRvmMaterial, Converter={StaticResource NullToVisibilityConverter}}" Margin="0,4,0,0">
                 <ContentControl.ContentTemplate>
                     <DataTemplate>
                         <dirtanddecal:AdvancedRmvMaterialView />
                     </DataTemplate>
                 </ContentControl.ContentTemplate>
             </ContentControl>
-            <ContentControl DockPanel.Dock="Top" Content="{Binding Blood}" Visibility="{Binding Blood, Converter={StaticResource NullToVisibilityConverter}}">
+            <ContentControl DockPanel.Dock="Top" Content="{Binding Blood}" Visibility="{Binding Blood, Converter={StaticResource NullToVisibilityConverter}}" Margin="0,4,0,0">
                 <ContentControl.ContentTemplate>
                     <DataTemplate>
                         <blood:BloodView />
                     </DataTemplate>
                 </ContentControl.ContentTemplate>
             </ContentControl>
-            <ContentControl DockPanel.Dock="Top" Content="{Binding Tint}" Visibility="{Binding Tint, Converter={StaticResource NullToVisibilityConverter}}">
+            <ContentControl DockPanel.Dock="Top" Content="{Binding Tint}" Visibility="{Binding Tint, Converter={StaticResource NullToVisibilityConverter}}" Margin="0,4,0,0">
                 <ContentControl.ContentTemplate>
                     <DataTemplate>
                         <tint:TintView />
                     </DataTemplate>
                 </ContentControl.ContentTemplate>
             </ContentControl>
-            <ContentControl DockPanel.Dock="Top" Content="{Binding Emissive}" Visibility="{Binding Emissive, Converter={StaticResource NullToVisibilityConverter}}">
+            <ContentControl DockPanel.Dock="Top" Content="{Binding Emissive}" Visibility="{Binding Emissive, Converter={StaticResource NullToVisibilityConverter}}" Margin="0,4,0,0">
                 <ContentControl.ContentTemplate>
                     <DataTemplate>
                         <emissive:EmissiveView />
                     </DataTemplate>
                 </ContentControl.ContentTemplate>
             </ContentControl>
-
         </DockPanel>
-    </Expander>
+    </StackPanel>
 </UserControl>

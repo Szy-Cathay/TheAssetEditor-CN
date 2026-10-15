@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.Events;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes;
@@ -11,20 +12,48 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
     {
         private readonly IEventHub _eventHub;
         private readonly ISceneNodeEditorFactory _editorFactory;
+        private readonly SceneNodePropertyEditor _propertyEditor;
         private ISceneNode? _currentNode;
+        private bool _refreshingName;
 
         [ObservableProperty] ISceneNodeEditor? _currentEditor;
         [ObservableProperty] string _emptyStateText;
+        [ObservableProperty] string _selectedNodeName = string.Empty;
 
         public SceneNodeEditorViewModel(
             IEventHub eventHub,
-            ISceneNodeEditorFactory editorFactory)
+            ISceneNodeEditorFactory editorFactory,
+            SceneNodePropertyEditor propertyEditor)
         {
             _eventHub = eventHub;
             _editorFactory = editorFactory;
+            _propertyEditor = propertyEditor;
             _emptyStateText = GetText("Kitbash.Sidebar.SelectNode");
 
             _eventHub.Register<SceneNodeSelectedEvent>(this, OnSelectionChanged);
+        }
+
+        public bool CanRenameSelectedNode => CurrentEditor != null &&
+            (_currentNode is Rmv2MeshNode || _currentNode?.GetType() == typeof(GroupNode));
+
+        public bool IsSelectedNodeNameReadOnly => !CanRenameSelectedNode;
+
+        partial void OnCurrentEditorChanged(ISceneNodeEditor? value)
+        {
+            OnPropertyChanged(nameof(CanRenameSelectedNode));
+            OnPropertyChanged(nameof(IsSelectedNodeNameReadOnly));
+        }
+
+        partial void OnSelectedNodeNameChanged(string value)
+        {
+            if (_refreshingName)
+                return;
+            if (!CanRenameSelectedNode || _currentNode is not { } node)
+            {
+                UpdateSelectedNodeName();
+                return;
+            }
+            _propertyEditor.Update(node.Name, value, name => node.Name = name);
         }
 
         void OnSelectionChanged(SceneNodeSelectedEvent selectionChangedEvent)
@@ -33,7 +62,7 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
                 selectionChangedEvent.SelectedObjects.Count == 1
                     ? selectionChangedEvent.SelectedObjects[0]
                     : null;
-            if (ReferenceEquals(_currentNode, selectedNode))
+            if (selectedNode != null && ReferenceEquals(_currentNode, selectedNode))
                 return;
 
             ClearCurrentEditor();
@@ -53,6 +82,9 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
             }
 
             _currentNode = selectedNode;
+            if (_currentNode is INotifyPropertyChanged observable)
+                observable.PropertyChanged += OnNodePropertyChanged;
+            UpdateSelectedNodeName();
             CurrentEditor = _editorFactory.Create(
                 selectedNode!);
             EmptyStateText = CurrentEditor == null
@@ -62,10 +94,37 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
 
         private void ClearCurrentEditor()
         {
+            if (_currentNode is INotifyPropertyChanged observable)
+                observable.PropertyChanged -= OnNodePropertyChanged;
             _currentNode = null;
+            SelectedNodeName = string.Empty;
             var editor = CurrentEditor;
             CurrentEditor = null;
             editor?.Dispose();
+        }
+
+        private void OnNodePropertyChanged(object? sender, PropertyChangedEventArgs args)
+        {
+            if (string.IsNullOrEmpty(args.PropertyName) || args.PropertyName == nameof(ISceneNode.Name))
+                UpdateSelectedNodeName();
+        }
+
+        private void UpdateSelectedNodeName()
+        {
+            _refreshingName = true;
+            try
+            {
+                SelectedNodeName = _currentNode switch
+                {
+                    MainEditableNode => GetText("MainNode.Header"),
+                    SkeletonNode { Skeleton: not null } skeleton => skeleton.Skeleton.SkeletonName,
+                    _ => _currentNode?.Name ?? string.Empty
+                };
+            }
+            finally
+            {
+                _refreshingName = false;
+            }
         }
 
         private static string GetText(string key) =>
