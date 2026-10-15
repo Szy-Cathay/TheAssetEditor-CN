@@ -84,6 +84,7 @@
 - 新增、修改、审查或验收用户界面、窗口、控件、主题、图标、动画或加载进度时，先读 `docs/ui-design-system.md` 的适用范围、架构边界、“Agent 公共组件复用协议”、禁止项和任务相关章节；跨模块 UI 或整体验收时通读全文。该文件是本仓库唯一长期 UI 规范；先搜索、再复用，未满足准入条件不得新增公共控件。
 - 修改共享 3D 初始视角时，先核对 `docs/architecture.md`：默认从目标上方俯视 24°、水平转角 26°，保持焦点、视距和后续自由绕转；显式相机设置不得被初值覆盖。
 - 修改场景下方播放器时，沿用 `docs/ui-design-system.md` 与 `docs/kitbash-editor.md` 的“动画播放器”整行展开标题及播放控制、帧数/秒数、进度条顺序；Kitbash 的骨骼和动画选择留在进度条下方。
+- 修改动画重定向布局、来源/目标切换或共享播放进度时，先核对 `docs/ui-design-system.md` 的重定向流程和 `docs/architecture.md` 的共享动画播放契约；保留手动应用与保存已生成结果的边界。
 - 音频浏览器资源/预览加载与工程历史是内容区加载的限定例外：加载时互斥替换各自完整正文，提示整体水平、垂直居中，不含编辑标签或最左侧图标栏，不提供展开详情层；具体边界见 `docs/ui-design-system.md` 和 `docs/folder-project-version-control.md`。
 - 只有稳定契约、领域含义、关键入口或已知限制改变时才同步更新文档；内部重构、测试数量、性能快照、分支名和提交 SHA 不写入长期上下文。
 - 文档结论必须用当前代码或测试核验；历史对话、记忆、提交标题、PR 描述和上游文档只能用于定位，不能直接证明当前行为。
@@ -108,6 +109,7 @@
 - `Shared/SharedCore` 放置无 WPF 业务界面的核心服务与模型，`Shared/GameFiles` 放置游戏格式，`Shared/SharedUI` 放置跨模块、无业务含义的通用 WPF 组件。
 - `Shared.Ui` 只能引用 `Shared/` 内项目，不得反向依赖 `AssetEditor`、`Editors` 或具体业务编辑器；已有 `SharedUiArchitectureTests` 是这条边界的自动门禁。
 - 只有被多个模块真实复用、无业务含义且可独立验证的 UI 才进入 `Shared.Ui`；对话框等通用依赖优先走 `IStandardDialogs` 等现有抽象。
+- 模型点选、框选、轮廓和模型 Gizmo 通过编辑器作用域内的 `ViewportInteractionCapabilities` 默认关闭，仅 Kitbash 显式启用；相机、骨骼、元数据标记和骑乘附着点等专用操作保持独立，不借用整模型选择入口。
 - 比较上游 `D:\TheAssetEditor` 时必须实时核对两边 HEAD、分支、工作区、行为、项目引用、本地化和测试；文件名相同或旧记忆不能证明功能等价。
 
 ## Pack 与文件夹工程

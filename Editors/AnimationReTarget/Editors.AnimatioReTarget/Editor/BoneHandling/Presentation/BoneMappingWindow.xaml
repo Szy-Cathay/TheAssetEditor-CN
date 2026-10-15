@@ -9,8 +9,8 @@
         xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
         mc:Ignorable="d"
         Title="{loc:Loc AnimReTarget.BoneMappingWindowTitle}"
-        Height="450"
-        Width="800"
+        Height="680" MinHeight="420"
+        Width="1000" MinWidth="640"
         Background="{DynamicResource AeBrush.Canvas}"
         Foreground="{DynamicResource AeBrush.TextPrimary}"
         FontFamily="{DynamicResource AppFontFamily}"
@@ -18,21 +18,22 @@
     <common:AssetEditorWindow.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+                <ResourceDictionary Source="../../RetargetUiStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </common:AssetEditorWindow.Resources>
-    <Grid>
+    <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
 
-        <view:BoneMappingView Grid.Row="0"/>
+        <view:BoneMappingView Grid.Row="0" LeftSkeletonHeader="{loc:Loc AnimReTarget.Mapping.TargetHeader}" RightSkeletonHeader="{loc:Loc AnimReTarget.Mapping.SourceHeader}" MappingHint="{loc:Loc AnimReTarget.Mapping.PairHint}"
+                              CopyToChildrenText="{loc:Loc AnimReTarget.Mapping.CopyToChildren}" CopyToChildrenToolTip="{loc:Loc AnimReTarget.Mapping.CopyToChildren.ToolTip}" />
 
         <DockPanel Grid.Row="1" LastChildFill="False" >
-            <Button DockPanel.Dock="Right" Width="72" Margin="3" Style="{StaticResource AeButton.Primary}" Content="{loc:Loc General.Ok}" Click="OkButtonClick"/>
-            <Button DockPanel.Dock="Right" Width="72" Margin="3" Style="{StaticResource AeButton.Quiet}" Content="{loc:Loc General.Cancel}" Click="CancelButtonClick"/>
+            <Button DockPanel.Dock="Right" Width="72" Margin="8,8,0,0" Style="{StaticResource AeButton.Primary}" Content="{loc:Loc General.Ok}" Click="OkButtonClick"/>
+            <Button DockPanel.Dock="Right" Width="72" Margin="8,8,0,0" Style="{StaticResource AeButton.Quiet}" Content="{loc:Loc General.Cancel}" Click="CancelButtonClick"/>
         </DockPanel>
     </Grid>
 </common:AssetEditorWindow>

@@ -62,6 +62,7 @@ namespace GameWorld.Core
         {
             serviceCollection.AddScoped<IComponentInserter, ComponentInserter>();
             serviceCollection.AddScoped<View3DCoreComponentSet>();
+            serviceCollection.AddScoped<ViewportInteractionCapabilities>();
             serviceCollection.AddScoped<CommandStackRenderer>();
             serviceCollection.AddScoped<IKeyboardComponent, KeyboardComponent>();
             serviceCollection.AddScoped<IMouseComponent, MouseComponent>();

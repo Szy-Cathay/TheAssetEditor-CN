@@ -94,6 +94,7 @@ namespace AnimationEditor.MountAnimationCreator
             var mount = _sceneObjectViewModelBuilder.CreateAsset("mount", true, Text("MountAnim.Mount"), Color.Black, null!);
             _rider = rider.Data;
             _mount = mount.Data;
+            vertexSelection?.SetMount(_mount);
             _preview = SceneObjectEditor.CreateAsset("mount-preview", Text("MountAnim.GeneratedAnimation"), Color.Red);
             Player.RegisterAsset(_preview);
             SceneObjects.Add(rider);
@@ -126,7 +127,7 @@ namespace AnimationEditor.MountAnimationCreator
 
         private void MountMeshChanged(SceneObject _)
         {
-            _mount.IsSelectable = true;
+            _mount.IsSelectable = false;
             if (MountAnimationGeneratorService.SettingsAreValid(AnimationSettings))
                 _mount.SetTransform(Matrix.CreateScale((float)AnimationSettings.Scale.Value));
             ResetAttachment();

@@ -71,7 +71,7 @@ namespace Test.AnimatioReTarget
             var meshFile = runner.PackFileService.FindFile(@"variantmeshes\wh_variantmodels\hu1e\cth\cth_celestial_general\cth_celestial_general_body_02.wsmodel");
 
             var targetNode = editor.GetSceneObjectFromId(AnimationRetargetIds.Target);
-            Assert.That(targetNode.ShowAnimationControls, Is.False);
+            Assert.That(targetNode.ShowAnimationControls, Is.True);
             sceneObjectEditor.SetMesh(targetNode.Data, meshFile);
 
             // Check that the target node is created correctly

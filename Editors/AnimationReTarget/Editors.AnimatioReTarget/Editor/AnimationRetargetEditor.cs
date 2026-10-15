@@ -1,4 +1,5 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using System.Windows;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Editors.AnimatioReTarget.Editor.BoneHandling;
 using Editors.AnimatioReTarget.Editor.Saving;
@@ -6,6 +7,7 @@ using Editors.AnimatioReTarget.Editor.Settings;
 using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.AnimationPlayer;
 using Editors.Shared.Core.Common.BaseControl;
+using Editors.Shared.Core.Common.ReferenceModel;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Components.Selection;
 using Microsoft.Xna.Framework;
@@ -49,6 +51,10 @@ namespace Editors.AnimatioReTarget.Editor
         [ObservableProperty] AnimationReTargetRenderingComponent _rendering;
         [ObservableProperty] AnimationGenerationSettings _settings;
         [ObservableProperty] SaveManager _saveManager;
+        [ObservableProperty] int _selectedCategoryIndex;
+
+        public SceneObjectViewModel SourceModel => GetSceneObjectFromId(AnimationRetargetIds.Source)!;
+        public SceneObjectViewModel TargetModel => GetSceneObjectFromId(AnimationRetargetIds.Target)!;
 
 
         public override Type EditorViewModelType => typeof(EditorView);
@@ -90,17 +96,21 @@ namespace Editors.AnimatioReTarget.Editor
 
         void Initialize()
         {
+            LeftColumnWidth = new GridLength(1, GridUnitType.Star);
+            RightColumnWidth = new GridLength(520);
             var targetLabel = LocalizationManager.Instance.Get("AnimReTarget.Scene.Target");
             var sourceLabel = LocalizationManager.Instance.Get("AnimReTarget.Scene.Source");
             var generatedLabel = LocalizationManager.Instance.Get("AnimReTarget.Scene.Generated");
             var target = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Target, true, targetLabel, Color.Black, null);
             var source = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Source, true, sourceLabel, Color.Black, null);
             var generated = _sceneObjectViewModelBuilder.CreateAsset(AnimationRetargetIds.Generated, true, generatedLabel, Color.Black, null);
-            target.ShowAnimationControls = false;
             generated.ShowAnimationControls = false;
             _target = target.Data;
             _source = source.Data;
             _generated = generated.Data;
+            _source.AnimationChanged += OnSourceAnimationChanged;
+            _target.AnimationChanged += OnTargetAnimationChanged;
+            SelectInputAnimation();
 
             generated.IsExpanded = false;
             generated.IsEnabled = false;
@@ -124,10 +134,16 @@ namespace Editors.AnimatioReTarget.Editor
                _sceneObjectEditor.CopyMeshFromOther(_generated, _target);
 
             if (e.Owner == _source && e.SkeletonChanged)
-                BoneManager.UpdateSourceSkeleton(_source.SkeletonName.Value);
+            {
+                BoneManager.UpdateSourceSkeleton(string.IsNullOrWhiteSpace(_source.SkeletonName.Value) ? null : _source.SkeletonName.Value);
+                SelectInputAnimation();
+            }
            
             if (e.Owner == _target && e.SkeletonChanged)
-                BoneManager.UpdateTargetSkeleton(_target.SkeletonName.Value);
+                BoneManager.UpdateTargetSkeleton(string.IsNullOrWhiteSpace(_target.SkeletonName.Value) ? null : _target.SkeletonName.Value);
+
+            if (_source != null && _player.SelectedMainAnimation?.Asset.Player.AnimationClip == null)
+                SelectInputAnimation();
 
             Rendering.ComputeOffsets();
         }
@@ -138,6 +154,20 @@ namespace Editors.AnimatioReTarget.Editor
 
             _sceneObjectEditor.SetMesh(_source, sourceInput.Mesh);
             _sceneObjectEditor.SetAnimation(_source, _pfs.GetFullPath(sourceInput.Animation));
+        }
+
+        private void OnSourceAnimationChanged(AnimationClip animation) => SelectInputAnimation();
+
+        private void OnTargetAnimationChanged(AnimationClip animation)
+        {
+            if (_player.SelectedMainAnimation.Asset == _target || _player.SelectedMainAnimation.Asset.Player.AnimationClip == null)
+                SelectInputAnimation();
+        }
+
+        private void SelectInputAnimation()
+        {
+            var main = _source.Player.AnimationClip != null || _target.Player.AnimationClip == null ? _source : _target;
+            _player.SelectedMainAnimation = _player.PlayerItems.First(x => x.Asset == main);
         }
 
         [RelayCommand]public void UpdateAnimation()
@@ -211,6 +241,8 @@ namespace Editors.AnimatioReTarget.Editor
 
         public void Dispose()
         {
+            _source.AnimationChanged -= OnSourceAnimationChanged;
+            _target.AnimationChanged -= OnTargetAnimationChanged;
             _eventHub?.UnRegister(this);
         }
     }

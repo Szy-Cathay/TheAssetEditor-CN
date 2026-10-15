@@ -26,6 +26,7 @@ namespace Editors.CscEditor.Services
         readonly IDeviceResolver _deviceResolver;
         readonly CscPlaybackContext _context;
         readonly CscSceneGraphBuilder _sceneBuilder;
+        readonly ViewportInteractionCapabilities _capabilities;
 
         Gizmo? _gizmo;
         readonly TargetAdapter _adapter = new();
@@ -45,7 +46,8 @@ namespace Editors.CscEditor.Services
             RenderEngineComponent renderEngine,
             IDeviceResolver deviceResolver,
             CscPlaybackContext context,
-            CscSceneGraphBuilder sceneBuilder)
+            CscSceneGraphBuilder sceneBuilder,
+            ViewportInteractionCapabilities capabilities)
         {
             _camera = camera;
             _mouse = mouseComponent;
@@ -54,6 +56,7 @@ namespace Editors.CscEditor.Services
             _deviceResolver = deviceResolver;
             _context = context;
             _sceneBuilder = sceneBuilder;
+            _capabilities = capabilities;
 
             UpdateOrder = (int)ComponentUpdateOrderEnum.Gizmo;
             DrawOrder = (int)ComponentDrawOrderEnum.Gizmo;
@@ -68,6 +71,7 @@ namespace Editors.CscEditor.Services
             _deviceResolver = null!;
             _context = null!;
             _sceneBuilder = null!;
+            _capabilities = new();
         }
 
         public override void Initialize()
@@ -99,12 +103,22 @@ namespace Editors.CscEditor.Services
         public void SetTarget(CscElement? element)
         {
             InterruptDragInteraction();
-            _element = element != null && !element.IsLegacyRaw ? element : null;
+            _element = CanManipulate(element) ? element : null;
             _gizmo?.ResetDeltas();
         }
 
         bool IsActive => _enabled && _element != null && _gizmo != null;
         internal bool IsDragActive => _dragActive;
+        internal bool HasTarget => _element != null;
+
+        bool CanManipulate(CscElement? element)
+        {
+            if (element == null || element.IsLegacyRaw)
+                return false;
+
+            return element.Kind is not (CscElementKind.Model or CscElementKind.VariantModel or
+                CscElementKind.Prefab or CscElementKind.RootRef) || _capabilities.ModelEditingEnabled;
+        }
 
         public override void Update(GameTime gameTime)
         {

@@ -55,7 +55,16 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         public ObservableCollection<AssetPlayerItem> PlayerItems { get; private set; } = new ObservableCollection<AssetPlayerItem>();
 
         AssetPlayerItem _selectedMainAnimation;
-        public AssetPlayerItem SelectedMainAnimation { get { return _selectedMainAnimation; } set { OnMainAnimationChanged(_selectedMainAnimation, value); SetAndNotifyWhenChanged(ref _selectedMainAnimation, value); } }
+        public AssetPlayerItem SelectedMainAnimation
+        {
+            get => _selectedMainAnimation;
+            set
+            {
+                var previous = _selectedMainAnimation;
+                SetAndNotifyWhenChanged(ref _selectedMainAnimation, value);
+                OnMainAnimationChanged(previous, value);
+            }
+        }
 
         public AnimationPlayerViewModel()
         {
@@ -68,16 +77,30 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             if (oldAnimation != null)
                 oldAnimation.Asset.Player.OnFrameChanged -= OnAnimationFrameChanged;
 
-            SelectedAnimationFrameCount.Value = mainAnimation.MaxFrames.Value;
-            SelectedAnimationCurrentTime.Value =
-                (float)mainAnimation.Asset.Player.CurrentTime.TotalSeconds;
-            SelectedAnimationMaxTime.Value =
-                (float)mainAnimation.Asset.Player.Duration.TotalSeconds;
-            SelectedAnimationFps.Value =
-                mainAnimation.Asset.Player.FramesPerSecond;
-            SetPlaybackPositionFromPlayer(
-                SelectedAnimationCurrentTime.Value);
+            RefreshPlaybackPosition();
             mainAnimation.Asset.Player.OnFrameChanged += OnAnimationFrameChanged;
+        }
+
+        private void RefreshPlaybackPosition()
+        {
+            var player = SelectedMainAnimation?.Asset.Player;
+            var wasUpdating = _isUpdatingPlaybackPosition;
+            _isUpdatingPlaybackPosition = true;
+            try
+            {
+                // Changing the slider range can write a coerced value back through its binding.
+                SelectedAnimationFrameCount.Value = player?.FrameCount ?? 0;
+                SelectedAnimationCurrentFrame.Value = player?.CurrentFrame ?? 0;
+                SelectedAnimationCurrentTime.Value = (float)(player?.CurrentTime.TotalSeconds ?? 0);
+                SelectedAnimationMaxTime.Value = (float)(player?.Duration.TotalSeconds ?? 0);
+                SelectedAnimationFps.Value = player?.FramesPerSecond ?? 0;
+                PlaybackPositionSeconds = SelectedAnimationCurrentTime.Value;
+            }
+            finally
+            {
+                _isUpdatingPlaybackPosition = wasUpdating;
+            }
+            UpdatePlayingState();
         }
 
         public void RegisterAsset(SceneObject asset)
@@ -87,11 +110,13 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             PlayerItems.Add(playerItem);
 
             asset.Player.LoopAnimation = false;
+            RefreshAssetViewModel(asset, playerItem);
             if (SelectedMainAnimation == null)
                 SelectedMainAnimation = playerItem;
 
             OnAnimationPlayerEnabled(IsEnabled.Value);
             asset.AnimationChanged += (x) => RefreshAssetViewModel(asset, playerItem);
+            asset.SkeletonChanged += (x) => RefreshAssetViewModel(asset, playerItem);
         }
 
         void RefreshAssetViewModel(SceneObject asset, AssetPlayerItem playerItem)
@@ -99,12 +124,14 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             playerItem.AnimationName.Value = asset.AnimationName.Value;
             playerItem.SlotName.Value = asset.Description;
             playerItem.MaxFrames.Value = asset.Player.FrameCount;
+            if (SelectedMainAnimation == playerItem)
+                RefreshPlaybackPosition();
         }
 
         public void ToggleAnimationPausePlay()
         {
-            var shouldPlay = !_assetList.Any(item =>
-                item.Player.IsPlaying && item.Player.IsEnabled);
+            UpdatePlayingState();
+            var shouldPlay = !IsPlaying.Value;
             foreach (var item in _assetList)
             {
                 if (shouldPlay)
@@ -145,16 +172,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         private void OnAnimationFrameChanged(int currentFrame)
         {
             var isSeeking = _isUpdatingPlaybackPosition;
-            SelectedAnimationFrameCount.Value = SelectedMainAnimation.Asset.Player.FrameCount;
-            SelectedAnimationCurrentFrame.Value = currentFrame;
-            SelectedAnimationCurrentTime.Value =
-                (float)SelectedMainAnimation.Asset.Player.CurrentTime.TotalSeconds;
-            SelectedAnimationMaxTime.Value =
-                (float)SelectedMainAnimation.Asset.Player.Duration.TotalSeconds;
-            SelectedAnimationFps.Value =
-                SelectedMainAnimation.Asset.Player.FramesPerSecond;
-            SetPlaybackPositionFromPlayer(
-                SelectedAnimationCurrentTime.Value);
+            RefreshPlaybackPosition();
 
             if (!isSeeking && !IsScrubbing && !SelectedMainAnimation.Asset.Player.IsPlaying
                 && SelectedMainAnimation.Asset.Player.Duration > TimeSpan.Zero
@@ -163,8 +181,10 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
                 if (LoopAnimation.Value)
                 {
                     SetAnimationFirstFrame();
-                    ToggleAnimationPausePlay();
+                    _assetList.ForEach(Resume);
                 }
+                else
+                    _assetList.ForEach(Pause);
             }
 
             UpdatePlayingState();
@@ -191,8 +211,12 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             UpdatePlayingState();
         }
 
-        private void UpdatePlayingState() => IsPlaying.Value = _assetList.Any(
-            item => item.Player.IsPlaying && item.Player.IsEnabled);
+        private void UpdatePlayingState()
+        {
+            var player = SelectedMainAnimation?.Asset.Player;
+            IsPlaying.Value = player != null && player.FrameCount > 0
+                && player.IsPlaying && player.IsEnabled;
+        }
 
         HashSet<GameAnimationPlayer> GetPlayers()
         {
@@ -213,6 +237,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
 
         void SeekPlayers(float timeSeconds)
         {
+            var wasUpdating = _isUpdatingPlaybackPosition;
             _isUpdatingPlaybackPosition = true;
             try
             {
@@ -226,21 +251,7 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             }
             finally
             {
-                _isUpdatingPlaybackPosition = false;
-            }
-        }
-
-        void SetPlaybackPositionFromPlayer(float timeSeconds)
-        {
-            var wasUpdatingPlaybackPosition = _isUpdatingPlaybackPosition;
-            _isUpdatingPlaybackPosition = true;
-            try
-            {
-                PlaybackPositionSeconds = timeSeconds;
-            }
-            finally
-            {
-                _isUpdatingPlaybackPosition = wasUpdatingPlaybackPosition;
+                _isUpdatingPlaybackPosition = wasUpdating;
             }
         }
 

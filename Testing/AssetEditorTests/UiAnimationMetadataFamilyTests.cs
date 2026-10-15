@@ -224,14 +224,10 @@ public class UiAnimationMetadataFamilyTests
                 Does.Contain("Visibility=\"{Binding ShowAnimationControls"));
             NUnitAssert.That(
                 editorSource,
-                Does.Contain("target.ShowAnimationControls = false"));
-            NUnitAssert.That(
-                boneSettingsView,
-                Does.Contain("Height=\"Auto\" MaxHeight=\"520\""));
-            NUnitAssert.That(
-                boneSettingsView,
-                Does.Match(
-                    "<TreeView\\s+Grid.Row=\"1\"\\s+Grid.Column=\"0\"\\s+MaxHeight=\"520\""));
+                Does.Not.Contain("target.ShowAnimationControls = false"));
+            NUnitAssert.That(boneSettingsView, Does.Contain("Height=\"*\""));
+            NUnitAssert.That(boneSettingsView, Does.Contain("x:Name=\"BonePropertiesScroll\""));
+            NUnitAssert.That(boneSettingsView, Does.Not.Contain("MaxHeight=\"520\""));
             NUnitAssert.That(
                 saveSettings,
                 Does.Match("PossibleAnimationFormats\\s*\\{\\s*get;"));

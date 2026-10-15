@@ -1,5 +1,4 @@
-﻿using AnimationEditor.Common.BaseControl;
-using Editors.AnimatioReTarget.Editor;
+﻿using Editors.AnimatioReTarget.Editor;
 using Editors.AnimatioReTarget.Editor.BoneHandling;
 using Editors.AnimatioReTarget.Editor.BoneHandling.Presentation;
 using Editors.AnimatioReTarget.Editor.Saving;
@@ -31,7 +30,7 @@ namespace Editors.AnimatioReTarget
         public override void RegisterTools(IEditorDatabase database)
         {
             EditorInfoBuilder
-              .Create<AnimationRetargetEditor, EditorHostView>(EditorEnums.AnimationRetarget_Editor)
+              .Create<AnimationRetargetEditor, RetargetWorkspaceView>(EditorEnums.AnimationRetarget_Editor)
               .AddToToolbar("DisplayName.AnimationTransferTool", true)
               .Build(database);
         }

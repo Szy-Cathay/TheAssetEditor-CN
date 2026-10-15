@@ -1,4 +1,4 @@
-<common:AssetEditorWindow
+﻿<common:AssetEditorWindow
     x:Class="Editors.AnimatioReTarget.Editor.Saving.SaveWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -9,7 +9,7 @@
     xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
     Title="{loc:Loc AnimReTarget.SaveWindowTitle}"
     Width="680"
-    Height="520"
+    Height="560" MinHeight="420" MinWidth="560"
     Background="{DynamicResource AeBrush.Canvas}"
     FontFamily="{DynamicResource AppFontFamily}"
     FontWeight="{DynamicResource AppFontWeight}"
@@ -18,17 +18,18 @@
     <common:AssetEditorWindow.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
+                <ResourceDictionary Source="../RetargetUiStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </common:AssetEditorWindow.Resources>
 
-    <Grid Margin="16">
+    <Grid Margin="8">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
+        <ScrollViewer Style="{StaticResource Retarget.Scroll}">
         <StackPanel x:Name="OptionsPanel">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -40,7 +41,7 @@
                 <Label
                     Grid.Column="0"
                     Content="{loc:Loc AnimReTarget.SavePrefix}"
-                    Style="{StaticResource AeForm.Label}" />
+                    Style="{StaticResource Retarget.Label}" />
                 <TextBox
                     Grid.Column="1"
                     VerticalAlignment="Center"
@@ -50,7 +51,7 @@
                     Grid.Column="2"
                     Margin="12,0,8,0"
                     Content="{loc:Loc AnimReTarget.Format}"
-                    Style="{StaticResource AeForm.Label}" />
+                    Style="{StaticResource Retarget.Label}" />
                 <ComboBox
                     Grid.Column="3"
                     ItemsSource="{Binding PossibleAnimationFormats}"
@@ -62,7 +63,7 @@
                 <Label
                     Width="140"
                     Content="{loc:Loc AnimReTarget.UseGeneratedSkeleton}"
-                    Style="{StaticResource AeForm.Label}" />
+                    Style="{StaticResource Retarget.Label}" />
                 <CheckBox
                     VerticalContentAlignment="Center"
                     IsChecked="{Binding UseGeneratedSkeleton, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}"
@@ -79,15 +80,13 @@
                     Text="{Binding ScaledSkeletonName, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
             </DockPanel>
 
-            <Border
-                Margin="0,16,0,0"
-                Padding="0,12,0,0"
-                BorderBrush="{DynamicResource AeBrush.Border}"
-                BorderThickness="0,1,0,0">
+            <Border Margin="0,16,0,0">
                 <StackPanel>
-                    <TextBlock
-                        Style="{StaticResource AeText.SectionTitle}"
-                        Text="{loc:Loc AnimReTarget.Batch.Title}" />
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Left" Style="{StaticResource Retarget.Heading}"
+                                   Text="{loc:Loc AnimReTarget.Batch.Title}" />
+                        <Separator Margin="8,0,0,0" VerticalAlignment="Center" />
+                    </DockPanel>
                     <TextBlock
                         Margin="0,4,0,12"
                         Foreground="{DynamicResource AeBrush.TextSecondary}"
@@ -97,6 +96,7 @@
 
                     <RadioButton
                         Content="{loc:Loc AnimReTarget.Batch.Path.Source}"
+                        ToolTip="{loc:Loc AnimReTarget.Batch.Path.Source.ToolTip}"
                         IsChecked="{Binding BatchUseSourcePath, Mode=TwoWay}"
                         Style="{StaticResource AeInput.RadioButton}" />
                     <RadioButton
@@ -145,6 +145,7 @@
                 </StackPanel>
             </Border>
         </StackPanel>
+        </ScrollViewer>
 
         <StackPanel
             Grid.Row="1"
@@ -163,6 +164,7 @@
                 MinWidth="112"
                 Click="SaveButtonClick"
                 Content="{loc:Loc AnimReTarget.SaveCurrentAnimation}"
+                ToolTip="{loc:Loc AnimReTarget.SaveCurrentAnimation.ToolTip}"
                 Style="{StaticResource AeButton.Secondary}" />
         </StackPanel>
 

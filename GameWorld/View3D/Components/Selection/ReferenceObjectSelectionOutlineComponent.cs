@@ -12,19 +12,25 @@ namespace GameWorld.Core.Components.Selection
     {
         private readonly SelectionManager _selectionManager;
         private readonly RenderEngineComponent _renderEngine;
+        private readonly ViewportInteractionCapabilities _capabilities;
         private readonly HashSet<Rmv2MeshNode> _outlinedMeshes = [];
 
         public ReferenceObjectSelectionOutlineComponent(
             SelectionManager selectionManager,
-            RenderEngineComponent renderEngine)
+            RenderEngineComponent renderEngine,
+            ViewportInteractionCapabilities capabilities)
         {
             _selectionManager = selectionManager;
             _renderEngine = renderEngine;
+            _capabilities = capabilities;
         }
 
         public override void Draw(GameTime gameTime)
         {
             ClearOutlines();
+            if (!_capabilities.ModelEditingEnabled)
+                return;
+
             if (_selectionManager.GetState() is not
                 ObjectSelectionState objectSelection)
             {

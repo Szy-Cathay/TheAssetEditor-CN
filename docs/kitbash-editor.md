@@ -34,7 +34,7 @@ KitbashEditor 是本仓库唯一承担模型编辑的编辑器。其职责包括
 
 硬边界：
 
-- 其他编辑器中的模型只用于参考、预览或辅助展示，不因此获得模型编辑能力。
+- 其他编辑器中的模型只用于参考、预览或辅助展示，不因此获得模型点选、框选或模型 Gizmo。模型交互能力按编辑器作用域默认关闭，仅由 `KitbashSceneComponentSet` 显式启用；骨骼、元数据标记和骑乘附着点等专用操作保持独立。
 - Kitbash 专属的选择输入、选择覆盖层和 Gizmo 编排必须留在 `Editors/Kitbashing/KitbasherEditor/`。
 - 不得把 Kitbash 专属组件注册为全局或所有编辑器作用域都能解析的 `IGameComponent`。
 - 不得在共享 View3D 组件中通过 `IsKitbash`、编辑器类型判断、模式开关或 Kitbash 默认值实现专属行为。

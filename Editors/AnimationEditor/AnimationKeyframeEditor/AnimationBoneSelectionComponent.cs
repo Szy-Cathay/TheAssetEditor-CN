@@ -32,6 +32,7 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
         private readonly SceneManager _sceneManager;
         private readonly RenderEngineComponent _renderEngine;
         private readonly IDeviceResolver _deviceResolver;
+        private readonly ViewportInteractionCapabilities _capabilities;
         private Texture2D? _selectionTexture;
         private bool _isMouseDown;
         private Vector2 _startDrag;
@@ -45,7 +46,8 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
             CommandFactory commandFactory,
             SceneManager sceneManager,
             RenderEngineComponent renderEngine,
-            IDeviceResolver deviceResolver)
+            IDeviceResolver deviceResolver,
+            ViewportInteractionCapabilities capabilities)
         {
             _mouse = mouse;
             _keyboard = keyboard;
@@ -55,6 +57,7 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
             _sceneManager = sceneManager;
             _renderEngine = renderEngine;
             _deviceResolver = deviceResolver;
+            _capabilities = capabilities;
             UpdateOrder = (int)ComponentUpdateOrderEnum.SelectionComponent;
             DrawOrder = (int)ComponentDrawOrderEnum.SelectionComponent;
         }
@@ -75,8 +78,8 @@ namespace Editors.AnimationVisualEditors.AnimationKeyframeEditor
         public override void Update(GameTime gameTime)
         {
             var state = _selectionManager.GetState();
-            if (state is not ObjectSelectionState and
-                not BoneSelectionState)
+            if (state is not BoneSelectionState &&
+                (state is not ObjectSelectionState || !_capabilities.ModelEditingEnabled))
             {
                 ReleaseMouseOwnership();
                 return;

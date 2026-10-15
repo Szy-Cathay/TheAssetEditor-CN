@@ -9,11 +9,13 @@ using GameWorld.Core.Components.Input;
 using GameWorld.Core.Components.Navigation;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
+using GameWorld.Core.Utility;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Graphics;
 using Moq;
+using Shared.Core.Events;
 using Shared.Core.Services;
 
 namespace AssetEditorTests;
@@ -21,6 +23,30 @@ namespace AssetEditorTests;
 [TestClass]
 public class View3DComponentIsolationTests
 {
+    [TestMethod]
+    public void DefaultViewport_DoesNotPickModelsOrCreateSelectionResources()
+    {
+        var mouse = new Mock<IMouseComponent>(MockBehavior.Strict);
+        var keyboard = new Mock<IKeyboardComponent>(MockBehavior.Strict);
+        var device = new Mock<IDeviceResolver>(MockBehavior.Strict);
+        using var selection = new SelectionManager(Mock.Of<IEventHub>());
+        var originalState = selection.GetState();
+        using var picker = new ReferenceObjectSelectionComponent(
+            mouse.Object, keyboard.Object, null!, selection, null!, null!, null!, device.Object,
+            new ViewportInteractionCapabilities());
+
+        picker.Initialize();
+        picker.Update(new GameTime());
+        picker.SelectFromIndex(0);
+        picker.Draw(new GameTime());
+
+        Assert.AreSame(originalState, selection.GetState());
+        Assert.AreEqual(0, selection.GetState().SelectionCount());
+        mouse.VerifyNoOtherCalls();
+        keyboard.VerifyNoOtherCalls();
+        device.VerifyNoOtherCalls();
+    }
+
     [TestMethod]
     public void ComponentInserter_AddsOnlyCoreAndExplicitEditorComponents()
     {

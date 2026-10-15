@@ -1138,10 +1138,10 @@ public class UiAnimationMetadataFamilyGallery
                     Does.Contain("批量动画重定向"));
                 NUnitAssert.That(
                     buttonContents,
-                    Does.Contain("保存当前动画"));
+                    Does.Contain("保存生成结果"));
                 NUnitAssert.That(
                     radioContents,
-                    Does.Contain("按单动画路径规则保存"));
+                    Does.Contain("按来源路径保存"));
                 NUnitAssert.That(
                     radioContents,
                     Does.Contain("保存到所选目录"));
@@ -1164,9 +1164,8 @@ public class UiAnimationMetadataFamilyGallery
         if (variant == "retarget-bone-settings")
         {
             var tree = FindVisualDescendants<TreeView>(window).Single();
-            var selectedBoneView =
-                FindVisualDescendants<RetargetSelectedBoneView>(window)
-                    .Single();
+            var propertiesScroll = FindVisualDescendants<ScrollViewer>(window)
+                .Single(viewer => viewer.Name == "BonePropertiesScroll");
             var splitter = FindVisualDescendants<GridSplitter>(window)
                 .Single();
             var treeScrollViewer =
@@ -1176,7 +1175,7 @@ public class UiAnimationMetadataFamilyGallery
             {
                 NUnitAssert.That(
                     tree.ActualHeight,
-                    Is.EqualTo(selectedBoneView.ActualHeight).Within(1));
+                    Is.EqualTo(propertiesScroll.ActualHeight).Within(1));
                 NUnitAssert.That(
                     splitter.ActualHeight,
                     Is.EqualTo(tree.ActualHeight).Within(1));
