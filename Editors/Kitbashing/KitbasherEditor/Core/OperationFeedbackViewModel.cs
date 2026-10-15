@@ -130,6 +130,7 @@ public sealed partial class OperationFeedbackViewModel : ObservableObject, IDisp
         [typeof(PinMeshToVertexCommand)] = "Kitbash.CommandHint.PinMeshesToVertex",
         [typeof(SkinWrapRiggingCommand)] = "Kitbash.CommandHint.SkinWrapRigging",
         [typeof(SceneNodePropertyChangeCommand<>)] = "Kitbash.CommandHint.EditSidebarProperty",
+        [typeof(NumericPropertyEditCommand)] = "Kitbash.CommandHint.EditSidebarProperty",
         [typeof(DuplicateFrameBoneCommand)] = "Kitbash.Operation.DuplicateFrame",
         [typeof(DeleteFrameBoneCommand)] = "Kitbash.Operation.DeleteFrame",
         [typeof(PasteWholeTransformBoneCommand)] = "Kitbash.Operation.PasteBones",

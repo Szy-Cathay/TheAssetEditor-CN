@@ -227,7 +227,7 @@ public partial class UiPropertyFormLayoutTests
     }
 
     [Test]
-    public void KitbashMaterialSubsectionHeaders_DoNotDrawTrailingSeparators()
+    public void KitbashMaterialSubsectionHeaders_UseStaticRules()
     {
         var solutionRoot = FindSolutionRoot();
         var materialRoot = Path.Combine(
@@ -242,13 +242,14 @@ public partial class UiPropertyFormLayoutTests
             "Mesh.Material");
         var offenders = Directory.EnumerateFiles(
                 materialRoot,
-                "*.xaml",
+                "*View.xaml",
                 SearchOption.AllDirectories)
             .SelectMany(path => XDocument.Load(path)
                 .Descendants()
-                .Where(element => element.Name.LocalName == "Separator")
-                .Where(element => element.Ancestors().Any(ancestor =>
-                    ancestor.Name.LocalName == "Expander.Header"))
+                .Where(element => HasAttribute(element, "Style", "{DynamicResource Kitbash.InspectorSectionHeader}"))
+                .DefaultIfEmpty()
+                .Where(header => header is null || header.Elements().Count(element =>
+                    element.Name.LocalName == "Separator" && HasAttribute(element, "IsHitTestVisible", "False")) != 1)
                 .Select(_ => Path.GetRelativePath(solutionRoot, path)))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
@@ -257,7 +258,7 @@ public partial class UiPropertyFormLayoutTests
     }
 
     [Test]
-    public void KitbashMaterialSubsections_AreInsetFromTheParentCategory()
+    public void KitbashMaterialSubsections_StayFlatWithinTheParentCategory()
     {
         var solutionRoot = FindSolutionRoot();
         var materialRoot = Path.Combine(
@@ -281,19 +282,12 @@ public partial class UiPropertyFormLayoutTests
             .Select(path => new
             {
                 Path = path,
-                Expander = XDocument.Load(path)
-                    .Descendants()
-                    .SingleOrDefault(element =>
-                        element.Name.LocalName == "Expander" &&
-                        !element.Ancestors().Any(ancestor => ancestor.Name.LocalName == "Expander")),
+                Document = XDocument.Load(path),
             })
             .Where(item =>
-                item.Expander is null ||
-                !item.Expander.Attributes().Any(attribute =>
-                    attribute.Name.LocalName == "Margin" &&
-                    attribute.Value.Contains(
-                        "MaterialSubsectionMargin",
-                        StringComparison.Ordinal)))
+                item.Document.Descendants().Any(element => element.Name.LocalName == "Expander") ||
+                !item.Document.Descendants().Any(element =>
+                    HasAttribute(element, "Style", "{DynamicResource Kitbash.InspectorSectionHeader}")))
             .Select(item => Path.GetRelativePath(solutionRoot, item.Path))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
@@ -325,19 +319,12 @@ public partial class UiPropertyFormLayoutTests
                 StringComparison.OrdinalIgnoreCase))
             .SelectMany(path => XDocument.Load(path)
                 .Descendants()
-                .Where(element => element.Name.LocalName == "Expander")
-                .Select(expander => new { Path = path, Expander = expander }))
+                .Where(element => HasAttribute(element, "Style", "{DynamicResource Kitbash.InspectorSectionHeader}"))
+                .DefaultIfEmpty()
+                .Select(header => new { Path = path, Header = header }))
             .Where(item =>
-                !HasAttribute(item.Expander, "Background", "Transparent") ||
-                !HasAttribute(item.Expander, "BorderThickness", "0") ||
-                item.Expander.Descendants()
-                    .Where(element =>
-                        element.Name.LocalName == "Expander.Header" ||
-                        element.Ancestors().Any(ancestor =>
-                            ancestor.Name.LocalName == "Expander.Header"))
-                    .SelectMany(element => element.Attributes())
-                    .Any(attribute =>
-                        attribute.Name.LocalName == "Background"))
+                item.Header is null || item.Header.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "Background" && attribute.Value != "Transparent"))
             .Select(item => Path.GetRelativePath(solutionRoot, item.Path))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
@@ -371,14 +358,17 @@ public partial class UiPropertyFormLayoutTests
                 .Descendants()
                 .Where(element =>
                     element.Name.LocalName == "TextBlock" &&
-                    element.Ancestors().Any(ancestor => ancestor.Name.LocalName == "Expander.Header"))
+                    element.Ancestors().Any(ancestor =>
+                        HasAttribute(ancestor, "Style", "{DynamicResource Kitbash.InspectorSectionHeader}")))
                 .DefaultIfEmpty()
                 .Select(title => new { Path = path, Title = title }))
             .Where(item =>
                 item.Title is null ||
                 item.Title.Attributes().Any(attribute =>
                     attribute.Name.LocalName == "FontSize") ||
-                !HasAttribute(item.Title, "FontWeight", "Normal"))
+                item.Title.Attributes().Any(attribute =>
+                    attribute.Name.LocalName == "FontWeight" && attribute.Value != "Normal") ||
+                !HasAttribute(item.Title, "Style", "{DynamicResource Kitbash.InspectorHeading}"))
             .Select(item => Path.GetRelativePath(solutionRoot, item.Path))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToArray();
@@ -421,13 +411,17 @@ public partial class UiPropertyFormLayoutTests
                 document.Descendants().Any(element =>
                     element.Name.LocalName == "AeAttribute"),
                 Is.False);
-            NUnitAssert.That(formLabels, Has.Length.EqualTo(4));
+            NUnitAssert.That(formLabels, Has.Length.EqualTo(3));
+            NUnitAssert.That(document.Descendants().Count(element =>
+                element.Name.LocalName == "CheckBox" &&
+                HasAttribute(element, "Content", "{loc:Loc Tint.PreviewCapability}") &&
+                HasAttribute(element, "Style", "{DynamicResource Kitbash.InspectorCheckBox}")), Is.EqualTo(1));
             NUnitAssert.That(
                 formLabels.All(label =>
                     label.Attributes().Any(attribute =>
                         attribute.Name.LocalName == "Style" &&
                         attribute.Value.Contains(
-                            "AeForm.Label",
+                            "Kitbash.InspectorLabel",
                             StringComparison.Ordinal))),
                 Is.True);
             NUnitAssert.That(colourPickers, Has.Length.EqualTo(3));
@@ -494,7 +488,7 @@ public partial class UiPropertyFormLayoutTests
     }
 
     [Test]
-    public void KitbashMaterialType_UsesTheSharedPropertyRowLayout()
+    public void KitbashMaterialType_UsesFullWidthInputBelowStaticHeading()
     {
         var solutionRoot = FindSolutionRoot();
         var path = Path.Combine(
@@ -517,24 +511,19 @@ public partial class UiPropertyFormLayoutTests
                     "CurrentMaterialType",
                     StringComparison.Ordinal)));
         var row = materialTypeInput.Parent!;
-        var label = row.Elements().Single(element =>
-            element.Name.LocalName == "Label");
+        var label = row.Descendants().Single(element =>
+            element.Name.LocalName == "TextBlock" &&
+            HasAttribute(element, "Text", "{loc:Loc ModelMaterial.SelectedShader}"));
 
         NUnitAssert.Multiple(() =>
         {
-            NUnitAssert.That(row.Name.LocalName, Is.EqualTo("DockPanel"));
+            NUnitAssert.That(row.Name.LocalName, Is.EqualTo("StackPanel"));
             NUnitAssert.That(
                 label.Attributes().Single(attribute =>
                     attribute.Name.LocalName == "Style").Value,
-                Does.Contain("AeForm.Label"));
-            NUnitAssert.That(
-                label.Attributes().Single(attribute =>
-                    attribute.Name.LocalName == "Width").Value,
-                Is.EqualTo("120"));
-            NUnitAssert.That(
-                label.Attributes().Single(attribute =>
-                    attribute.Name.LocalName == "DockPanel.Dock").Value,
-                Is.EqualTo("Left"));
+                Does.Contain("Kitbash.InspectorHeading"));
+            NUnitAssert.That(row.Elements().First(), Is.SameAs(label.Ancestors().First(element => element.Parent == row)));
+            NUnitAssert.That(HasAttribute(materialTypeInput, "HorizontalAlignment", "Stretch"), Is.True);
             NUnitAssert.That(
                 materialTypeInput.Attributes().Any(attribute =>
                     attribute.Name.LocalName == "Margin"),

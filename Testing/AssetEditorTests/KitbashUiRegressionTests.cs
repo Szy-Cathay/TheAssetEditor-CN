@@ -292,7 +292,7 @@ public class KitbashUiRegressionTests
                 NUnitAssert.That(circle.IsEnabled, Is.False);
                 NUnitAssert.That(((SolidColorBrush)circleSurface.Background).Color.A, Is.Zero,
                     "A disabled circle-selection tool must not leave an opaque block on the viewport.");
-                NUnitAssert.That(((SolidColorBrush)circleSurface.BorderBrush).Color.A, Is.Zero);
+                NUnitAssert.That(circleSurface.BorderThickness, Is.EqualTo(new Thickness(0)));
             });
         });
     }
@@ -395,24 +395,28 @@ public class KitbashUiRegressionTests
 
     [TestCase(ThemeType.LightTheme)]
     [TestCase(ThemeType.DarkTheme)]
-    public void MaterialSubgroups_RespectTheirBorderAndBackground(ThemeType theme)
+    public void MaterialSubgroups_UseStaticBorderlessSectionHeaders(ThemeType theme)
     {
         WithTheme(theme, () =>
         {
             var material = new MetalRoughView();
             var workspace = new KitbasherView { DataContext = new WorkspaceModel { SceneNodeEditor = new { CurrentEditor = material } } };
-            WithWindow(workspace, 900, _ =>
+            PlaybackAndViewportRefinementTests.Layout(workspace, 900, 600);
+            var headers = Descendants<DockPanel>(material)
+                .Where(panel => panel.Style == panel.TryFindResource("Kitbash.InspectorSectionHeader")).ToArray();
+            NUnitAssert.That(headers, Is.Not.Empty);
+            NUnitAssert.That(Descendants<Expander>(material), Is.Empty);
+            foreach (var header in headers)
             {
-                var subgroups = Descendants<Expander>(material)
-                    .Where(expander => expander.ReadLocalValue(Control.BorderThicknessProperty) is Thickness thickness && thickness == new Thickness(0)).ToArray();
-                NUnitAssert.That(subgroups, Is.Not.Empty);
-                foreach (var subgroup in subgroups)
-                {
-                    var header = (ToggleButton)subgroup.Template.FindName("HeaderSite", subgroup);
-                    NUnitAssert.That(header.BorderThickness, Is.EqualTo(subgroup.BorderThickness));
-                    NUnitAssert.That(header.BorderThickness, Is.EqualTo(new Thickness(0)));
-                }
-            });
+                NUnitAssert.That(header.Background == null ||
+                    header.Background is SolidColorBrush { Color.A: 0 }, Is.True);
+                var title = Descendants<TextBlock>(header).First();
+                NUnitAssert.That(title.FontStyle, Is.EqualTo(FontStyles.Italic));
+                NUnitAssert.That(title.FontWeight, Is.EqualTo(FontWeights.Normal));
+                var rule = Descendants<Separator>(header).Single();
+                NUnitAssert.That(rule.IsHitTestVisible, Is.False);
+                NUnitAssert.That(rule.ActualWidth, Is.GreaterThan(8));
+            }
         });
     }
 
@@ -537,38 +541,29 @@ public class KitbashUiRegressionTests
 
     [TestCase(ThemeType.VSCodeDark)]
     [TestCase(ThemeType.VSCodeLight)]
-    public void ShadingPopup_InsideClicksStayOpenAndOutsideClicksClose(ThemeType theme)
+    public void ShadingButtons_UpdateTheActualModeWithoutAPopup(ThemeType theme)
     {
         WithTheme(theme, () =>
         {
-            var view = new MenuBarView();
-            WithWindow(view, 900, window =>
+            var renderer = new GameWorld.Core.Components.Rendering.RenderEngineComponent(null!, null!, null!, null!,
+                new ApplicationSettingsService(), new GameWorld.Core.Components.Rendering.SceneRenderParametersStore(),
+                Mock.Of<IEventHub>(), new GameWorld.Core.Components.GridComponent(null!, null!, null!));
+            var model = new KitbasherEditor.ViewModels.MenuBarViews.ViewportShadingViewModel(renderer);
+            var view = new MenuBarView
             {
-                var toggle = (ToggleButton)view.FindName("ShadingArrowBtn");
-                var popup = (Popup)view.FindName("ShadingPopup");
-                var panel = (FrameworkElement)view.FindName("ShadingPanel");
-                toggle.IsChecked = true;
-                window.UpdateLayout();
-                NUnitAssert.That(popup.IsOpen, Is.True);
-                var handler = typeof(MenuBarView).GetMethod("HostWindow_PreviewMouseDown",
-                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
-                var click = new System.Windows.Input.MouseButtonEventArgs(
-                    System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
-                {
-                    RoutedEvent = System.Windows.Input.Mouse.PreviewMouseDownEvent,
-                    Source = Descendants<ComboBox>(panel).First(),
-                };
-                handler.Invoke(view, [window, click]);
-                NUnitAssert.That(popup.IsOpen, Is.True);
-                var outside = new System.Windows.Input.MouseButtonEventArgs(
-                    System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
-                {
-                    RoutedEvent = System.Windows.Input.Mouse.PreviewMouseDownEvent,
-                    Source = window,
-                };
-                handler.Invoke(view, [window, outside]);
-                NUnitAssert.That(popup.IsOpen, Is.False);
-            });
+                DataContext = new { ViewportShading = model, MenuItems = Array.Empty<object>(), CustomButtons = Array.Empty<object>() },
+            };
+            PlaybackAndViewportRefinementTests.Layout(view, 900);
+            var modes = Descendants<RadioButton>(view).Where(button => button.GroupName == "ViewportShading").ToArray();
+            var solid = modes.Single(button => BindingOperations.GetBinding(button, ToggleButton.IsCheckedProperty)!.Path.Path.EndsWith(".IsSolid"));
+            var material = modes.Single(button => !ReferenceEquals(button, solid));
+            solid.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+            NUnitAssert.That(renderer.ShadingMode, Is.EqualTo(GameWorld.Core.Components.Rendering.ViewportShadingMode.Solid));
+            material.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+            NUnitAssert.That(renderer.ShadingMode, Is.EqualTo(GameWorld.Core.Components.Rendering.ViewportShadingMode.MaterialPreview));
+            NUnitAssert.That(solid.IsChecked, Is.False);
+            NUnitAssert.That(material.IsChecked, Is.True);
+            NUnitAssert.That(view.FindName("ShadingPopup"), Is.Null);
         });
     }
 
@@ -934,9 +929,8 @@ public class KitbashUiRegressionTests
             });
             WithWindow(view, 400, window =>
             {
-                Descendants<Expander>(view).First().IsExpanded = true;
-                window.UpdateLayout();
                 var combo = Descendants<ComboBox>(view).Single();
+                NUnitAssert.That(combo.IsVisible, Is.True);
                 NUnitAssert.That(combo.Text, Is.EqualTo("无"));
                 NUnitAssert.That(combo.Items.Count, Is.EqualTo(2));
                 combo.IsDropDownOpen = true;
