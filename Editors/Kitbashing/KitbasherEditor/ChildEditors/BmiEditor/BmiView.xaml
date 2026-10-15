@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="KitbasherEditor.Views.EditorViews.BmiView"
+<UserControl x:Class="KitbasherEditor.Views.EditorViews.BmiView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -171,7 +171,7 @@
             <Button DockPanel.Dock="Right" Content="{loc:Loc General.Apply}" Width="150" Margin="10,0" Click="{s:MethodBinding Apply}" Style="{StaticResource AeButton.Primary}"/>
             <TextBox DockPanel.Dock="Right" Text="{Binding ScaleFactor.TextValue, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center">
                 <b:Interaction.Behaviors>
-                    <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
+                    <behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="0.001"/>
                 </b:Interaction.Behaviors>
             </TextBox>
         </DockPanel>

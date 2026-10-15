@@ -130,7 +130,7 @@ namespace Shared.Ui.Editors.BoneMapping
 
         private void OnParentBoneSelected(AnimatedBone bone)
         {
-            if (bone == null)
+            if (bone == null || MeshBones.SelectedItem == null)
                 return;
 
             MeshBones.SelectedItem.MappedBoneIndex.Value = bone.BoneIndex.Value;
@@ -169,7 +169,7 @@ namespace Shared.Ui.Editors.BoneMapping
             ApplyChanges();
         }
 
-        public bool OnOkButton()
+        public virtual bool OnOkButton()
         {
             var res = Validate(out var errorText);
             if (res == false)

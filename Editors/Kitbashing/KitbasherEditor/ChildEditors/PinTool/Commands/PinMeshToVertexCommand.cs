@@ -1,5 +1,6 @@
 ﻿using GameWorld.Core.Commands;
 using GameWorld.Core.Components.Selection;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.SceneNodes;
 using Microsoft.Xna.Framework;
@@ -15,6 +16,8 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
         List<MeshObject> _originalGeos;
         List<MeshObject> _updatedGeometries;
         List<Vector3> _originalPivots;
+        List<AnimationPlayer?> _originalPlayers;
+        AnimationPlayer? _sourcePlayer;
 
         List<Rmv2MeshNode> _meshesToPin;
         Rmv2MeshNode _source;
@@ -41,6 +44,8 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
                 throw new InvalidOperationException(LocalizationManager.Instance?.Get("Msg.Kitbash.PinSourceMustBeAnimated")
                     ?? "源网格没有骨骼权重，请选择带骨骼权重的网格顶点。");
             var sourceVert = _source.Geometry.GetVertexExtented(_vertexId);
+            _sourcePlayer = _source.AnimationPlayer;
+            _originalPlayers = _meshesToPin.Select(x => x.AnimationPlayer).ToList();
             _updatedGeometries = new List<MeshObject>(_meshesToPin.Count);
             _originalGeos = _meshesToPin.Select(x => x.Geometry).ToList();
             _originalPivots = _meshesToPin.Select(x => x.PivotPoint).ToList();
@@ -70,6 +75,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
             {
                 _meshesToPin[index].Geometry = _updatedGeometries[index];
                 _meshesToPin[index].PivotPoint = Vector3.Zero;
+                _meshesToPin[index].AnimationPlayer = _sourcePlayer;
             }
             _selectionManager.SetState(_selectionOldState.Clone());
         }
@@ -80,6 +86,7 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
             {
                 _meshesToPin[i].Geometry = _originalGeos[i];
                 _meshesToPin[i].PivotPoint = _originalPivots[i];
+                _meshesToPin[i].AnimationPlayer = _originalPlayers[i];
             }
 
             _selectionManager.SetState(_selectionOldState);

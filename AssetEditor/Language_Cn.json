@@ -3892,5 +3892,12 @@
   "Vfx.Terry.StartFailed": "Terry 启动失败或提前退出。请检查 Assembly Kit 是否完整安装。",
   "Vfx.Terry.StartTimeout": "Terry 未在 90 秒内打开预览场景。请查看 Terry 是否有错误提示，再重试。",
   "Vfx.Terry.ProtectedFile": "预览文件已被其他程序修改，已停止覆盖以保护文件：{0}",
-  "Vfx.Terry.FilterUnavailable": "场景已打开，但未能自动定位当前特效。请确认 Terry 的工具属性面板可见，再重新点击预览。"
+  "Vfx.Terry.FilterUnavailable": "场景已打开，但未能自动定位当前特效。请确认 Terry 的工具属性面板可见，再重新点击预览。",
+  "Msg.Kitbash.ModelNameByteLimit": "模型组件名称最多可保存 32 个 UTF-8 字节（通常为 10 个汉字），且不能包含空字符。请缩短名称后再保存；程序不会截断名称。",
+  "Msg.Kitbash.WrapSourceMustBeAnimated": "蒙皮包裹的来源必须是带骨骼权重的网格，请重新选择来源。",
+  "MeshFitter.ValidTransformHint": "缩放必须为不小于 0.00001 的有效数值，位置和旋转必须填写完整的有限数值。",
+  "Kitbash.NumericDrag.Help": "按住鼠标左键水平拖动可调值，Shift 精调；Esc 或右键取消。单击仍可直接输入。",
+  "Kitbasher.Transform.WorldDelta": "本次变换量 · 世界坐标",
+  "Kitbasher.Transform.LocalScaleDelta": "本次缩放量 · Gizmo 局部坐标",
+  "Msg.Kitbash.SelectOnePinVertex": "请选择一个有效的源顶点。"
 }

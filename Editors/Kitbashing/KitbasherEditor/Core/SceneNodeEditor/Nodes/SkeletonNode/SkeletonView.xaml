@@ -21,7 +21,7 @@
                             <ToolTip Content="{loc:Loc SkeletonInfo.ScaleToolTip}" />
                         </TextBox.ToolTip>
                         <b:Interaction.Behaviors>
-                            <behaviors:TextBoxInputBehavior InputMode="DecimalInput" />
+                            <behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragMinimum="0.00001" />
                         </b:Interaction.Behaviors>
                     </TextBox>
                 </Grid>

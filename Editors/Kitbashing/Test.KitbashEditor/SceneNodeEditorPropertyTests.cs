@@ -1,4 +1,4 @@
-using Editors.KitbasherEditor.Core;
+﻿using Editors.KitbasherEditor.Core;
 using Editors.KitbasherEditor.ViewModels.SceneNodeEditor;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes.Rmv2;
@@ -25,6 +25,29 @@ namespace Test.KitbashEditor
     [TestFixture]
     public class SceneNodeEditorPropertyTests
     {
+        [Test]
+        public void NumericDrag_UsesOneUndoEntryAndCancellationPreservesHistory()
+        {
+            var executor = new CommandExecutor(Mock.Of<IEventHub>());
+            var editor = new SceneNodePropertyEditor(executor);
+            var value = 1d;
+            editor.BeginEdit();
+            foreach (var next in new[] { 2d, 3d, 4d }) editor.Update(value, next, v => value = v);
+            Assert.That(value, Is.EqualTo(4));
+            Assert.That(executor.CurrentDocumentStateId, Is.Zero);
+            editor.EndEdit(false);
+            Assert.That(executor.Undo(), Is.True);
+            Assert.That(value, Is.EqualTo(1));
+            Assert.That(executor.CanUndo(), Is.False);
+            editor.BeginEdit();
+            editor.Update(value, 6d, v => value = v);
+            editor.EndEdit(true);
+            Assert.That(value, Is.EqualTo(1));
+            Assert.That(executor.CanRedo(), Is.True);
+            executor.Redo();
+            Assert.That(value, Is.EqualTo(4));
+        }
+
         [Test]
         public void Update_TracksDocumentStateAndSupportsUndoRedo()
         {

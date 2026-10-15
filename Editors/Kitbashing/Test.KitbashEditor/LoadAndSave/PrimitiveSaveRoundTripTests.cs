@@ -13,8 +13,9 @@ namespace Test.KitbashEditor.LoadAndSave
     [TestFixture]
     internal class PrimitiveSaveRoundTripTests : LoadAndSaveBase
     {
-        [Test]
-        public void CreateBox_SaveAndReload_PreservesGeometryAndMaterial()
+        [TestCase("primitive_box")]
+        [TestCase("胸甲_左侧")]
+        public void CreateBox_SaveAndReload_PreservesGeometryAndMaterial(string modelName)
         {
             var (runner, editor) = CreateKitbashTool(TestFiles.RomePack_MeshDecal);
             var commandFactory =
@@ -24,6 +25,7 @@ namespace Test.KitbashEditor.LoadAndSave
                 .GetLodNodes()
                 .SelectMany(lod => lod.GetAllModels(false))
                 .Single(mesh => mesh.Name == "primitive_box");
+            createdMesh.Name = modelName;
             var expectedVertexFormat = createdMesh.Geometry.VertexFormat switch
             {
                 UiVertexFormat.Static => VertexFormat.Static,
@@ -51,7 +53,7 @@ namespace Test.KitbashEditor.LoadAndSave
                 .Create()
                 .Load(savedFile!.DataSource.ReadData());
             var primitive = reloaded.ModelList[0]
-                .Single(model => model.Material.ModelName == "primitive_box");
+                .Single(model => model.Material.ModelName == modelName);
 
             Assert.Multiple(() =>
             {

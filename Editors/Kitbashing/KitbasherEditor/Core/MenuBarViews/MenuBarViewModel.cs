@@ -84,6 +84,8 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             CanUseMeshSelectionTools.Value = selectionManager.GetState().Mode is
                 GeometrySelectionMode.Vertex or GeometrySelectionMode.Edge or GeometrySelectionMode.Face;
             TransformTool = transformToolViewModel;
+            if (components != null)
+                TransformTool.AttachGizmo(components.ModelGizmo);
             ProportionalEditing = new ProportionalEditingViewModel(selectionManager, eventHub);
             ViewportShading = new ViewportShadingViewModel(renderEngine);
             UpdateViewportBackground(ViewportRenderSettings.From(applicationSettings?.CurrentSettings ?? new ApplicationSettings()));

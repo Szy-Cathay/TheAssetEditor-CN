@@ -1,6 +1,7 @@
-using GameWorld.Core.Animation;
+﻿using GameWorld.Core.Animation;
 using GameWorld.Core.Commands;
 using GameWorld.Core.Commands.Bone;
+using GameWorld.Core.Components.Gizmo;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.Geometry;
@@ -19,6 +20,75 @@ namespace Test.KitbashEditor;
 [TestFixture]
 public class TransformToolViewModelTests
 {
+    [Test]
+    public void NumericDrag_ReplacesFromInitialAndCommitsOnceOrCancels()
+    {
+        var context = CreateContext();
+        context.ViewModel.SetMode(TransformToolViewModel.TransformMode.Translate);
+        var initial = context.Selection.CurrentAnimation.DynamicFrames[0].Position[0];
+        context.ViewModel.BeginNumericEdit();
+        context.ViewModel.Vector3.X.Value = 1;
+        context.ViewModel.Vector3.X.Value = 2;
+        Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+        Assert.That(context.Selection.CurrentAnimation.DynamicFrames[0].Position[0].X, Is.EqualTo(initial.X + 2).Within(0.001));
+        context.ViewModel.EndNumericEdit(false);
+        Assert.That(context.CommandExecutor.Undo(), Is.True);
+        Assert.That(context.Selection.CurrentAnimation.DynamicFrames[0].Position[0], Is.EqualTo(initial));
+        Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+        context.ViewModel.BeginNumericEdit();
+        context.ViewModel.Vector3.Y.Value = 7;
+        context.ViewModel.EndNumericEdit(true);
+        Assert.That(context.Selection.CurrentAnimation.DynamicFrames[0].Position[0], Is.EqualTo(initial));
+        Assert.That(context.CommandExecutor.CanRedo(), Is.True);
+        Assert.That(context.Selection.BoneModificationSubscriberCount, Is.Zero);
+    }
+
+    [TestCase(12, 37, -41)]
+    [TestCase(-20, 90, 30)]
+    [TestCase(25, -90, -60)]
+    public void GizmoRotation_ReadbackMatchesNumericXyzOrder(float x, float y, float z)
+    {
+        static Matrix Rotation(Vector3 value) => Matrix.CreateRotationX(MathHelper.ToRadians(value.X)) *
+            Matrix.CreateRotationY(MathHelper.ToRadians(value.Y)) * Matrix.CreateRotationZ(MathHelper.ToRadians(value.Z));
+        var expected = Rotation(new Vector3(x, y, z));
+        var actual = Rotation(TransformToolViewModel.RotationDegrees(expected));
+        Assert.That(Vector3.Distance(actual.Right, expected.Right), Is.LessThan(0.0001));
+        Assert.That(Vector3.Distance(actual.Up, expected.Up), Is.LessThan(0.0001));
+        Assert.That(Vector3.Distance(actual.Backward, expected.Backward), Is.LessThan(0.0001));
+    }
+
+    [Test]
+    public void NumericDrag_RejectedZeroScaleShowsActualIdentityAndDoesNotCommit()
+    {
+        var context = CreateContext();
+        context.ViewModel.SetMode(TransformToolViewModel.TransformMode.Scale);
+        context.ViewModel.BeginNumericEdit();
+        context.ViewModel.Vector3.X.Value = 0;
+        Assert.That(context.ViewModel.Vector3.GetAsVector3(), Is.EqualTo(Vector3.One));
+        context.ViewModel.EndNumericEdit(false);
+        Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+    }
+
+    [Test]
+    public void GizmoReadback_DoesNotReapplyPreviewAndResetsAtEnd()
+    {
+        var context = CreateContext();
+        var initial = context.Selection.CurrentAnimation.DynamicFrames[0].Position[0];
+        context.ViewModel.SynchronizeGizmoPreview(GizmoMode.Translate,
+            ModalPreviewReplacement.Translate(new Vector3(1, 2, 3), PivotType.SelectionCenter));
+        Assert.That(context.ViewModel.Vector3.GetAsVector3(), Is.EqualTo(new Vector3(1, 2, 3)));
+        Assert.That(context.ViewModel.CanEditValues, Is.False);
+        context.ViewModel.ApplyCommand.Execute(null);
+        Assert.That(context.Selection.CurrentAnimation.DynamicFrames[0].Position[0], Is.EqualTo(initial));
+        Assert.That(context.CommandExecutor.CanUndo(), Is.False);
+        context.ViewModel.SynchronizeGizmoPreview(GizmoMode.Translate, null);
+        Assert.That(context.ViewModel.Vector3.GetAsVector3(), Is.EqualTo(Vector3.Zero));
+        Assert.That(context.ViewModel.CanEditValues, Is.True);
+        context.ViewModel.SynchronizeGizmoPreview(GizmoMode.NonUniformScale,
+            ModalPreviewReplacement.Scale(new Vector3(0.5f, 0, -0.5f), PivotType.ObjectCenter, Matrix.CreateRotationZ(0.4f)));
+        Assert.That(context.ViewModel.Vector3.GetAsVector3(), Is.EqualTo(new Vector3(1.5f, 1, 0.5f)));
+    }
+
     [Test]
     public void SelectionChanged_BoneSelectionSetsButtonFromCurrentSelection()
     {

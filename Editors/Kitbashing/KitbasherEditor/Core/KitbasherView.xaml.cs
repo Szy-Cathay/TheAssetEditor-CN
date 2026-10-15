@@ -17,6 +17,20 @@ namespace KitbasherEditor.Views
         public KitbasherView()
         {
             InitializeComponent();
+            KitbasherEditor.ViewModels.MenuBarViews.TransformToolViewModel numericEditor = null;
+            TransformFields.AddHandler(Shared.Ui.Common.Behaviors.TextBoxInputBehavior.NumericDragStartedEvent,
+                new RoutedEventHandler((_, _) =>
+                {
+                    numericEditor = (DataContext as KitbasherViewModel)?.MenuBar.TransformTool;
+                    numericEditor?.BeginNumericEdit();
+                }));
+            TransformFields.AddHandler(Shared.Ui.Common.Behaviors.TextBoxInputBehavior.NumericDragCompletedEvent,
+                new EventHandler<Shared.Ui.Common.Behaviors.NumericDragCompletedEventArgs>((_, e) =>
+                {
+                    numericEditor?.EndNumericEdit(e.Cancelled);
+                    numericEditor = null;
+                }));
+            Unloaded += (_, _) => numericEditor?.EndNumericEdit(true);
             Loaded += (_, _) =>
             {
                 UpdateStatisticsPosition();

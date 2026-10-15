@@ -67,6 +67,14 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
 
             TakeAnimationFromMesh = selectionAsMeshNode;
 
+            if (selectionAsMeshNode.Geometry.WeightCount == 0)
+            {
+                TakeAnimationFromMesh = null;
+                _standardDialogs.ShowDialogBox(LocalizationManager.Instance.Get("Msg.Kitbash.WrapSourceMustBeAnimated"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return;
+            }
+
             description = TakeAnimationFromMesh.Name;
             Description = description;
         }
@@ -86,6 +94,13 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
             {
                 _standardDialogs.ShowDialogBox(
                     LocalizationManager.Instance.Get("Msg.Kitbash.SelectTargetMeshes"),
+                    LocalizationManager.Instance.Get("General.Error"));
+                return false;
+            }
+
+            if (TakeAnimationFromMesh.Geometry.WeightCount == 0)
+            {
+                _standardDialogs.ShowDialogBox(LocalizationManager.Instance.Get("Msg.Kitbash.WrapSourceMustBeAnimated"),
                     LocalizationManager.Instance.Get("General.Error"));
                 return false;
             }

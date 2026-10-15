@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="KitbasherEditor.Views.MenuBarView"
+<UserControl x:Class="KitbasherEditor.Views.MenuBarView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -202,7 +202,7 @@
                     </RadioButton>
                 </StackPanel>
 
-                <Separator Style="{DynamicResource VerticalSeparatorStyle}"/>
+
 
                 <!-- Proportional editing toggle + dropdown -->
                 <StackPanel Orientation="Horizontal"

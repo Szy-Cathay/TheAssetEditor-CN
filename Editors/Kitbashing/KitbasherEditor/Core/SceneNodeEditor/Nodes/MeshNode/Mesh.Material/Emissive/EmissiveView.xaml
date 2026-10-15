@@ -32,7 +32,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Label Content="{loc:Loc Emissive.Strength}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissiveStrength, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" />
+                <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissiveStrength, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True"/></b:Interaction.Behaviors></TextBox>
             </Grid>
             <Grid Style="{DynamicResource Kitbash.InspectorRow}" ToolTip="{loc:Loc Emissive.FresnelStrength.ToolTip}">
                 <Grid.ColumnDefinitions>
@@ -40,7 +40,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <Label Content="{loc:Loc Emissive.FresnelStrength}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissiveFresnelStrength, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" />
+                <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissiveFresnelStrength, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True"/></b:Interaction.Behaviors></TextBox>
             </Grid>
             <StackPanel ToolTip="{loc:Loc Emissive.Tiling.ToolTip}" Margin="0,0,0,4">
                 <Label Content="{loc:Loc Emissive.Tiling}" Style="{DynamicResource Kitbash.InspectorStackedLabel}" />
@@ -63,7 +63,7 @@
                         <DockPanel LastChildFill="False" Grid.Column="1">
                             <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient0}" />
                             <Label DockPanel.Dock="Left" Margin="8,0,8,0" Content="{loc:Loc Emissive.Time}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                            <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Left" Text="{Binding GradientTime0, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}" TextAlignment="Left" />
+                            <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Left" Text="{Binding GradientTime0, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragMinimum="0" DragMaximum="1"/></b:Interaction.Behaviors></TextBox>
                         </DockPanel>
                     </Grid>
                     <Grid Style="{DynamicResource Kitbash.InspectorRow}">
@@ -75,7 +75,7 @@
                         <DockPanel LastChildFill="False" Grid.Column="1">
                             <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient1}" />
                             <Label DockPanel.Dock="Left" Margin="8,0,8,0" Content="{loc:Loc Emissive.Time}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                            <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Left" Text="{Binding GradientTime1, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}" TextAlignment="Left" />
+                            <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Left" Text="{Binding GradientTime1, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragMinimum="0" DragMaximum="1"/></b:Interaction.Behaviors></TextBox>
                         </DockPanel>
                     </Grid>
                     <Grid Style="{DynamicResource Kitbash.InspectorRow}">
@@ -87,7 +87,7 @@
                         <DockPanel LastChildFill="False" Grid.Column="1">
                             <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient2}" />
                             <Label DockPanel.Dock="Left" Margin="8,0,8,0" Content="{loc:Loc Emissive.Time}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                            <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Left" Text="{Binding GradientTime2, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}" TextAlignment="Left" />
+                            <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Left" Text="{Binding GradientTime2, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragMinimum="0" DragMaximum="1"/></b:Interaction.Behaviors></TextBox>
                         </DockPanel>
                     </Grid>
                     <Grid Style="{DynamicResource Kitbash.InspectorRow}">
@@ -99,7 +99,7 @@
                         <DockPanel LastChildFill="False" Grid.Column="1">
                             <colourpickerbutton:ColourPickerButtonView DockPanel.Dock="Left" Width="20" Height="20" DataContext="{Binding Gradient3}" />
                             <Label DockPanel.Dock="Left" Margin="8,0,8,0" Content="{loc:Loc Emissive.Time}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                            <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Left" Text="{Binding GradientTime3, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}" TextAlignment="Left" />
+                            <TextBox DockPanel.Dock="Left" Width="64" HorizontalContentAlignment="Left" Text="{Binding GradientTime3, UpdateSourceTrigger=LostFocus}" ToolTip="{loc:Loc Emissive.Gradient.ToolTip}" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragMinimum="0" DragMaximum="1"/></b:Interaction.Behaviors></TextBox>
                         </DockPanel>
                     </Grid>
                 </StackPanel>
@@ -127,7 +127,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Label Content="{loc:Loc Emissive.DistortStrength}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                        <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissiveDistortStrength, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" />
+                        <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissiveDistortStrength, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True"/></b:Interaction.Behaviors></TextBox>
                     </Grid>
                     <Grid Style="{DynamicResource Kitbash.InspectorRow}">
                         <Grid.ColumnDefinitions>
@@ -135,7 +135,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Label Content="{loc:Loc Emissive.Speed}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                        <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissiveSpeed, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" />
+                        <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissiveSpeed, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True"/></b:Interaction.Behaviors></TextBox>
                     </Grid>
                     <Grid Style="{DynamicResource Kitbash.InspectorRow}">
                         <Grid.ColumnDefinitions>
@@ -143,7 +143,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Label Content="{loc:Loc Emissive.PulseSpeed}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                        <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissivePulseSpeed, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" />
+                        <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissivePulseSpeed, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True"/></b:Interaction.Behaviors></TextBox>
                     </Grid>
                     <Grid Style="{DynamicResource Kitbash.InspectorRow}">
                         <Grid.ColumnDefinitions>
@@ -151,7 +151,7 @@
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
                         <Label Content="{loc:Loc Emissive.PulseStrength}" Style="{DynamicResource Kitbash.InspectorLabel}" />
-                        <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissivePulseStrength, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" />
+                        <TextBox HorizontalAlignment="Left" HorizontalContentAlignment="Left" Text="{Binding EmissivePulseStrength, UpdateSourceTrigger=LostFocus}" Grid.Column="1" Width="100" TextAlignment="Left" ><b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True"/></b:Interaction.Behaviors></TextBox>
                     </Grid>
                 </StackPanel>
             </StackPanel>

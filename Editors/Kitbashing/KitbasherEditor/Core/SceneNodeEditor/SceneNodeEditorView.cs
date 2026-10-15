@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Editors.KitbasherEditor.Events;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes;
@@ -37,6 +37,9 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
             (_currentNode is Rmv2MeshNode || _currentNode?.GetType() == typeof(GroupNode));
 
         public bool IsSelectedNodeNameReadOnly => !CanRenameSelectedNode;
+
+        public void BeginNumericEdit() => _propertyEditor.BeginEdit();
+        public void EndNumericEdit(bool cancelled) => _propertyEditor.EndEdit(cancelled);
 
         partial void OnCurrentEditorChanged(ISceneNodeEditor? value)
         {
@@ -94,6 +97,7 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
 
         private void ClearCurrentEditor()
         {
+            _propertyEditor.EndEdit(true);
             if (_currentNode is INotifyPropertyChanged observable)
                 observable.PropertyChanged -= OnNodePropertyChanged;
             _currentNode = null;

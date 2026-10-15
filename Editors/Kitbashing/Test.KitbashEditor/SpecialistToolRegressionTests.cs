@@ -274,6 +274,40 @@ namespace Test.KitbashEditor
             Assert.That(target.Geometry.VertexArray[0].BlendIndices.X, Is.EqualTo(1));
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Rigging_TransfersAnimationSourceAndRestoresItOnUndo(bool wrap)
+        {
+            var source = Mesh();
+            source.AnimationPlayer = new AnimationPlayer();
+            var target = Mesh();
+            target.AnimationPlayer = new AnimationPlayer();
+            var originalPlayer = target.AnimationPlayer;
+            var originalGeometry = target.Geometry;
+            IRedoableCommand command;
+            if (wrap)
+            {
+                var skinWrap = new SkinWrapRiggingCommand(Selection());
+                skinWrap.Configure([target], source);
+                command = skinWrap;
+            }
+            else
+            {
+                var pin = new PinMeshToVertexCommand(Selection());
+                pin.Configure([target], source, 0);
+                command = pin;
+            }
+            command.Execute();
+            Assert.That(target.AnimationPlayer, Is.SameAs(source.AnimationPlayer));
+            var result = target.Geometry;
+            command.Undo();
+            Assert.That(target.AnimationPlayer, Is.SameAs(originalPlayer));
+            Assert.That(target.Geometry, Is.SameAs(originalGeometry));
+            command.Redo();
+            Assert.That(target.AnimationPlayer, Is.SameAs(source.AnimationPlayer));
+            Assert.That(target.Geometry, Is.SameAs(result));
+        }
+
         [TestCase(UiVertexFormat.Weighted, 2)]
         [TestCase(UiVertexFormat.Cinematic, 3)]
         public void SkinWrap_NormalizesOnlyWeightsThatTheVertexFormatCanStore(UiVertexFormat format, int count)
@@ -373,6 +407,7 @@ namespace Test.KitbashEditor
                 MeshSkeletonName = "source_skeleton", ParnetModelSkeletonName = "target_skeleton",
                 MeshBones = AnimatedBoneHelper.CreateFromSkeleton(file), ParentModelBones = AnimatedBoneHelper.CreateFromSkeleton(file)
             }, [mesh], skeleton, file);
+            Assert.That(vm.IsBoneSelected.Value, Is.True, "The initially selected root must have editable parameters.");
             vm.ScaleFactor.Value = 2;
             vm.OnApplyButton();
             Assert.That(vm.OnOkButton(), Is.True);
@@ -384,6 +419,44 @@ namespace Test.KitbashEditor
             Assert.That(executor.CurrentDocumentStateId, Is.Zero);
         }
 
+        [TestCase("")]
+        [TestCase("-")]
+        [TestCase("NaN")]
+        [TestCase("Infinity")]
+        [TestCase("-2")]
+        [TestCase("3e38")]
+        public void MeshFitter_InvalidScalePreventsCommitAndCancelRestoresOriginal(string invalid)
+        {
+            var file = SkeletonFile();
+            var player = new AnimationPlayer();
+            var skeleton = new GameSkeleton(file, player);
+            var scene = new SceneManager(Renderer(), null!, Mock.Of<IEventHub>());
+            scene.RootNode.AddObject(new MainEditableNode(SpecialNodes.EditableModel, new SkeletonNode(skeleton), null!));
+            var mesh = Mesh();
+            mesh.AnimationPlayer = player;
+            var original = mesh.Geometry;
+            var selection = Selection();
+            Select(selection, mesh);
+            var executor = new CommandExecutor(Mock.Of<IEventHub>());
+            var provider = new Mock<IServiceProvider>();
+            provider.Setup(x => x.GetService(typeof(CreateAnimatedMeshPoseCommand))).Returns(() => new CreateAnimatedMeshPoseCommand());
+            using var vm = new MeshFitterViewModel(new CommandFactory(provider.Object, executor), new AnimationsContainerComponent(), scene);
+            vm.Initialize(new RemappedAnimatedBoneConfiguration
+            {
+                MeshSkeletonName = "source_skeleton", ParnetModelSkeletonName = "target_skeleton",
+                MeshBones = AnimatedBoneHelper.CreateFromSkeleton(file), ParentModelBones = AnimatedBoneHelper.CreateFromSkeleton(file)
+            }, [mesh], skeleton, file);
+            Assert.That(vm.IsBoneSelected.Value, Is.True, "The initially selected root must have editable parameters.");
+            vm.ScaleFactor.Value = 2;
+            vm.ScaleFactor.TextValue = invalid;
+            Assert.That(vm.HasValidTransform, Is.False);
+            Assert.That(vm.OnOkButton(), Is.False);
+            Assert.That(executor.CanUndo(), Is.False);
+            Assert.That(mesh.Geometry, Is.SameAs(original));
+            vm.Dispose();
+            Assert.That(mesh.AnimationPlayer, Is.SameAs(player));
+            Assert.That(mesh.Geometry, Is.SameAs(original));
+        }
         static ICommand CreateCommand(string operation, Rmv2MeshNode mesh, GroupNode parent, SelectionManager selection)
         {
             switch (operation)

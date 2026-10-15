@@ -1,4 +1,4 @@
-using Editors.KitbasherEditor.Events;
+﻿using Editors.KitbasherEditor.Events;
 using Editors.KitbasherEditor.ViewModels.SceneExplorer.Nodes;
 using Editors.KitbasherEditor.ViewModels.SceneNodeEditor;
 using GameWorld.Core.SceneNodes;
@@ -35,13 +35,13 @@ namespace Test.KitbashEditor
             select!(new SceneNodeSelectedEvent([first]));
             Assert.That(viewModel.CanRenameSelectedNode, Is.True);
             Assert.That(commands.CurrentDocumentStateId, Is.Zero, "Selection and initialization must not dirty the document.");
-            viewModel.SelectedNodeName = "Changed";
-            Assert.That(first.Name, Is.EqualTo("Changed"));
+            viewModel.SelectedNodeName = "胸甲_左侧";
+            Assert.That(first.Name, Is.EqualTo("胸甲_左侧"));
             commands.Undo();
             Assert.That(viewModel.SelectedNodeName, Is.EqualTo("First"));
             Assert.That(commands.CanUndo(), Is.False, "A rename must produce exactly one command.");
             commands.Redo();
-            Assert.That(viewModel.SelectedNodeName, Is.EqualTo("Changed"));
+            Assert.That(viewModel.SelectedNodeName, Is.EqualTo("胸甲_左侧"));
 
             select(new SceneNodeSelectedEvent([second]));
             commands.Undo();

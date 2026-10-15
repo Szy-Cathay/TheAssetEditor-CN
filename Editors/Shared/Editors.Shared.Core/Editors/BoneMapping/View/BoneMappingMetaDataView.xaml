@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="Editors.Shared.Core.Editors.BoneMapping.View.BoneMappingMetaDataView"
+<UserControl x:Class="Editors.Shared.Core.Editors.BoneMapping.View.BoneMappingMetaDataView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -10,58 +10,112 @@
              xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
              xmlns:mathviews="clr-namespace:CommonControls.MathViews;assembly=Shared.Ui" xmlns:view="clr-namespace:Editors.Shared.Core.Editors.BoneMapping.View"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450" d:DesignWidth="332" FontSize="12" FontWeight="Normal">
     <UserControl.Resources>
         <DataTemplate x:Key="BoneVector">
-            <StackPanel>
-                <UniformGrid Columns="3" Margin="0,0,0,4">
-                    <TextBlock Text="{loc:Loc Ui.Axis.X}" Style="{StaticResource AeText.Caption}"/>
-                    <TextBlock Text="{loc:Loc Ui.Axis.Y}" Style="{StaticResource AeText.Caption}"/>
-                    <TextBlock Text="{loc:Loc Ui.Axis.Z}" Style="{StaticResource AeText.Caption}"/>
-                </UniformGrid>
-                <mathviews:Vector3View Vector3="{Binding}"/>
-            </StackPanel>
-        </DataTemplate>
-    </UserControl.Resources>
-    <Grid Visibility="{Binding ShowTransformSection.Value, Converter={StaticResource BoolToCollapsedConverter}}">
-        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="16"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-        <StackPanel Grid.Column="0">
-            <TextBlock Text="{loc:Loc BoneMapping.OverallSettings}" Style="{StaticResource AeText.SectionTitle}" Margin="0,0,0,8"/>
-            <DockPanel Margin="0,0,0,8">
-                <Label Content="{loc:Loc BoneMapping.RootScale}" Width="116" Style="{StaticResource AeForm.Label}"/>
-                <TextBox Text="{Binding ScaleFactor.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput"/></b:Interaction.Behaviors>
-                </TextBox>
-            </DockPanel>
-            <DockPanel Margin="0,0,0,8">
-                <Label Content="{loc:Loc BoneMapping.RelativeScale}" Width="116" Style="{StaticResource AeForm.Label}"/>
-                <CheckBox IsChecked="{Binding RelativeScale.Value, Mode=TwoWay}"/>
-            </DockPanel>
-            <DockPanel>
-                <Label Content="{loc:Loc BoneMapping.DisplayOffset}" Width="116" Style="{StaticResource AeForm.Label}"/>
-                <ContentControl Content="{Binding SkeletonDisplayOffset}" ContentTemplate="{StaticResource BoneVector}"/>
-            </DockPanel>
-            <Button Content="{loc:Loc BoneMapping.ResetOffsets}" Click="{s:MethodBinding ResetOffsetTransforms}" HorizontalAlignment="Right" Margin="0,12,0,0" Style="{StaticResource AeButton.Quiet}"/>
-        </StackPanel>
-        <StackPanel Grid.Column="2">
-            <TextBlock Text="{loc:Loc BoneMapping.SelectedBoneSettings}" Style="{StaticResource AeText.SectionTitle}" Margin="0,0,0,8"/>
-            <StackPanel IsEnabled="{Binding IsBoneSelected.Value}">
-                <DockPanel Margin="0,0,0,8">
-                    <Label Content="{loc:Loc BoneMapping.PosOffset}" Width="116" Style="{StaticResource AeForm.Label}"/>
-                    <ContentControl Content="{Binding BonePositionOffset}" ContentTemplate="{StaticResource BoneVector}"/>
-                </DockPanel>
-                <DockPanel Margin="0,0,0,8">
-                    <Label Content="{loc:Loc BoneMapping.RotOffset}" Width="116" Style="{StaticResource AeForm.Label}"/>
-                    <ContentControl Content="{Binding BoneRotationOffset}" ContentTemplate="{StaticResource BoneVector}"/>
-                </DockPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="4"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="4"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
                 <DockPanel>
-                    <Label Content="{loc:Loc BoneMapping.Scale}" Width="116" Style="{StaticResource AeForm.Label}"/>
-                    <TextBox Text="{Binding BoneScaleFactor.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                        <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput"/></b:Interaction.Behaviors>
+                    <TextBlock Text="X" Width="12" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource AeBrush.TextSecondary}"/>
+                    <TextBox Text="{Binding X.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Left" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}">
+                        <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="{Binding Tag, RelativeSource={RelativeSource AncestorType=ContentControl}, FallbackValue=0.01}"/></b:Interaction.Behaviors>
                     </TextBox>
                 </DockPanel>
-                <Button Content="{loc:Loc BoneMapping.CopyToChildren}" Click="{s:MethodBinding CopyScaleToChildren}" HorizontalAlignment="Right" Margin="0,12,0,0" Style="{StaticResource AeButton.Quiet}"/>
-            </StackPanel>
-        </StackPanel>
+                <DockPanel Grid.Column="2">
+                    <TextBlock Text="Y" Width="12" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource AeBrush.TextSecondary}"/>
+                    <TextBox Text="{Binding Y.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Left" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}">
+                        <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="{Binding Tag, RelativeSource={RelativeSource AncestorType=ContentControl}, FallbackValue=0.01}"/></b:Interaction.Behaviors>
+                    </TextBox>
+                </DockPanel>
+                <DockPanel Grid.Column="4">
+                    <TextBlock Text="Z" Width="12" VerticalAlignment="Center" Margin="0,0,4,0" Foreground="{DynamicResource AeBrush.TextSecondary}"/>
+                    <TextBox Text="{Binding Z.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Left" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}">
+                        <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="{Binding Tag, RelativeSource={RelativeSource AncestorType=ContentControl}, FallbackValue=0.01}"/></b:Interaction.Behaviors>
+                    </TextBox>
+                </DockPanel>
+            </Grid>
+        </DataTemplate>
+        <Style x:Key="Heading" TargetType="TextBlock" BasedOn="{StaticResource AeText.Body}">
+            <Setter Property="FontStyle" Value="Italic"/>
+            <Setter Property="Foreground" Value="{DynamicResource AeBrush.TextSecondary}"/>
+            <Setter Property="FontWeight" Value="Normal"/>
+        </Style>
+        <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource AeText.Body}">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Left"/>
+        </Style>
+    </UserControl.Resources>
+    <Grid Visibility="{Binding ShowTransformSection.Value, Converter={StaticResource BoolToCollapsedConverter}}" VerticalAlignment="Top">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="84"/>
+            <ColumnDefinition Width="8"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="8"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DockPanel Grid.ColumnSpan="3">
+            <TextBlock Text="{loc:Loc BoneMapping.OverallSettings}" Style="{StaticResource Heading}"/>
+            <Border Height="1" Background="{DynamicResource AeBrush.Border}" Margin="8,0,0,0"/>
+        </DockPanel>
+        <TextBlock x:Name="RootScaleLabel" Grid.Row="2" Text="{loc:Loc BoneMapping.RootScale}" Style="{StaticResource FieldLabel}"/>
+        <TextBox x:Name="RootScaleInput" Grid.Row="2" Grid.Column="2" Margin="16,0,0,0" Text="{Binding ScaleFactor.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Left" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}">
+            <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragMinimum="0.00001"/></b:Interaction.Behaviors>
+        </TextBox>
+        <CheckBox x:Name="RelativeScaleOption" Grid.Row="3" Grid.Column="2" Content="{loc:Loc BoneMapping.RelativeScale}" IsChecked="{Binding RelativeScale.Value, Mode=TwoWay}" Margin="16,8,0,8"/>
+        <TextBlock x:Name="DisplayOffsetLabel" Grid.Row="4" Text="{loc:Loc BoneMapping.DisplayOffset}" Style="{StaticResource FieldLabel}"/>
+        <ContentControl x:Name="DisplayOffsetValues" Grid.Row="4" Grid.Column="2" Content="{Binding SkeletonDisplayOffset}" Tag="0.01" ContentTemplate="{StaticResource BoneVector}" HorizontalContentAlignment="Stretch"/>
+        <DockPanel Grid.Row="6" Grid.ColumnSpan="3">
+            <TextBlock Text="{loc:Loc BoneMapping.SelectedBoneSettings}" Style="{StaticResource Heading}"/>
+            <Border Height="1" Background="{DynamicResource AeBrush.Border}" Margin="8,0,0,0"/>
+        </DockPanel>
+        <TextBlock Grid.Row="7" Grid.ColumnSpan="3" Text="{Binding MeshBones.SelectedItem.Name.Value}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" Margin="0,4,0,8"/>
+        <Grid Grid.Row="8" Grid.ColumnSpan="3" IsEnabled="{Binding IsBoneSelected.Value}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="84"/>
+                <ColumnDefinition Width="8"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="8"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="8"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="8"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="PositionOffsetLabel" Text="{loc:Loc BoneMapping.PosOffset}" Style="{StaticResource FieldLabel}"/>
+            <ContentControl x:Name="PositionOffsetValues" Grid.Column="2" Content="{Binding BonePositionOffset}" Tag="0.01" ContentTemplate="{StaticResource BoneVector}" HorizontalContentAlignment="Stretch"/>
+            <TextBlock x:Name="RotationOffsetLabel" Grid.Row="2" Text="{loc:Loc BoneMapping.RotOffset}" Style="{StaticResource FieldLabel}"/>
+            <ContentControl x:Name="RotationOffsetValues" Grid.Row="2" Grid.Column="2" Content="{Binding BoneRotationOffset}" Tag="0.25" ContentTemplate="{StaticResource BoneVector}" HorizontalContentAlignment="Stretch"/>
+            <TextBlock x:Name="BoneScaleLabel" Grid.Row="4" Text="{loc:Loc BoneMapping.Scale}" Style="{StaticResource FieldLabel}"/>
+            <TextBox x:Name="BoneScaleInput" Grid.Row="4" Grid.Column="2" Margin="16,0,0,0" Text="{Binding BoneScaleFactor.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" HorizontalContentAlignment="Left" ToolTip="{loc:Loc Kitbash.NumericDrag.Help}">
+                <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragMinimum="0.00001"/></b:Interaction.Behaviors>
+            </TextBox>
+            <Grid x:Name="BoneActions" Grid.Row="6" Grid.Column="2" Margin="16,0,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="4"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Content="{loc:Loc BoneMapping.ResetOffsets}" Click="{s:MethodBinding ResetOffsetTransforms}" Style="{StaticResource AeButton.Quiet}"/>
+                <Button Grid.Column="2" Content="{loc:Loc BoneMapping.CopyToChildren}" Click="{s:MethodBinding CopyScaleToChildren}" Style="{StaticResource AeButton.Quiet}"/>
+            </Grid>
+        </Grid>
     </Grid>
 </UserControl>

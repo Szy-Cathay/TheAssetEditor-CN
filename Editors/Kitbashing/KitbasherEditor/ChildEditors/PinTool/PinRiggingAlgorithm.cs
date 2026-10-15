@@ -19,6 +19,9 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
         [ObservableProperty] Rmv2MeshNode? _selectedMesh;
         [ObservableProperty] string _description = "";
 
+        public bool HasValidSource => SelectedMesh?.Geometry?.WeightCount > 0 && SelectedVertex.Count == 1 &&
+            SelectedVertex[0] >= 0 && SelectedVertex[0] < SelectedMesh.Geometry.VertexCount();
+
         public PinRiggingAlgorithm(CommandFactory commandFactory, IStandardDialogs standardDialogs, SelectionManager selectionManager)
         {
             _commandFactory = commandFactory;
@@ -28,7 +31,8 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
 
         public bool Execute(List<Rmv2MeshNode> meshesToAffect)
         {
-            if (SelectedMesh == null || SelectedVertex.Count == 0)
+            if (SelectedMesh == null || SelectedVertex.Count != 1 ||
+                SelectedVertex.Any(index => index < 0 || index >= SelectedMesh.Geometry.VertexCount()))
             {
                 _standardDialogs.ShowDialogBox(
                     LocalizationManager.Instance.Get("Msg.Kitbash.PinSourceRequired"),
@@ -72,10 +76,10 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool
 
             var description = LocalizationManager.Instance.Get("Msg.Kitbash.NoMeshSelected");
             var selectionState = _selectionManager.GetState<VertexSelectionState>();
-            if (selectionState == null || selectionState.SelectionCount() == 0)
+            if (selectionState == null || selectionState.SelectionCount() != 1)
             {
                 _standardDialogs.ShowDialogBox(
-                    LocalizationManager.Instance.Get("Msg.Kitbash.NoVertexSelected"),
+                    LocalizationManager.Instance.Get("Msg.Kitbash.SelectOnePinVertex"),
                     LocalizationManager.Instance.Get("General.Error"));
                 return;
             }

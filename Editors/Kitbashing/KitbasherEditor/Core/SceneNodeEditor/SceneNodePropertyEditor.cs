@@ -1,4 +1,4 @@
-using GameWorld.Core.Commands;
+﻿using GameWorld.Core.Commands;
 using GameWorld.Core.Services;
 using Shared.Core.Services;
 
@@ -9,6 +9,11 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
         private readonly CommandExecutor _commandExecutor;
         private readonly string _hintText;
         private bool _isApplyingCommand;
+        private bool _isEditing;
+        private ICommand? _firstEdit;
+        private ICommand? _lastEdit;
+        private object? _initialValue;
+        private object? _latestValue;
 
         public SceneNodePropertyEditor(CommandExecutor commandExecutor)
         {
@@ -25,11 +30,46 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
                 return;
             }
 
-            _commandExecutor.ExecuteCommand(new SceneNodePropertyChangeCommand<T>(
+            var command = new SceneNodePropertyChangeCommand<T>(
                 currentValue,
                 newValue,
                 value => Apply(value, apply),
-                _hintText));
+                _hintText);
+            if (_isEditing)
+            {
+                if (_firstEdit == null)
+                {
+                    _firstEdit = command;
+                    _initialValue = currentValue;
+                }
+                _lastEdit = command;
+                _latestValue = newValue;
+                command.Execute();
+            }
+            else
+                _commandExecutor.ExecuteCommand(command);
+        }
+
+        public void BeginEdit()
+        {
+            EndEdit(true);
+            _isEditing = true;
+        }
+
+        public void EndEdit(bool cancelled)
+        {
+            var first = _firstEdit;
+            var last = _lastEdit;
+            var unchanged = Equals(_initialValue, _latestValue);
+            _isEditing = false;
+            _firstEdit = _lastEdit = null;
+            _initialValue = _latestValue = null;
+            if (first == null || last == null)
+                return;
+            if (cancelled)
+                first.Undo();
+            else if (!unchanged)
+                _commandExecutor.ExecuteCommand(new NumericPropertyEditCommand(first, last, _hintText));
         }
 
         public void Update<T>(
@@ -58,6 +98,15 @@ namespace Editors.KitbasherEditor.ViewModels.SceneNodeEditor
                 _isApplyingCommand = false;
             }
         }
+    }
+
+    internal sealed class NumericPropertyEditCommand(ICommand first, ICommand last, string hintText) : IRedoableCommand
+    {
+        public string HintText => hintText;
+        public bool IsMutation => true;
+        public void Execute() { }
+        public void Undo() => first.Undo();
+        public void Redo() => last.Execute();
     }
 
     internal sealed class SceneNodePropertyChangeCommand<T> : ICommand

@@ -10,6 +10,8 @@ using Shared.Core.Misc;
 using Shared.Core.Services;
 using Shared.Ui.BaseDialogs.MathViews;
 using System.Runtime.ExceptionServices;
+using System.Globalization;
+using Editors.KitbasherEditor.Components;
 
 namespace KitbasherEditor.ViewModels.MenuBarViews
 {
@@ -28,6 +30,19 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         private readonly SelectionManager _selectionManager;
         private readonly CommandExecutor _commandExecutor;
         private readonly CommandFactory _commandFactory;
+
+        private KitbashModelGizmoComponent _gizmoComponent;
+        private TransformGizmoWrapper _numericTransform;
+        private Matrix _scaleOrientation = Matrix.Identity;
+        private PivotType _pivot = PivotType.ObjectCenter;
+        private bool _synchronizing;
+        private bool _gizmoActive;
+        private Vector3 _numericInitialValue;
+        public bool CanEditValues => !_gizmoActive;
+        public double DragStep => _activeMode == TransformMode.Rotate ? 0.25 : 0.01;
+        public string CoordinateDescription => LocalizationManager.Instance.Get(
+            _activeMode == TransformMode.Scale && _scaleOrientation != Matrix.Identity
+                ? "Kitbasher.Transform.LocalScaleDelta" : "Kitbasher.Transform.WorldDelta");
 
         public System.Windows.Input.ICommand ApplyCommand { get; set; }
 
@@ -54,6 +69,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         public TransformToolViewModel(SelectionManager selectionManager, CommandExecutor commandExecutor, CommandFactory commandFactory, IEventHub eventHub)
         {
             ApplyCommand = new RelayCommand(ApplyTransform);
+            Vector3.OnValueChanged += _ => PreviewNumericEdit();
 
             VertexMovementFalloff = new NotifyAttr<DoubleViewModel>(new DoubleViewModel());
             VertexMovementFalloff.Value.PropertyChanged += VertexMovementFalloffChanged;
@@ -70,6 +86,8 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
 
         private void SelectionChanged(ISelectionState state)
         {
+            EndNumericEdit(true);
+            SetDefaultValue();
             ShowVertexFalloff.Value = false;
             ButtonEnabled = false;
             if (state is ObjectSelectionState objectSelectionState)
@@ -95,6 +113,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
 
         public void SetMode(TransformMode mode)
         {
+            EndNumericEdit(true);
             _activeMode = mode;
             IsVisible = _activeMode != TransformMode.None;
 
@@ -108,11 +127,13 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             Description = mode == TransformMode.None ? "" : LocalizationManager.Instance.Get($"Kitbasher.Transform.{mode}.Help");
 
             SetDefaultValue();
+            NotifyPropertyChanged(nameof(DragStep));
+            NotifyPropertyChanged(nameof(CoordinateDescription));
         }
 
         void ApplyTransform()
         {
-            if (_activeMode == TransformMode.None)
+            if (_activeMode == TransformMode.None || _gizmoActive || !HasValidValues())
                 return;
 
             var transform = TransformGizmoWrapper.CreateFromSelectionState(_selectionManager.GetState(), _commandFactory);
@@ -125,25 +146,9 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
                 var commitAttempted = false;
                 try
                 {
-                    if (_activeMode == TransformMode.Rotate)
-                    {
-                        transform.BeginTransform();
-                        transform.GizmoRotateEvent(
-                            Matrix.CreateRotationX(MathHelper.ToRadians((float)_vector3.X.Value)) *
-                            Matrix.CreateRotationY(MathHelper.ToRadians((float)_vector3.Y.Value)) *
-                            Matrix.CreateRotationZ(MathHelper.ToRadians((float)_vector3.Z.Value)), PivotType.ObjectCenter);
-                    }
-                    else if (_activeMode == TransformMode.Translate)
-                    {
-                        transform.BeginTransform();
-                        transform.GizmoTranslateEvent(new Vector3((float)_vector3.X.Value, (float)_vector3.Y.Value, (float)_vector3.Z.Value), PivotType.ObjectCenter);
-                    }
-                    else if (_activeMode == TransformMode.Scale)
-                    {
-                        transform.BeginTransform();
-                        transform.GizmoScaleEvent(new Vector3((float)_vector3.X.Value - 1, (float)_vector3.Y.Value - 1, (float)_vector3.Z.Value - 1), PivotType.ObjectCenter);    // -1 due to weirdness inside the function
-                    }
-
+                    ConfigureTransform(transform);
+                    transform.BeginTransform();
+                    transform.ReplaceInitialPreview(CreateReplacement());
                     commitAttempted = true;
                     transform.CommitTransform(_commandExecutor);
                     SetDefaultValue();
@@ -167,14 +172,154 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             }
         }
 
-        void SetDefaultValue()
+        public void AttachGizmo(KitbashModelGizmoComponent component)
         {
-            if (_activeMode == TransformMode.Scale)
-                _vector3.Set(1);
-            else
-                _vector3.Set(0);
+            if (_gizmoComponent != null)
+                _gizmoComponent.PreviewChanged -= SynchronizeGizmoPreview;
+            _gizmoComponent = component;
+            component.PreviewChanged += SynchronizeGizmoPreview;
         }
 
+        internal void SynchronizeGizmoPreview(GizmoMode mode, ModalPreviewReplacement? preview)
+        {
+            if (!preview.HasValue)
+            {
+                _gizmoActive = false;
+                SetDefaultValue();
+            }
+            else
+            {
+                var transformMode = mode switch
+                {
+                    GizmoMode.Rotate => TransformMode.Rotate,
+                    GizmoMode.Translate => TransformMode.Translate,
+                    _ => TransformMode.Scale
+                };
+                if (_activeMode != transformMode)
+                    SetMode(transformMode);
+                _gizmoActive = true;
+                var value = preview.Value;
+                _pivot = value.Pivot;
+                if (value.Kind == ModalPreviewReplacementKind.Scale)
+                    _scaleOrientation = value.ScaleOrientation;
+                SetVector(value.Kind switch
+                {
+                    ModalPreviewReplacementKind.Translate => value.VectorValue,
+                    ModalPreviewReplacementKind.Rotate => RotationDegrees(value.RotationValue),
+                    ModalPreviewReplacementKind.Scale => value.VectorValue + Microsoft.Xna.Framework.Vector3.One,
+                    _ => _activeMode == TransformMode.Scale ? Microsoft.Xna.Framework.Vector3.One : Microsoft.Xna.Framework.Vector3.Zero
+                });
+            }
+            NotifyPropertyChanged(nameof(CanEditValues));
+            NotifyPropertyChanged(nameof(CoordinateDescription));
+        }
+
+        // Row-vector X * Y * Z, identical to the numeric apply path.
+        internal static Vector3 RotationDegrees(Matrix matrix)
+        {
+            var y = MathF.Asin(Math.Clamp(-matrix.M13, -1, 1));
+            var x = Math.Abs(MathF.Cos(y)) > 0.0001f
+                ? MathF.Atan2(matrix.M23, matrix.M33)
+                : MathF.Atan2(-matrix.M32, matrix.M22);
+            var z = Math.Abs(MathF.Cos(y)) > 0.0001f ? MathF.Atan2(matrix.M12, matrix.M11) : 0;
+            return new Vector3(MathHelper.ToDegrees(x), MathHelper.ToDegrees(y), MathHelper.ToDegrees(z));
+        }
+
+        private void ConfigureTransform(TransformGizmoWrapper transform)
+        {
+            transform.SetFalloffDistance(_selectionManager.VertexSelectionFalloff);
+            _pivot = _gizmoComponent?.Gizmo?.ActivePivot ?? PivotType.ObjectCenter;
+            _scaleOrientation = _gizmoComponent?.Gizmo?.GizmoDisplaySpace == TransformSpace.Local
+                ? Matrix.CreateFromQuaternion(transform.Orientation) : Matrix.Identity;
+            NotifyPropertyChanged(nameof(CoordinateDescription));
+        }
+
+        private ModalPreviewReplacement CreateReplacement()
+        {
+            var value = _vector3.GetAsVector3();
+            return _activeMode switch
+            {
+                TransformMode.Translate => ModalPreviewReplacement.Translate(value, _pivot),
+                TransformMode.Rotate => ModalPreviewReplacement.Rotate(
+                    Matrix.CreateRotationX(MathHelper.ToRadians(value.X)) *
+                    Matrix.CreateRotationY(MathHelper.ToRadians(value.Y)) *
+                    Matrix.CreateRotationZ(MathHelper.ToRadians(value.Z)), _pivot),
+                TransformMode.Scale => ModalPreviewReplacement.Scale(value - Microsoft.Xna.Framework.Vector3.One, _pivot, _scaleOrientation),
+                _ => ModalPreviewReplacement.RestoreOnly(_pivot)
+            };
+        }
+
+        private bool HasValidValues() => new[] { _vector3.X, _vector3.Y, _vector3.Z }.All(x =>
+            double.TryParse(x.TextValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) &&
+            double.IsFinite(number) && Math.Abs(number) <= float.MaxValue);
+
+        public void BeginNumericEdit()
+        {
+            if (_gizmoActive || _activeMode == TransformMode.None || !HasValidValues())
+                return;
+            EndNumericEdit(true);
+            var transform = TransformGizmoWrapper.CreateFromSelectionState(_selectionManager.GetState(), _commandFactory);
+            if (transform == null)
+                return;
+            _numericInitialValue = _vector3.GetAsVector3();
+            ConfigureTransform(transform);
+            try
+            {
+                transform.BeginTransform();
+                _numericTransform = transform;
+            }
+            catch
+            {
+                transform.Dispose();
+                throw;
+            }
+        }
+
+        private void PreviewNumericEdit()
+        {
+            if (_synchronizing || _numericTransform == null || !HasValidValues())
+                return;
+            try
+            {
+                if (!_numericTransform.ReplaceInitialPreview(CreateReplacement()))
+                    SetDefaultValue();
+            }
+            catch
+            {
+                EndNumericEdit(true);
+                throw;
+            }
+        }
+
+        public void EndNumericEdit(bool cancelled)
+        {
+            var transform = _numericTransform;
+            if (transform == null)
+                return;
+            _numericTransform = null;
+            try
+            {
+                if (cancelled)
+                    transform.CancelTransform();
+                else
+                    transform.CommitTransform(_commandExecutor);
+            }
+            finally
+            {
+                transform.Dispose();
+                if (cancelled) SetVector(_numericInitialValue);
+                else SetDefaultValue();
+            }
+        }
+
+        private void SetVector(Vector3 value)
+        {
+            _synchronizing = true;
+            try { _vector3.Set(value); }
+            finally { _synchronizing = false; }
+        }
+
+        void SetDefaultValue() => SetVector(_activeMode == TransformMode.Scale ? Microsoft.Xna.Framework.Vector3.One : Microsoft.Xna.Framework.Vector3.Zero);
         void Handle(SelectionChangedEvent notification)
         {
             SelectionChanged(notification.NewState);

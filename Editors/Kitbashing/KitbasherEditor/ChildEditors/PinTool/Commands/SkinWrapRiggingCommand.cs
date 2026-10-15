@@ -1,5 +1,6 @@
 ﻿using GameWorld.Core.Commands;
 using GameWorld.Core.Components.Selection;
+using GameWorld.Core.Animation;
 using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.SceneNodes;
 using Microsoft.Xna.Framework;
@@ -14,6 +15,8 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
 
         List<MeshObject> _originalGeometries;
         List<MeshObject> _updatedGeometries;
+        List<AnimationPlayer?> _originalPlayers;
+        AnimationPlayer? _sourcePlayer;
 
         List<Rmv2MeshNode> _giveAnimationToList;
         Rmv2MeshNode _takeAnimationFrom;
@@ -43,6 +46,8 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
                 _takeAnimationFrom.Geometry,
                 _takeAnimationFrom.GetRenderWorldMatrix());
             _updatedGeometries = new List<MeshObject>(_giveAnimationToList.Count);
+            _sourcePlayer = _takeAnimationFrom.AnimationPlayer;
+            _originalPlayers = _giveAnimationToList.Select(x => x.AnimationPlayer).ToList();
             _originalGeometries = _giveAnimationToList.Select(x => x.Geometry).ToList();
             _selectionOldState = _selectionManager.GetStateCopy();
 
@@ -72,14 +77,20 @@ namespace Editors.KitbasherEditor.ChildEditors.PinTool.Commands
         public void Redo()
         {
             for (var index = 0; index < _giveAnimationToList.Count; index++)
+            {
                 _giveAnimationToList[index].Geometry = _updatedGeometries[index];
+                _giveAnimationToList[index].AnimationPlayer = _sourcePlayer;
+            }
             _selectionManager.SetState(_selectionOldState.Clone());
         }
 
         public void Undo()
         {
             for (var i = 0; i < _giveAnimationToList.Count; i++)
+            {
                 _giveAnimationToList[i].Geometry = _originalGeometries[i];
+                _giveAnimationToList[i].AnimationPlayer = _originalPlayers[i];
+            }
 
             _selectionManager.SetState(_selectionOldState);
         }

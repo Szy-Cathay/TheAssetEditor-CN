@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="KitbasherEditor.Views.KitbasherView"
+<UserControl x:Class="KitbasherEditor.Views.KitbasherView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -188,28 +188,26 @@
 
             <Grid Grid.Row="0"
                   Visibility="{Binding MenuBar.TransformTool.IsVisible, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
-                <DockPanel HorizontalAlignment="Right" VerticalAlignment="Top" Background="{DynamicResource AeBrush.Surface1}">
-                    <Rectangle Fill="{DynamicResource AeBrush.Border}" DockPanel.Dock="Left" Width="2"/>
-                    <Rectangle Fill="{DynamicResource AeBrush.Border}" DockPanel.Dock="Bottom" Height="2"/>
+                <Border x:Name="TransformPanel" HorizontalAlignment="Right" VerticalAlignment="Top" Style="{StaticResource AeSurface.Overlay}" Margin="6" Padding="2">
 
                     <StackPanel Orientation="Vertical">
                         <StackPanel Orientation="Horizontal" Margin="6,4" ToolTip="{Binding MenuBar.TransformTool.Description}">
                             <TextBlock Text="{Binding MenuBar.TransformTool.Text}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <StackPanel Orientation="Horizontal" DataContext="{Binding MenuBar.TransformTool.Vector3}">
+                            <StackPanel x:Name="TransformFields" Orientation="Horizontal" IsEnabled="{Binding DataContext.MenuBar.TransformTool.CanEditValues, RelativeSource={RelativeSource AncestorType=UserControl}}" Tag="{Binding DataContext.MenuBar.TransformTool.DragStep, RelativeSource={RelativeSource AncestorType=UserControl}}" DataContext="{Binding MenuBar.TransformTool.Vector3}">
                                 <TextBlock Text="X" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource AeBrush.TextSecondary}" />
-                                <TextBox Width="58" MaxLength="60" Margin="0,0,8,0" HorizontalContentAlignment="Right"
+                                <TextBox Width="58" MaxLength="60" Margin="0,0,8,0" HorizontalContentAlignment="Left"
                                          Text="{Binding X.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Kitbasher.Transform.AxisX}">
-                                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" /></b:Interaction.Behaviors>
+                                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="{Binding Tag, ElementName=TransformFields}" /></b:Interaction.Behaviors>
                                 </TextBox>
                                 <TextBlock Text="Y" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource AeBrush.TextSecondary}" />
-                                <TextBox Width="58" MaxLength="60" Margin="0,0,8,0" HorizontalContentAlignment="Right"
+                                <TextBox Width="58" MaxLength="60" Margin="0,0,8,0" HorizontalContentAlignment="Left"
                                          Text="{Binding Y.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Kitbasher.Transform.AxisY}">
-                                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" /></b:Interaction.Behaviors>
+                                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="{Binding Tag, ElementName=TransformFields}" /></b:Interaction.Behaviors>
                                 </TextBox>
                                 <TextBlock Text="Z" Margin="0,0,4,0" VerticalAlignment="Center" Foreground="{DynamicResource AeBrush.TextSecondary}" />
-                                <TextBox Width="58" MaxLength="60" Margin="0,0,8,0" HorizontalContentAlignment="Right"
+                                <TextBox Width="58" MaxLength="60" Margin="0,0,8,0" HorizontalContentAlignment="Left"
                                          Text="{Binding Z.TextValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.Name="{loc:Loc Kitbasher.Transform.AxisZ}">
-                                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" /></b:Interaction.Behaviors>
+                                    <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragStep="{Binding Tag, ElementName=TransformFields}" /></b:Interaction.Behaviors>
                                 </TextBox>
                             </StackPanel>
                             <Button Content="{loc:Loc Kitbasher.Apply}"
@@ -219,6 +217,7 @@
                                     IsEnabled="{Binding MenuBar.TransformTool.ButtonEnabled, UpdateSourceTrigger=PropertyChanged}"/> 
                         </StackPanel>
 
+                        <TextBlock Text="{Binding MenuBar.TransformTool.CoordinateDescription}" FontSize="12" Style="{StaticResource AeText.Caption}" Margin="6,0,6,4"/>
                         <DockPanel Margin="2" Visibility="{Binding MenuBar.TransformTool.ShowVertexFalloff.Value, UpdateSourceTrigger=PropertyChanged, Converter={StaticResource BoolToCollapsedConverter}}">
                             <TextBlock Style="{StaticResource AeForm.TextLabel}" Text="{loc:Loc Kitbasher.VertexFalloff}" DockPanel.Dock="Left"/>
                             <TextBox  DockPanel.Dock="Right"
@@ -226,13 +225,13 @@
                                          UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" VerticalContentAlignment="Center" 
                                          ToolTip="{loc:Loc Kitbasher.VertexFalloff.ToolTip}">
                                 <b:Interaction.Behaviors>
-                                    <behaviors:TextBoxInputBehavior InputMode="DecimalInput"/>
+                                    <behaviors:TextBoxInputBehavior InputMode="DecimalInput" IsDragEnabled="True" DragMinimum="0"/>
                                 </b:Interaction.Behaviors>
                             </TextBox>
                         </DockPanel>
                     </StackPanel>
 
-                </DockPanel>
+                </Border>
             </Grid>
         </Grid>
 
