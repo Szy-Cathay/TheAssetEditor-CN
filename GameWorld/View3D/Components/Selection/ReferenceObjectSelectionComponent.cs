@@ -26,6 +26,7 @@ namespace GameWorld.Core.Components.Selection
         private readonly SceneManager _sceneManager;
         private readonly RenderEngineComponent _renderEngine;
         private readonly IDeviceResolver _deviceResolver;
+        private readonly ViewportInteractionCapabilities _capabilities;
         private Texture2D? _selectionTexture;
         private bool _isMouseDown;
         private Vector2 _startDrag;
@@ -39,7 +40,8 @@ namespace GameWorld.Core.Components.Selection
             CommandFactory commandFactory,
             SceneManager sceneManager,
             RenderEngineComponent renderEngine,
-            IDeviceResolver deviceResolver)
+            IDeviceResolver deviceResolver,
+            ViewportInteractionCapabilities capabilities)
         {
             _mouse = mouse;
             _keyboard = keyboard;
@@ -49,12 +51,19 @@ namespace GameWorld.Core.Components.Selection
             _sceneManager = sceneManager;
             _renderEngine = renderEngine;
             _deviceResolver = deviceResolver;
+            _capabilities = capabilities;
             UpdateOrder = (int)ComponentUpdateOrderEnum.SelectionComponent;
             DrawOrder = (int)ComponentDrawOrderEnum.SelectionComponent;
         }
 
         public override void Initialize()
         {
+            if (!_capabilities.ModelEditingEnabled)
+            {
+                base.Initialize();
+                return;
+            }
+
             if (_selectionManager.GetState() == null)
             {
                 _selectionManager.CreateSelectionSate(
@@ -73,6 +82,9 @@ namespace GameWorld.Core.Components.Selection
 
         public override void Update(GameTime gameTime)
         {
+            if (!_capabilities.ModelEditingEnabled)
+                return;
+
             if (_selectionManager.GetState()?.Mode !=
                 GeometrySelectionMode.Object)
             {
@@ -127,6 +139,9 @@ namespace GameWorld.Core.Components.Selection
 
         public void SelectFromIndex(int index)
         {
+            if (!_capabilities.ModelEditingEnabled)
+                return;
+
             var selectable = _sceneManager.GetByIndex(index);
             if (selectable != null)
                 SelectObjects([selectable], false, false);
@@ -172,7 +187,7 @@ namespace GameWorld.Core.Components.Selection
 
         public override void Draw(GameTime gameTime)
         {
-            if (!_isMouseDown || _selectionTexture == null)
+            if (!_capabilities.ModelEditingEnabled || !_isMouseDown || _selectionTexture == null)
                 return;
 
             var destination = CreateSelectionRectangle(

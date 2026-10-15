@@ -141,7 +141,8 @@ namespace AssetEditorTests
                 commandFactory,
                 null!,
                 null!,
-                null!);
+                null!,
+                new GameWorld.Core.Components.ViewportInteractionCapabilities());
             var boneSelectionHighlight =
                 new BoneSelectionHighlightComponent(
                     selectionManager,

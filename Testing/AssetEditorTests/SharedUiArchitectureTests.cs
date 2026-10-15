@@ -165,6 +165,8 @@ namespace AssetEditorTests
                 ["{StaticResource AeVerticalGridSplitterStyle}"],
                 ["Editors/AnimationFragmentEditor/Editor.AnimationFragmentEditor/CampaignAnimBin/CampaignTableEditorView.xaml"] =
                 ["{StaticResource AeVerticalGridSplitterStyle}"],
+                ["Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/RetargetWorkspaceView.xaml"] =
+                ["{StaticResource AeVerticalGridSplitterStyle}"],
                 ["Editors/AnimationReTarget/Editors.AnimatioReTarget/Editor/BoneHandling/Presentation/BoneSettingsView.xaml"] =
                 ["{StaticResource AeVerticalGridSplitterStyle}"],
                 ["Editors/CscEditor/Editors.CscEditor/Views/CscEditorView.xaml"] =

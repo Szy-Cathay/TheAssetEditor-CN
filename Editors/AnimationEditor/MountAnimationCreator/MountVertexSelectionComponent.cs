@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using Editors.Shared.Core.Common;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Components;
 using GameWorld.Core.Components.Input;
@@ -31,6 +33,8 @@ namespace AnimationEditor.MountAnimationCreator
         private VertexRenderItem? _vertexRenderItem;
         private Rmv2MeshNode? _wireframeMesh;
         private AnimatedWireframeRenderItem? _wireframeRenderItem;
+        private SceneObject? _mount;
+        private bool _isSelectingAttachment;
         private bool _isMouseDown;
         private Vector2 _startDrag;
         private Vector2 _currentMousePosition;
@@ -83,25 +87,30 @@ namespace AnimationEditor.MountAnimationCreator
                 ToggleVertexSelectionMode();
             }
 
-            if (_selectionManager.GetState() is not
-                VertexSelectionState vertexSelection)
+            if (!_isSelectingAttachment)
+                return;
+
+            if (!_mouse.IsMouseOwner(this) ||
+                _keyboard.IsKeyDown(Keys.LeftAlt) || _keyboard.IsKeyDown(Keys.RightAlt))
             {
+                ReleaseMouseOwnership();
                 return;
             }
 
-            if (!_mouse.IsMouseOwner(this))
-                return;
-
+            var vertexSelection = _selectionManager.GetState<VertexSelectionState>();
             _currentMousePosition = _mouse.Position();
             if (_mouse.IsMouseButtonPressed(MouseButton.Left))
             {
+                vertexSelection = SelectAttachmentMesh(_camera.CreateCameraRay(_currentMousePosition)) ?? vertexSelection;
+                if (vertexSelection == null || !GetMountMeshes().Contains(vertexSelection.RenderObject))
+                    return;
                 _startDrag = _currentMousePosition;
                 _isMouseDown = true;
                 if (_mouse.MouseOwner != this)
                     _mouse.MouseOwner = this;
             }
 
-            if (_mouse.IsMouseButtonReleased(MouseButton.Left))
+            if (_isMouseDown && vertexSelection != null && _mouse.IsMouseButtonReleased(MouseButton.Left))
             {
                 var rectangle = CreateSelectionRectangle(
                     _startDrag,
@@ -130,38 +139,96 @@ namespace AnimationEditor.MountAnimationCreator
                 _isMouseDown = false;
             }
 
-            if (!_isMouseDown && _mouse.MouseOwner == this)
+            if (!_isMouseDown)
+                ReleaseMouseOwnership();
+        }
+
+        public void SetMount(SceneObject mount)
+        {
+            if (_mount != null)
+                _mount.MeshChanged -= OnMountMeshChanged;
+            ResetAttachmentSelection();
+            _mount = mount;
+            _mount.MeshChanged += OnMountMeshChanged;
+        }
+
+        private void OnMountMeshChanged(SceneObject _) => ResetAttachmentSelection();
+
+        internal void ToggleVertexSelectionMode()
+        {
+            if (_isSelectingAttachment)
             {
-                _mouse.MouseOwner = null;
-                _mouse.ClearStates();
+                ResetAttachmentSelection();
+                return;
+            }
+
+            var mesh = GetMountMeshes().FirstOrDefault();
+            if (mesh == null)
+                return;
+            _isSelectingAttachment = true;
+            _selectionManager.CreateSelectionSate(GeometrySelectionMode.Vertex, mesh);
+        }
+
+        private void ResetAttachmentSelection()
+        {
+            ReleaseMouseOwnership();
+            if (_isSelectingAttachment)
+                _selectionManager.CreateSelectionSate(GeometrySelectionMode.Object, null!);
+            _isSelectingAttachment = false;
+        }
+
+        internal VertexSelectionState? SelectAttachmentMesh(Ray ray)
+        {
+            if (!_isSelectingAttachment)
+                return null;
+
+            Rmv2MeshNode? closestMesh = null;
+            var closestDistance = float.MaxValue;
+            foreach (var mesh in GetMountMeshes())
+            {
+                var distance = IntersectionMath.IntersectObject(
+                    ray, mesh.Geometry, MeshPoseSnapshot.Capture(mesh).GetWorldPositions());
+                if (distance.HasValue && distance.Value < closestDistance)
+                {
+                    closestDistance = distance.Value;
+                    closestMesh = mesh;
+                }
+            }
+            if (closestMesh == null)
+                return null;
+
+            var state = _selectionManager.GetState<VertexSelectionState>();
+            return state?.RenderObject == closestMesh ? state :
+                (VertexSelectionState)_selectionManager.CreateSelectionSate(GeometrySelectionMode.Vertex, closestMesh);
+        }
+
+        private IEnumerable<Rmv2MeshNode> GetMountMeshes()
+        {
+            var root = _mount?.ModelNode;
+            if (root == null)
+                yield break;
+            for (var node = root; node != null; node = node.Parent)
+            {
+                if (!node.IsVisible)
+                    yield break;
+            }
+            var meshes = SceneNodeHelper.GetChildrenOfType<Rmv2MeshNode>(root, node => node.IsVisible);
+            if (root is Rmv2MeshNode rootMesh)
+                meshes.Add(rootMesh);
+            foreach (var mesh in meshes)
+            {
+                if (mesh.Geometry.WeightCount > 0)
+                    yield return mesh;
             }
         }
 
-        private void ToggleVertexSelectionMode()
+        private void ReleaseMouseOwnership()
         {
-            var state = _selectionManager.GetState();
-            if (state is ObjectSelectionState objectSelection)
-            {
-                var selectedObject =
-                    objectSelection.GetSingleSelectedObject();
-                if (selectedObject != null)
-                {
-                    _selectionManager.CreateSelectionSate(
-                        GeometrySelectionMode.Vertex,
-                        selectedObject);
-                }
+            _isMouseDown = false;
+            if (_mouse.MouseOwner != this)
                 return;
-            }
-
-            if (state is not VertexSelectionState vertexSelection)
-                return;
-
-            var renderObject = vertexSelection.RenderObject;
-            var replacement = (ObjectSelectionState)
-                _selectionManager.CreateSelectionSate(
-                    GeometrySelectionMode.Object,
-                    null);
-            replacement.ModifySelection([renderObject], false);
+            _mouse.MouseOwner = null;
+            _mouse.ClearStates();
         }
 
         private void SelectFromRectangle(
@@ -234,9 +301,10 @@ namespace AnimationEditor.MountAnimationCreator
 
         public override void Draw(GameTime gameTime)
         {
-            if (_selectionManager.GetState() is not
+            if (!_isSelectingAttachment || _selectionManager.GetState() is not
                     VertexSelectionState selection ||
                 selection.RenderObject is not Rmv2MeshNode mesh ||
+                !GetMountMeshes().Contains(mesh) ||
                 _vertexRenderItem == null)
             {
                 return;
@@ -273,6 +341,10 @@ namespace AnimationEditor.MountAnimationCreator
 
         public void Dispose()
         {
+            ResetAttachmentSelection();
+            if (_mount != null)
+                _mount.MeshChanged -= OnMountMeshChanged;
+            _mount = null;
             _wireframeRenderItem?.Dispose();
             _wireframeRenderItem = null;
             _wireframeMesh = null;

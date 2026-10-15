@@ -8,6 +8,7 @@
 | 跨模块定位、依赖注入、Pack 生命周期、共享 UI、更新器或测试路由 | [`architecture.md`](architecture.md) | 入口、边界、验证定位 |
 | KitbashEditor、模型选择/变换/覆盖层、场景树、保存或 Kitbash 子工具 | [`kitbash-editor.md`](kitbash-editor.md) | 模型编辑架构、状态所有权、实现边界和验证门禁 |
 | 超级视图、SuperView、Animation META 预览、元数据时间/空间编辑或双文档保存 | [`superview.md`](superview.md) | 元数据预览/编辑数据流、双文档所有权和模型编辑隔离 |
+| 动画重定向布局、来源/目标切换或共享播放进度 | [`ui-design-system.md`](ui-design-system.md)、[`architecture.md`](architecture.md) | 实际重定向流程、主动画进度与模型交互隔离 |
 | 新增、修改、审查或验收任何 WPF 界面、窗口、控件、主题、图标、动画或加载进度 | [`ui-design-system.md`](ui-design-system.md) | 唯一长期 UI 规范与实施门禁 |
 | 文件夹工程、本地 Git、状态语义、路径安全或大型工程性能 | [`folder-project-version-control.md`](folder-project-version-control.md) | 非显然状态模型和高风险契约 |
 | 外部进程通过命名管道打开资源 | [`asseteditor-ipc.md`](asseteditor-ipc.md) | IPC 协议和限制 |
@@ -34,3 +35,4 @@
 以下文件仅用于追溯用户要求保留的阶段验收，不作为默认加载的 AI 上下文，也不能代替当前代码和新改动的验证：
 
 - [KitbashEditor 界面与工具改进验收记录](maintenance/kitbash-editor-acceptance-20261015.md)
+- [动画重定向布局与播放改进验收记录](maintenance/animation-retarget-acceptance-20261015.md)

@@ -1,4 +1,5 @@
 ﻿using Editors.CscEditor.Services;
+using Editors.CscEditor.Data;
 using GameWorld.Core.Components;
 using GameWorld.Core.Components.Input;
 using Microsoft.Xna.Framework;
@@ -8,6 +9,25 @@ namespace Test.CscEditor;
 
 public class CscGizmoHistoryTests
 {
+    [TestCase(CscElementKind.Model, false)]
+    [TestCase(CscElementKind.VariantModel, false)]
+    [TestCase(CscElementKind.Prefab, false)]
+    [TestCase(CscElementKind.RootRef, false)]
+    [TestCase(CscElementKind.Camera, true)]
+    [TestCase(CscElementKind.PointLight, true)]
+    [TestCase(CscElementKind.SpotLight, true)]
+    [TestCase(CscElementKind.Locator, true)]
+    [TestCase(CscElementKind.Vfx, true)]
+    public void SetTarget_RejectsModelsAndKeepsSpecializedSceneTargets(CscElementKind kind, bool expected)
+    {
+        var mouse = new TestMouse();
+        using var gizmo = new CscGizmoComponent(mouse);
+        gizmo.SetTarget(new CscElement { Kind = kind });
+
+        Assert.That(gizmo.HasTarget, Is.EqualTo(expected));
+        Assert.That(mouse.MouseOwner, Is.Null);
+    }
+
     [TestCase("SetTarget")]
     [TestCase("Disable")]
     [TestCase("Dispose")]

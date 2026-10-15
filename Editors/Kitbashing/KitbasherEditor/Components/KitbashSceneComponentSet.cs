@@ -31,8 +31,10 @@ namespace Editors.KitbasherEditor.Components
             SelectionManager selectionManager,
             SceneManager sceneManager,
             IScopedResourceLibrary resourceLibrary,
-            IWpfGame scene)
+            IWpfGame scene,
+            ViewportInteractionCapabilities capabilities)
         {
+            capabilities.EnableModelEditing();
             ModelGizmo = new KitbashModelGizmoComponent(
                 eventHub,
                 keyboard,

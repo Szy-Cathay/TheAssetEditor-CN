@@ -1164,9 +1164,8 @@ public class UiAnimationMetadataFamilyGallery
         if (variant == "retarget-bone-settings")
         {
             var tree = FindVisualDescendants<TreeView>(window).Single();
-            var selectedBoneView =
-                FindVisualDescendants<RetargetSelectedBoneView>(window)
-                    .Single();
+            var propertiesScroll = FindVisualDescendants<ScrollViewer>(window)
+                .Single(viewer => viewer.Name == "BonePropertiesScroll");
             var splitter = FindVisualDescendants<GridSplitter>(window)
                 .Single();
             var treeScrollViewer =
@@ -1176,7 +1175,7 @@ public class UiAnimationMetadataFamilyGallery
             {
                 NUnitAssert.That(
                     tree.ActualHeight,
-                    Is.EqualTo(selectedBoneView.ActualHeight).Within(1));
+                    Is.EqualTo(propertiesScroll.ActualHeight).Within(1));
                 NUnitAssert.That(
                     splitter.ActualHeight,
                     Is.EqualTo(tree.ActualHeight).Within(1));

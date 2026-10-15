@@ -1,0 +1,56 @@
+﻿<UserControl x:Class="Editors.AnimatioReTarget.Editor.RetargetWorkspaceView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Editors.AnimatioReTarget.Editor"
+             xmlns:player="clr-namespace:AnimationEditor.Common.AnimationPlayer;assembly=Editors.Shared.Core"
+             xmlns:b="http://schemas.microsoft.com/xaml/behaviors"
+             xmlns:behaviors="clr-namespace:Shared.Ui.Common.Behaviors;assembly=Shared.Ui"
+             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+             Background="{DynamicResource AeBrush.Canvas}" Foreground="{DynamicResource AeBrush.TextPrimary}"
+             FontFamily="{DynamicResource AppFontFamily}" FontSize="12" FontWeight="Normal">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="RetargetUiStyles.xaml" />
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="{Binding LeftColumnWidth, Mode=TwoWay}" MinWidth="320" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="{Binding RightColumnWidth, Mode=TwoWay}" MinWidth="460" />
+        </Grid.ColumnDefinitions>
+        <Grid x:Name="PreviewArea">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" MinHeight="120" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <WrapPanel Background="{DynamicResource AeBrush.Surface1}">
+                <Menu>
+                    <MenuItem Header="{loc:Loc EditorHost.Menu.Camera}">
+                        <MenuItem Header="{loc:Loc EditorHost.Menu.FocusSelection}" Command="{Binding FocusCameraCommand}" />
+                        <MenuItem Header="{loc:Loc EditorHost.Menu.Reset}" Command="{Binding ResetCameraCommand}" />
+                    </MenuItem>
+                    <MenuItem Header="{loc:Loc FactionTint.Menu}" Command="{Binding OpenFactionColourSettingsCommand}" />
+                </Menu>
+                <CheckBox Content="{loc:Loc AnimReTarget.GeneratedMesh}" IsChecked="{Binding Rendering.ShowGeneratedMesh}" Margin="8,0" />
+                <CheckBox Content="{loc:Loc AnimReTarget.GeneratedSkeleton}" IsChecked="{Binding Rendering.ShowGeneratedSkeleton}" Margin="0,0,8,0" />
+                <StackPanel Orientation="Horizontal">
+                    <Label Content="{loc:Loc AnimReTarget.OffsetSpacing}" Style="{StaticResource Retarget.Label}" />
+                    <TextBox Width="64" Height="20" MinHeight="0" Padding="6,0" Margin="0,2,8,2" VerticalAlignment="Center"
+                             Text="{Binding Rendering.VisualOffset, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                             AutomationProperties.Name="{loc:Loc AnimReTarget.OffsetSpacing}" ToolTip="{loc:Loc AnimReTarget.DisplaySpacing.ToolTip}">
+                        <b:Interaction.Behaviors><behaviors:TextBoxInputBehavior InputMode="DecimalInput" /></b:Interaction.Behaviors>
+                    </TextBox>
+                </StackPanel>
+            </WrapPanel>
+            <ContentControl x:Name="Viewport" Grid.Row="1" Content="{Binding GameWorld}" />
+            <player:AnimationPlayerView x:Name="Playback" Grid.Row="2" DataContext="{Binding Player}" />
+        </Grid>
+        <GridSplitter Grid.Column="1" Style="{StaticResource AeVerticalGridSplitterStyle}" />
+        <local:EditorView x:Name="Inspector" Grid.Column="2" />
+    </Grid>
+</UserControl>
