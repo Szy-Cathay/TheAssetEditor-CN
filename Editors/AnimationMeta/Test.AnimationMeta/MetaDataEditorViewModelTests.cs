@@ -295,6 +295,60 @@ namespace Test.AnimationMeta
         }
 
         [Test]
+        public void RepeatPasteCreatesIndependentEffectObjects()
+        {
+            var parser = new MetaDataFileParser(new MetaDataDatabase());
+            var clipboard = new CopyPasteManager();
+            var command = new Editors.AnimationMeta.MetaEditor.Commands.CopyPastCommand(clipboard, Moq.Mock.Of<IStandardDialogs>());
+            var firstOwner = new MetaDataEditorViewModel(null!, parser, Moq.Mock.Of<IEventHub>());
+            var secondOwner = new MetaDataEditorViewModel(null!, parser, Moq.Mock.Of<IEventHub>());
+            var original = new Effect_v12
+            {
+                Name = "EFFECT", Version = 12, VfxName = "copy_identity", Position = new(1, 2, 3), Scale = 2,
+                StartTime = .25f, EndTime = 2, NodeIndex = -1,
+            };
+            var source = new ParsedMetadataFile { Version = 2, Attributes = [original] };
+            firstOwner.LoadFile(PackFile.CreateFromBytes("animation.anm.meta", parser.GenerateBytes(2, source)));
+            secondOwner.LoadFile(PackFile.CreateFromBytes("persistent.meta", parser.GenerateBytes(2, new ParsedMetadataFile { Version = 2 })));
+            try
+            {
+                firstOwner.Tags.Single().IsSelected = true;
+                command.ExecuteCopy(firstOwner);
+                var copy = clipboard.GetPasteObject<Editors.AnimationMeta.MetaEditor.Commands.MetaDataTagCopyItem>()!;
+                var template = (Effect_v12)copy.Items.Single();
+                command.ExecutePaste(firstOwner);
+                var first = (Effect_v12)firstOwner.ParsedFile!.Attributes.Last();
+                command.ExecutePaste(firstOwner);
+                var second = (Effect_v12)firstOwner.ParsedFile.Attributes.Last();
+                Assert.That(first, Is.Not.SameAs(template), "A paste must create a fresh source object instead of inserting the clipboard's template.");
+                Assert.That(second, Is.Not.SameAs(first));
+                Assert.That(second, Is.Not.SameAs(template));
+                first.Position = new(9, 8, 7); first.Scale = 5; first.VfxName = "changed_copy"; first.Name = "CHANGED_EFFECT";
+                foreach (var unchanged in new[] { second, template, (Effect_v12)firstOwner.ParsedFile.Attributes[0] })
+                {
+                    Assert.That(unchanged.Position, Is.EqualTo(original.Position)); Assert.That(unchanged.Scale, Is.EqualTo(original.Scale));
+                    Assert.That(unchanged.VfxName, Is.EqualTo(original.VfxName)); Assert.That(unchanged.Name, Is.EqualTo(original.Name));
+                }
+                command.ExecutePaste(firstOwner);
+                var third = (Effect_v12)firstOwner.ParsedFile.Attributes.Last();
+                Assert.That(third, Is.Not.SameAs(first).And.Not.SameAs(second).And.Not.SameAs(template));
+                Assert.That(third.Position, Is.EqualTo(original.Position)); Assert.That(third.Scale, Is.EqualTo(original.Scale));
+                Assert.That(third.VfxName, Is.EqualTo(original.VfxName)); Assert.That(third.Name, Is.EqualTo(original.Name));
+                command.ExecutePaste(secondOwner);
+                var otherOwner = (Effect_v12)secondOwner.ParsedFile!.Attributes.Single();
+                Assert.That(otherOwner, Is.Not.SameAs(first).And.Not.SameAs(second).And.Not.SameAs(third).And.Not.SameAs(template));
+                otherOwner.Position = new(-3, -2, -1); otherOwner.Scale = .5f; otherOwner.VfxName = "other_owner";
+                Assert.That(third.Position, Is.EqualTo(original.Position)); Assert.That(third.Scale, Is.EqualTo(original.Scale));
+                Assert.That(third.VfxName, Is.EqualTo(original.VfxName));
+                Assert.That(template.Position, Is.EqualTo(original.Position)); Assert.That(template.Scale, Is.EqualTo(original.Scale));
+                Assert.That(template.VfxName, Is.EqualTo(original.VfxName));
+                Assert.That(firstOwner.ParsedFile.Attributes, Has.Count.EqualTo(4));
+                Assert.That(firstOwner.HasUnsavedChanges, Is.True); Assert.That(secondOwner.HasUnsavedChanges, Is.True);
+            }
+            finally { firstOwner.Close(); secondOwner.Close(); }
+        }
+
+        [Test]
         public void MetaDataEditor_UpdateViewAfterStructuralChange_MarksEditorDirty()
         {
             var packFile = PathHelper.GetDataFile("Throt.pack");

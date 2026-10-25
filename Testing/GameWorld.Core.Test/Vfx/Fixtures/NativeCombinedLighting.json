@@ -1,0 +1,2561 @@
+{
+  "Scope": "Static ordinary camera-facing opaque sprites, C0.04, size0.55, average0.6, g0.4, white sun20000 at azimuth90 elevation30; fixed same-position eroded interiors. Approximate response within1 display code, not full shader equivalence. Zero speed/force/emitter rotation, same source/depth10; no inferred age. Corrected world normals and native cube labels are independently checked at yaw0/pitch0 and yaw45/pitch30.",
+  "EnvironmentXml": "<environment_file serialise_version=\"11\" environment_prefab=\"prefabs/sky_cloudy_01.bmd\" post_processes=\"\" time_of_day=\"12.000000\">\r\n  <lighting serialise_version=\"15\" sun_colour_scale=\"20000\" sea_bed_light_scatter_red=\"0.980000\" sea_bed_light_scatter_green=\"0.980000\" sea_bed_light_scatter_blue=\"0.980000\" refraction_light_scatter=\"0.630000\" use_custom_ambient_cube_colours=\"true\" ambient_cube_hdr_scaler=\"1\" ambient_scale=\"1\" sun_direction_azimuth=\"90\" sun_direction_elevation=\"30\" auto_gen_cubemap_set=\"false\" cloud_shadow_scroll_speed=\"1.000000\" cloud_shadow_uv_scale=\"0.000000\" cloud_shadow_lerp=\"0\" sky_colour_scale=\"0\" cloud_shadow_texture=\"commontextures/clouds_soft.dds\" dynamic_light_scale=\"0.100000\" terrain_shadow_softening=\"7.000000\" irradiance_power=\"1\" ambient_fudge_factor=\"1\" skydome_texture_file=\"\" vfx_global_brightness_multiplier=\"1\" sss_distance_cutoff=\"0.100000\" sss_blur_amount=\"0\" sss_blur_step=\"0\" terrain_shadow_bias_depth_threshold=\"0.450000\" terrain_shadow_full_bias=\"7.000000\">\r\n    <sun_colour r=\"1\" g=\"1\" b=\"1\" />\r\n    <deep_water_colour r=\"0.306901\" g=\"0.370629\" b=\"0.363945\" />\r\n    <shallow_water_colour r=\"0.236940\" g=\"0.532510\" b=\"0.545455\" />\r\n    <ambient_cube_left r=\"0.6\" g=\"0.2\" b=\"0.1\" />\r\n    <ambient_cube_right r=\"0.1\" g=\"0.5\" b=\"0.2\" />\r\n    <ambient_cube_top r=\"0.2\" g=\"0.4\" b=\"0.6\" />\r\n    <ambient_cube_bottom r=\"0.3\" g=\"0.1\" b=\"0.2\" />\r\n    <ambient_cube_front r=\"0.4\" g=\"0.2\" b=\"0.1\" />\r\n    <ambient_cube_back r=\"0.1\" g=\"0.3\" b=\"0.5\" />\r\n    <component_common serialise_version=\"1\" accumulate=\"true\" />\r\n  </lighting>\r\n  <post_processing serialise_version=\"5\" lut_texture_file=\"default\" lut_texture_file_2=\"default\" brightness_r=\"1.000000\" brightness_g=\"1.000000\" brightness_b=\"1.000000\" contrast_r=\"1.000000\" contrast_g=\"1.000000\" contrast_b=\"1.000000\" saturation_r=\"1.000000\" saturation_g=\"1.000000\" saturation_b=\"1.000000\" hue=\"0.000000\" sharpening_strength=\"0\" near_lut_strength=\"1.000000\" far_lut_strength=\"1.000000\" near_lut_distance=\"20.000000\" far_lut_distance=\"100.000000\" sharpening_strength_TAA=\"0\">\r\n    <overlay r=\"1.000000\" g=\"1.000000\" b=\"1.000000\" />\r\n    <component_common serialise_version=\"1\" accumulate=\"true\" />\r\n  </post_processing>\r\n  <fog serialise_version=\"8\" enabled=\"false\" density=\"0.000000\" haziness=\"0.000000\" height_top=\"200.000000\" height_density=\"0.000000\" noise=\"0.250000\" terrain_relative_height_fog=\"true\" clear_distance=\"200.000000\" is_3d=\"1.000000\" height_bottom=\"0.000000\" height_fog_clear_distance=\"200.000000\" clear_distance_fade_out=\"300.000000\" far_skybox_lerp=\"1.000000\" far_skybox_mip=\"5.000000\" shadow_strength=\"1.000000\" blur_strength=\"0.000000\" blur_offset=\"0.150000\" noise_scroll_speed=\"0.350000\">\r\n    <colour r=\"0.000000\" g=\"0.000000\" b=\"0.000000\" />\r\n    <component_common serialise_version=\"1\" accumulate=\"true\" />\r\n  </fog>\r\n  <legacy_fog serialise_version=\"2\" fog_distance_start=\"0.000000\" fog_distance_strength=\"0.000000\" fog_distance_scale=\"0.500000\" fog_height_top=\"0.000000\" fog_height_strength=\"0.000000\" fog_clear_distance=\"1000.000000\" fog_colour_blend=\"1.000000\" fog_precipitation_intensity=\"1.000000\" fog_precipitation_distance_modifier=\"0.070000\" terrain_relative_height_fog=\"false\">\r\n    <volume_fog_colour r=\"1.000000\" g=\"1.000000\" b=\"1.000000\" a=\"1.000000\" />\r\n  </legacy_fog>\r\n  <depth_of_field serialise_version=\"3\" dof_focal_depth=\"0.000000\" dof_focal_width=\"3402823346297367662189621542912\" dof_focal_falloff_near=\"1.000000\" dof_focal_falloff_far=\"1.000000\" dof_focal_depth_near=\"0.000000\" dof_focal_depth_far=\"3402823346297367662189621542912\" dof_focal_depth_near_max=\"0.000000\" dof_focal_depth_far_max=\"3402823346297367662189621542912\" dof_kernel_size_foreground=\"10.000000\" dof_kernel_size_foreground_coc=\"20.000000\" dof_kernel_size_background=\"10.000000\" dof_bokeh_sprite_radius=\"10.000000\" dof_bokeh_threshold=\"100.000000\" dof_bokeh_hotspot_kernel_size=\"5.000000\" dof_bokeh_intensity=\"2.000000\">\r\n    <tilt_shift_angles x=\"0.000000\" y=\"0.000000\" />\r\n    <component_common serialise_version=\"1\" accumulate=\"true\" />\r\n  </depth_of_field>\r\n  <audio serialise_version=\"1\" environment=\"\" />\r\n  <bloom serialise_version=\"4\" bloom_threshold=\"4.000000\" bloom_strength=\"0\" bloom_particle_strength=\"0\" bloom_emissive_strength=\"0\" bloom_water_strength=\"0\">\r\n    <component_common serialise_version=\"1\" accumulate=\"true\" />\r\n  </bloom>\r\n  <legacy_hdr serialise_version=\"5\" absolute_black_point=\"0.000000\" max_black_point=\"5.000000\" min_white_point=\"2.000000\" absolute_white_point=\"15.000000\" exposure_sensitivity=\"0.860000\" auto_exposure_speed_down=\"0.020000\" auto_exposure_speed_up=\"0.020000\" low_tones_bias_red=\"0.330000\" high_tones_bias_red=\"0.660000\" low_tones_bias_green=\"0.330000\" high_tones_bias_green=\"0.660000\" low_tones_bias_blue=\"0.330000\" high_tones_bias_blue=\"0.660000\" lock_rgb_relative_tones=\"true\" bloom_point_above_white_point=\"0.000000\" whiteout_start=\"0.000000\" whiteout_end=\"10.000000\" bloom_strength=\"1.000000\" />\r\n  <tone_mapping serialise_version=\"2\" brightness=\"1.000000\" burn=\"0.050000\" enabled=\"false\" auto_exposure=\"false\" target_exposure=\"-1\" adaptation_speed_up=\"0.500000\" adaptation_speed_down=\"0.500000\" max_relative_correction=\"1.000000\" sensitivity=\"0.200000\">\r\n    <component_common serialise_version=\"1\" accumulate=\"true\" />\r\n  </tone_mapping>\r\n  <weather serialise_version=\"5\" wind_dir_random=\"true\" wind_dir_degrees=\"303.952393\" wind_dir_variation_degrees=\"0.000000\" definition_name=\"dry gusty\" snowing_intensity=\"0.000000\" creep_intensity=\"0.000000\" />\r\n  <sun_mesh serialise_version=\"2\" sun_texture=\"sundisk1.dds\" sun_scale=\"0.001000\" sun_flare=\"0.000000\" sun_brightness_factor=\"0.000000\" />\r\n  <sunsky serialise_version=\"2\" sky_colour_scale=\"1.000000\" circumsolar_decay=\"0.840000\" circumsolar_colour_scale=\"1.000000\" horizon_colour_scale=\"1.000000\" horizon_opposite_colour_scale=\"1.000000\" horizon_decay=\"0.174757\" backscatter_colour_scale=\"1.000000\" backscatter_decay=\"1.000000\" render_skydome=\"false\">\r\n    <sky_colour r=\"0.400000\" g=\"0.478431\" b=\"0.576471\" />\r\n    <circumsolar_colour r=\"0.866667\" g=\"0.690196\" b=\"0.423529\" />\r\n    <horizon_colour r=\"0.866667\" g=\"0.690196\" b=\"0.423529\" />\r\n    <horizon_opposite_colour r=\"0.866667\" g=\"0.690196\" b=\"0.423529\" />\r\n    <backscatter_colour r=\"0.300000\" g=\"0.300000\" b=\"0.300000\" />\r\n  </sunsky>\r\n  <near_cloud_plane_mesh serialise_version=\"2\" grid_size=\"18\" height_scale=\"1.000000\" cloud_velocity=\"0.000000\" cloud_density=\"0.250000\" flatten_factor=\"1.000000\" sun_transmit_falloff=\"0.000000\" cloud_shadow_gradient=\"1.000000\" cloud_shadow_falloff=\"0.000000\" horizon_alpha_start=\"0.950000\" horizon_alpha_end=\"1.000000\" cloud_height_variation=\"0.000000\" cloudset=\"cloudset_1\" cloud_rotation=\"1.000000\" seed=\"0\">\r\n    <sun_transmitted_colour r=\"1.000000\" g=\"1.000000\" b=\"1.000000\" />\r\n    <sun_reflected_colour r=\"1.000000\" g=\"1.000000\" b=\"1.000000\" />\r\n    <cloud_shadow_colour r=\"1.000000\" g=\"1.000000\" b=\"1.000000\" />\r\n    <cloud_plane_data />\r\n  </near_cloud_plane_mesh>\r\n  <far_cloud_plane_mesh serialise_version=\"2\" grid_size=\"18\" height_scale=\"1.000000\" cloud_velocity=\"0.000000\" cloud_density=\"0.250000\" flatten_factor=\"1.000000\" sun_transmit_falloff=\"0.000000\" cloud_shadow_gradient=\"1.000000\" cloud_shadow_falloff=\"0.000000\" horizon_alpha_start=\"0.950000\" horizon_alpha_end=\"1.000000\" cloud_height_variation=\"0.000000\" cloudset=\"cloudset_1\" cloud_rotation=\"1.000000\" seed=\"0\">\r\n    <sun_transmitted_colour r=\"1.000000\" g=\"1.000000\" b=\"1.000000\" />\r\n    <sun_reflected_colour r=\"1.000000\" g=\"1.000000\" b=\"1.000000\" />\r\n    <cloud_shadow_colour r=\"1.000000\" g=\"1.000000\" b=\"1.000000\" />\r\n    <cloud_plane_data />\r\n  </far_cloud_plane_mesh>\r\n  <material_overrides />\r\n  <terrain_environment_data serialise_version=\"1\" battle_size=\"64\" />\r\n</environment_file>",
+  "EnvironmentSha256": "e2e77918983a631c6c3ea00eebd9c28c20e056779ea5d408c458442c2c72a4d2",
+  "Evidence": [
+    {
+      "Profile": "front-combined-native",
+      "RawFrames": 588,
+      "Pngs": 12,
+      "EnvironmentSha256": "e2e77918983a631c6c3ea00eebd9c28c20e056779ea5d408c458442c2c72a4d2",
+      "RecoveredPackSha256": "a9ad2ff01394212b2fe1ee67e349164461447abc93ff787e97ec2b68e21c62d7",
+      "InputsPreparedBeforeCapture": true
+    },
+    {
+      "Profile": "front-equivalent-native",
+      "RawFrames": 598,
+      "Pngs": 12,
+      "EnvironmentSha256": "e2e77918983a631c6c3ea00eebd9c28c20e056779ea5d408c458442c2c72a4d2",
+      "RecoveredPackSha256": "7878be264d82f1bf8e04f2edcec6aaedfcab4094045ce1160850c4c0a6f508ac",
+      "InputsPreparedBeforeCapture": true
+    },
+    {
+      "Profile": "compound-combined-native",
+      "RawFrames": 565,
+      "Pngs": 12,
+      "EnvironmentSha256": "e2e77918983a631c6c3ea00eebd9c28c20e056779ea5d408c458442c2c72a4d2",
+      "RecoveredPackSha256": "28d3daeb2a61d9bcb6cd086216401d931a385f75454bba36d5fe402924ce2afa",
+      "InputsPreparedBeforeCapture": true
+    },
+    {
+      "Profile": "compound-equivalent-native",
+      "RawFrames": 540,
+      "Pngs": 12,
+      "EnvironmentSha256": "e2e77918983a631c6c3ea00eebd9c28c20e056779ea5d408c458442c2c72a4d2",
+      "RecoveredPackSha256": "3cf259926bf807983cc63b2edc078e2261c1f7e6995c9471a657a742f080b7e2",
+      "InputsPreparedBeforeCapture": true
+    }
+  ],
+  "Cases": [
+    {
+      "Index": 0,
+      "Normal": "unset",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.4327602,
+        1.4959763,
+        1.6367785
+      ],
+      "WorldNormal": [
+        0,
+        0,
+        -1
+      ],
+      "SourceSha256": "48b06086fab7f9ec20550202f795ff27f4f3bfdf2c187f420d7392ec3bda6716",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        51.0,
+        52.0,
+        54.0
+      ],
+      "EquivalentRgb": [
+        51.0,
+        52.0,
+        55.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 1,
+      "Normal": "flat",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.4329681,
+        1.496177,
+        1.6369748
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.003921628,
+        -0.9999846
+      ],
+      "SourceSha256": "278e34e560d78d9debe9851271d1513225b332d4adf34d3770780a9958ffaa37",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        51.0,
+        52.0,
+        54.0
+      ],
+      "EquivalentRgb": [
+        51.0,
+        52.0,
+        55.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 2,
+      "Normal": "x-positive",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.7333825,
+        1.5712624,
+        1.6061461
+      ],
+      "WorldNormal": [
+        0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "3054a49afc4707164b933f280a1ad17e97c65d65df2782504c47c31f107565cf",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        55.0,
+        53.0,
+        53.0
+      ],
+      "EquivalentRgb": [
+        56.0,
+        54.0,
+        54.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 3,
+      "Normal": "x-negative",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.3377438,
+        1.491957,
+        1.4248209
+      ],
+      "WorldNormal": [
+        -0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "0a89b5e25f6f30935f56cb6c20d1271e9521d694f2eb3ce3cc5b8bdec6144943",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        49.0,
+        52.0,
+        51.0
+      ],
+      "EquivalentRgb": [
+        50.0,
+        52.0,
+        51.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 4,
+      "Normal": "y-positive",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.5059385,
+        1.5927696,
+        1.7625723
+      ],
+      "WorldNormal": [
+        0.003921628,
+        0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "53b93c722be72c307cf4ff8e9da15c6c23e8b3b44ee2a19546ff1406c5775241",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        52.0,
+        53.0,
+        56.0
+      ],
+      "EquivalentRgb": [
+        52.0,
+        54.0,
+        57.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 5,
+      "Normal": "y-negative",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.4185758,
+        1.4000746,
+        1.4647928
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "8b621c087ba7be3173aa2cc976ecfea229ebf974d7944ecf608e7e573a3aa903",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        50.0,
+        50.0,
+        51.0
+      ],
+      "EquivalentRgb": [
+        51.0,
+        51.0,
+        52.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 6,
+      "Normal": "unset",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.9713915,
+        1.0346076,
+        1.1754098
+      ],
+      "WorldNormal": [
+        0,
+        0,
+        -1
+      ],
+      "SourceSha256": "efc6963e9536c45bbfa59e574cfac259330ec6ccd7c6b92370a34463bceab8b9",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        42.0,
+        44.0,
+        47.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        44.0,
+        47.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 7,
+      "Normal": "flat",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.9714983,
+        1.0347072,
+        1.175505
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.003921628,
+        -0.9999846
+      ],
+      "SourceSha256": "03a955f4a84c0cd12f3aa27696428a9fe447ebfe29346c20c4eb49c15cb331b4",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        42.0,
+        44.0,
+        47.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        44.0,
+        47.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 8,
+      "Normal": "x-positive",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.2214011,
+        1.059281,
+        1.0941647
+      ],
+      "WorldNormal": [
+        0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "1fc5d5ec7ba8ba9d151edbd0b90f0384a140ff762a1a380682d7ed7755ea1b84",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        47.0,
+        44.0,
+        45.0
+      ],
+      "EquivalentRgb": [
+        48.0,
+        44.0,
+        45.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 9,
+      "Normal": "x-negative",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.92388374,
+        1.078097,
+        1.0109609
+      ],
+      "WorldNormal": [
+        -0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "2f833fe770cfe9792ff71ec5656b566681a3fb0455c1a920930a39a105373c35",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        41.0,
+        45.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        42.0,
+        45.0,
+        44.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 10,
+      "Normal": "y-positive",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0154419,
+        1.1022729,
+        1.2720757
+      ],
+      "WorldNormal": [
+        0.003921628,
+        0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "48a2d85583052551f0f8b3e6def71318b0cdc71984bbd2fc03e28a90f7488301",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        45.0,
+        48.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        45.0,
+        49.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 11,
+      "Normal": "y-negative",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.98472965,
+        0.9662285,
+        1.0309467
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "3350838c9c0f0c8903269210ef15869a7b24f4af9b49737cc4c5187818a02543",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        42.0,
+        44.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        44.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 12,
+      "Normal": "unset",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0100229,
+        1.073239,
+        1.2140411
+      ],
+      "WorldNormal": [
+        0,
+        0,
+        -1
+      ],
+      "SourceSha256": "320293205c9069d9e81f198cd517d8d50ac855712d2478611439c889a7e70d43",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        45.0,
+        48.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        45.0,
+        48.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 13,
+      "Normal": "flat",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0100286,
+        1.0732374,
+        1.2140353
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.003921628,
+        -0.9999846
+      ],
+      "SourceSha256": "43f86e2f629fc5fc94fe96c83ef8648ab01efffea6ef6c1b06652ee35ad8cbd9",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        45.0,
+        48.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        45.0,
+        48.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 14,
+      "Normal": "x-positive",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.2094197,
+        1.0472996,
+        1.0821834
+      ],
+      "WorldNormal": [
+        0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "ee8094f071ee93c9c00db550fe6b90837de2eff2a18266e8cc4ffcd5b7b6bbcf",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        48.0,
+        44.0,
+        45.0
+      ],
+      "EquivalentRgb": [
+        47.0,
+        44.0,
+        45.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 15,
+      "Normal": "x-negative",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0100238,
+        1.164237,
+        1.097101
+      ],
+      "WorldNormal": [
+        -0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "f8d3b505073aff898083c45e9a4a38536a8f50577a13d8d9d57c71081dfd98e6",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        47.0,
+        45.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        47.0,
+        45.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 16,
+      "Normal": "y-positive",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0249451,
+        1.1117762,
+        1.281579
+      ],
+      "WorldNormal": [
+        0.003921628,
+        0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "e9326b14e42e07a7b8c57b3ecde079a8074b81f5a9ca5e7b23b0566d8554945c",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        44.0,
+        46.0,
+        49.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        46.0,
+        49.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 17,
+      "Normal": "y-negative",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0508835,
+        1.0323824,
+        1.0971006
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "9d8e593988085928cb4dc90498a055ad50d213dfa3642e392ef9d4a31332b158",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        44.0,
+        44.0,
+        45.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        44.0,
+        45.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 18,
+      "Normal": "unset",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.010022826,
+        0.07323897,
+        0.21404114
+      ],
+      "WorldNormal": [
+        0,
+        0,
+        -1
+      ],
+      "SourceSha256": "667ee19d61c07a50a1653ab7df05a3610151655ee40c915013ccb8f8249a8894",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        1.0,
+        10.0,
+        19.0
+      ],
+      "EquivalentRgb": [
+        2.0,
+        10.0,
+        19.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 19,
+      "Normal": "flat",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.010028543,
+        0.07323738,
+        0.21403523
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.003921628,
+        -0.9999846
+      ],
+      "SourceSha256": "e3601c936a9fc27cad82d3a18e6782ef937177302b417e47534cdac73cb52f84",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        1.0,
+        10.0,
+        19.0
+      ],
+      "EquivalentRgb": [
+        2.0,
+        10.0,
+        19.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 20,
+      "Normal": "x-positive",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.20941974,
+        0.047299664,
+        0.08218338
+      ],
+      "WorldNormal": [
+        0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "afc2f416fadfea919b5b1740be0f5e9f15506e9556a33b88ebec30c54eb3f029",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        19.0,
+        7.0,
+        11.0
+      ],
+      "EquivalentRgb": [
+        19.0,
+        8.0,
+        11.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 21,
+      "Normal": "x-negative",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.010023797,
+        0.16423701,
+        0.097101
+      ],
+      "WorldNormal": [
+        -0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "40c7967860dcbbe477e5e2909ff75b382df7a1e8a7a6b10d3716baec4263393d",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        1.0,
+        17.0,
+        12.0
+      ],
+      "EquivalentRgb": [
+        2.0,
+        17.0,
+        12.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 22,
+      "Normal": "y-positive",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.024945192,
+        0.1117762,
+        0.28157896
+      ],
+      "WorldNormal": [
+        0.003921628,
+        0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "a6789b123da5ca28db585f14a388c125bfdae2e66bcb1abe755a2c88124a9dde",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        4.0,
+        13.0,
+        22.0
+      ],
+      "EquivalentRgb": [
+        5.0,
+        13.0,
+        22.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 23,
+      "Normal": "y-negative",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.050883524,
+        0.032382395,
+        0.09710065
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "bfb08f7a0ef4f7a2e33a7750616561b7e6bae0983516059eebcdde2a07461db4",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        8.0,
+        5.0,
+        12.0
+      ],
+      "EquivalentRgb": [
+        8.0,
+        6.0,
+        12.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 24,
+      "Normal": "unset",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        0,
+        0,
+        -1
+      ],
+      "SourceSha256": "3f6e32dae5b0fc60203cb1a6317ca3124f4b997fb5227d8d7d0936687d4b1372",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 25,
+      "Normal": "flat",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.003921628,
+        -0.9999846
+      ],
+      "SourceSha256": "c40afa3f380605e1a77d07a7f2dd40c32aa496c3de34fde18e430af4882398e2",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 26,
+      "Normal": "x-positive",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "aead6822de921ce6bfae3ffd488a5b4c77f76ce22eee8eeae0a7aa02ee35ad1d",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 27,
+      "Normal": "x-negative",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        -0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "713c0051c65a63bfac3a2785a9704e26aee6c4ff989a0171d9cb4252db5d06a9",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 28,
+      "Normal": "y-positive",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        0.003921628,
+        0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "92a7dc8b2e8ee6adf396dd1676b12efc27934994dbea108e6292e14befcc5bd7",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 29,
+      "Normal": "y-negative",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "aaed316720152cce80bab80d4fb03d17f4cfbb012cc5d74a54b833eee78d5d63",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 30,
+      "Normal": "unset",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        0,
+        0,
+        -1
+      ],
+      "SourceSha256": "eda208fde9482fb4e96645a0200b716f4ffa8aaef779bf36d954a8e5b102415e",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 31,
+      "Normal": "flat",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.003921628,
+        -0.9999846
+      ],
+      "SourceSha256": "35f716e9e129a0993840f73a677684493b07a0c7054c7d6cfb4850ed62cbb6bb",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 32,
+      "Normal": "x-positive",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "3e337392fdb85333b0229738c7b34ef173bf16d54c4ee38d2a144b1c7e4ad9e9",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 33,
+      "Normal": "x-negative",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        -0.8039216,
+        -0.003921628,
+        -0.5947224
+      ],
+      "SourceSha256": "9070ebfc01bb2b00fcbecb2175e26771d2cb014d39c1c02e34fd6d950399f631",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 34,
+      "Normal": "y-positive",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        0.003921628,
+        0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "d12800007e74466f19ced307050bf2ef281f3e49049bb684169c3bd776cdc55f",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 35,
+      "Normal": "y-negative",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        0.003921628,
+        -0.8039216,
+        -0.5947224
+      ],
+      "SourceSha256": "7db7749d2a9d9721ec935125b3e1e0c7e79aa39e1954bc5cd5a5e7b854f84dd8",
+      "Profile": "front",
+      "Yaw": 0,
+      "Pitch": 0,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 0,
+      "Normal": "unset",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.3995888,
+        1.5247426,
+        1.5561119
+      ],
+      "WorldNormal": [
+        -0.6123724,
+        0.5,
+        -0.6123724
+      ],
+      "SourceSha256": "48b06086fab7f9ec20550202f795ff27f4f3bfdf2c187f420d7392ec3bda6716",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        50.0,
+        52.0,
+        53.0
+      ],
+      "EquivalentRgb": [
+        51.0,
+        53.0,
+        53.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 1,
+      "Normal": "flat",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.3994429,
+        1.5242323,
+        1.5559988
+      ],
+      "WorldNormal": [
+        -0.61097646,
+        0.49659607,
+        -0.6165225
+      ],
+      "SourceSha256": "278e34e560d78d9debe9851271d1513225b332d4adf34d3770780a9958ffaa37",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        50.0,
+        52.0,
+        53.0
+      ],
+      "EquivalentRgb": [
+        51.0,
+        53.0,
+        53.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 2,
+      "Normal": "x-positive",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.4936376,
+        1.5456611,
+        1.6835958
+      ],
+      "WorldNormal": [
+        0.2028803,
+        0.29396495,
+        -0.9340365
+      ],
+      "SourceSha256": "3054a49afc4707164b933f280a1ad17e97c65d65df2782504c47c31f107565cf",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        52.0,
+        52.0,
+        55.0
+      ],
+      "EquivalentRgb": [
+        52.0,
+        53.0,
+        55.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 3,
+      "Normal": "x-negative",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.3495686,
+        1.5320739,
+        1.3893161
+      ],
+      "WorldNormal": [
+        -0.9340365,
+        0.29396495,
+        0.2028803
+      ],
+      "SourceSha256": "0a89b5e25f6f30935f56cb6c20d1271e9521d694f2eb3ce3cc5b8bdec6144943",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        49.0,
+        52.0,
+        50.0
+      ],
+      "EquivalentRgb": [
+        50.0,
+        53.0,
+        50.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 4,
+      "Normal": "y-positive",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.5174115,
+        1.6175461,
+        1.800733
+      ],
+      "WorldNormal": [
+        -0.077189356,
+        0.9935777,
+        -0.08273539
+      ],
+      "SourceSha256": "53b93c722be72c307cf4ff8e9da15c6c23e8b3b44ee2a19546ff1406c5775241",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        52.0,
+        54.0,
+        57.0
+      ],
+      "EquivalentRgb": [
+        53.0,
+        54.0,
+        57.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 5,
+      "Normal": "y-negative",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.3398844,
+        1.4416819,
+        1.4296362
+      ],
+      "WorldNormal": [
+        -0.64564776,
+        -0.39885533,
+        -0.65119374
+      ],
+      "SourceSha256": "8b621c087ba7be3173aa2cc976ecfea229ebf974d7944ecf608e7e573a3aa903",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        49.0,
+        51.0,
+        51.0
+      ],
+      "EquivalentRgb": [
+        50.0,
+        51.0,
+        51.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 6,
+      "Normal": "unset",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.9576911,
+        1.0828449,
+        1.1142142
+      ],
+      "WorldNormal": [
+        -0.6123724,
+        0.5,
+        -0.6123724
+      ],
+      "SourceSha256": "efc6963e9536c45bbfa59e574cfac259330ec6ccd7c6b92370a34463bceab8b9",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        42.0,
+        45.0,
+        45.0
+      ],
+      "EquivalentRgb": [
+        42.0,
+        45.0,
+        46.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 7,
+      "Normal": "flat",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.95757896,
+        1.0823684,
+        1.1141348
+      ],
+      "WorldNormal": [
+        -0.61097646,
+        0.49659607,
+        -0.6165225
+      ],
+      "SourceSha256": "03a955f4a84c0cd12f3aa27696428a9fe447ebfe29346c20c4eb49c15cb331b4",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        42.0,
+        45.0,
+        45.0
+      ],
+      "EquivalentRgb": [
+        42.0,
+        45.0,
+        46.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 8,
+      "Normal": "x-positive",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.009177,
+        1.0612005,
+        1.1991352
+      ],
+      "WorldNormal": [
+        0.2028803,
+        0.29396495,
+        -0.9340365
+      ],
+      "SourceSha256": "1fc5d5ec7ba8ba9d151edbd0b90f0384a140ff762a1a380682d7ed7755ea1b84",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        43.0,
+        44.0,
+        47.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        45.0,
+        47.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 9,
+      "Normal": "x-negative",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.9333212,
+        1.1158265,
+        0.97306865
+      ],
+      "WorldNormal": [
+        -0.9340365,
+        0.29396495,
+        0.2028803
+      ],
+      "SourceSha256": "2f833fe770cfe9792ff71ec5656b566681a3fb0455c1a920930a39a105373c35",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        41.0,
+        45.0,
+        42.0
+      ],
+      "EquivalentRgb": [
+        42.0,
+        46.0,
+        43.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 10,
+      "Normal": "y-positive",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0251104,
+        1.1252449,
+        1.3084319
+      ],
+      "WorldNormal": [
+        -0.077189356,
+        0.9935777,
+        -0.08273539
+      ],
+      "SourceSha256": "48a2d85583052551f0f8b3e6def71318b0cdc71984bbd2fc03e28a90f7488301",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        43.0,
+        45.0,
+        49.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        46.0,
+        49.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 11,
+      "Normal": "y-negative",
+      "SimpleLighting": false,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.929982,
+        1.0317795,
+        1.0197338
+      ],
+      "WorldNormal": [
+        -0.64564776,
+        -0.39885533,
+        -0.65119374
+      ],
+      "SourceSha256": "3350838c9c0f0c8903269210ef15869a7b24f4af9b49737cc4c5187818a02543",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        41.0,
+        44.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        42.0,
+        44.0,
+        44.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 12,
+      "Normal": "unset",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0157933,
+        1.1409471,
+        1.1723164
+      ],
+      "WorldNormal": [
+        -0.6123724,
+        0.5,
+        -0.6123724
+      ],
+      "SourceSha256": "320293205c9069d9e81f198cd517d8d50ac855712d2478611439c889a7e70d43",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        44.0,
+        46.0,
+        47.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        46.0,
+        47.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 13,
+      "Normal": "flat",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.015715,
+        1.1405044,
+        1.1722709
+      ],
+      "WorldNormal": [
+        -0.61097646,
+        0.49659607,
+        -0.6165225
+      ],
+      "SourceSha256": "43f86e2f629fc5fc94fe96c83ef8648ab01efffea6ef6c1b06652ee35ad8cbd9",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        44.0,
+        46.0,
+        47.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        46.0,
+        47.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 14,
+      "Normal": "x-positive",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0247164,
+        1.0767399,
+        1.2146746
+      ],
+      "WorldNormal": [
+        0.2028803,
+        0.29396495,
+        -0.9340365
+      ],
+      "SourceSha256": "ee8094f071ee93c9c00db550fe6b90837de2eff2a18266e8cc4ffcd5b7b6bbcf",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        44.0,
+        45.0,
+        48.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        45.0,
+        48.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 15,
+      "Normal": "x-negative",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0170739,
+        1.1995791,
+        1.0568213
+      ],
+      "WorldNormal": [
+        -0.9340365,
+        0.29396495,
+        0.2028803
+      ],
+      "SourceSha256": "f8d3b505073aff898083c45e9a4a38536a8f50577a13d8d9d57c71081dfd98e6",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        43.0,
+        47.0,
+        44.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        47.0,
+        44.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 16,
+      "Normal": "y-positive",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0328093,
+        1.1329439,
+        1.3161308
+      ],
+      "WorldNormal": [
+        -0.077189356,
+        0.9935777,
+        -0.08273539
+      ],
+      "SourceSha256": "e9326b14e42e07a7b8c57b3ecde079a8074b81f5a9ca5e7b23b0566d8554945c",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        44.0,
+        46.0,
+        49.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        46.0,
+        49.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 17,
+      "Normal": "y-negative",
+      "SimpleLighting": false,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1.0200796,
+        1.1218771,
+        1.1098315
+      ],
+      "WorldNormal": [
+        -0.64564776,
+        -0.39885533,
+        -0.65119374
+      ],
+      "SourceSha256": "9d8e593988085928cb4dc90498a055ad50d213dfa3642e392ef9d4a31332b158",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        44.0,
+        46.0,
+        46.0
+      ],
+      "EquivalentRgb": [
+        44.0,
+        46.0,
+        46.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 18,
+      "Normal": "unset",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.015793309,
+        0.14094712,
+        0.1723164
+      ],
+      "WorldNormal": [
+        -0.6123724,
+        0.5,
+        -0.6123724
+      ],
+      "SourceSha256": "667ee19d61c07a50a1653ab7df05a3610151655ee40c915013ccb8f8249a8894",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        2.0,
+        15.0,
+        17.0
+      ],
+      "EquivalentRgb": [
+        3.0,
+        15.0,
+        17.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 19,
+      "Normal": "flat",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.015715007,
+        0.14050438,
+        0.17227086
+      ],
+      "WorldNormal": [
+        -0.61097646,
+        0.49659607,
+        -0.6165225
+      ],
+      "SourceSha256": "e3601c936a9fc27cad82d3a18e6782ef937177302b417e47534cdac73cb52f84",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        2.0,
+        15.0,
+        17.0
+      ],
+      "EquivalentRgb": [
+        3.0,
+        15.0,
+        17.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 20,
+      "Normal": "x-positive",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.024716433,
+        0.07673992,
+        0.21467458
+      ],
+      "WorldNormal": [
+        0.2028803,
+        0.29396495,
+        -0.9340365
+      ],
+      "SourceSha256": "afc2f416fadfea919b5b1740be0f5e9f15506e9556a33b88ebec30c54eb3f029",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        4.0,
+        10.0,
+        19.0
+      ],
+      "EquivalentRgb": [
+        5.0,
+        11.0,
+        19.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 21,
+      "Normal": "x-negative",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.017073832,
+        0.19957915,
+        0.05682129
+      ],
+      "WorldNormal": [
+        -0.9340365,
+        0.29396495,
+        0.2028803
+      ],
+      "SourceSha256": "40c7967860dcbbe477e5e2909ff75b382df7a1e8a7a6b10d3716baec4263393d",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        2.0,
+        19.0,
+        8.0
+      ],
+      "EquivalentRgb": [
+        3.0,
+        18.0,
+        9.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 22,
+      "Normal": "y-positive",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.032809235,
+        0.13294381,
+        0.31613076
+      ],
+      "WorldNormal": [
+        -0.077189356,
+        0.9935777,
+        -0.08273539
+      ],
+      "SourceSha256": "a6789b123da5ca28db585f14a388c125bfdae2e66bcb1abe755a2c88124a9dde",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        5.0,
+        15.0,
+        24.0
+      ],
+      "EquivalentRgb": [
+        6.0,
+        15.0,
+        24.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 23,
+      "Normal": "y-negative",
+      "SimpleLighting": false,
+      "Emissive": 0,
+      "Small": 0,
+      "Large": 0,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.0200796,
+        0.12187712,
+        0.10983142
+      ],
+      "WorldNormal": [
+        -0.64564776,
+        -0.39885533,
+        -0.65119374
+      ],
+      "SourceSha256": "bfb08f7a0ef4f7a2e33a7750616561b7e6bae0983516059eebcdde2a07461db4",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        3.0,
+        14.0,
+        13.0
+      ],
+      "EquivalentRgb": [
+        4.0,
+        14.0,
+        13.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 24,
+      "Normal": "unset",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        -0.6123724,
+        0.5,
+        -0.6123724
+      ],
+      "SourceSha256": "3f6e32dae5b0fc60203cb1a6317ca3124f4b997fb5227d8d7d0936687d4b1372",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 25,
+      "Normal": "flat",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        -0.61097646,
+        0.49659607,
+        -0.6165225
+      ],
+      "SourceSha256": "c40afa3f380605e1a77d07a7f2dd40c32aa496c3de34fde18e430af4882398e2",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 26,
+      "Normal": "x-positive",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        0.2028803,
+        0.29396495,
+        -0.9340365
+      ],
+      "SourceSha256": "aead6822de921ce6bfae3ffd488a5b4c77f76ce22eee8eeae0a7aa02ee35ad1d",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 27,
+      "Normal": "x-negative",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        -0.9340365,
+        0.29396495,
+        0.2028803
+      ],
+      "SourceSha256": "713c0051c65a63bfac3a2785a9704e26aee6c4ff989a0171d9cb4252db5d06a9",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 28,
+      "Normal": "y-positive",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        -0.077189356,
+        0.9935777,
+        -0.08273539
+      ],
+      "SourceSha256": "92a7dc8b2e8ee6adf396dd1676b12efc27934994dbea108e6292e14befcc5bd7",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 29,
+      "Normal": "y-negative",
+      "SimpleLighting": true,
+      "Emissive": 0.5,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        0.2665524,
+        0.31643417,
+        0.40927342
+      ],
+      "WorldNormal": [
+        -0.64564776,
+        -0.39885533,
+        -0.65119374
+      ],
+      "SourceSha256": "aaed316720152cce80bab80d4fb03d17f4cfbb012cc5d74a54b833eee78d5d63",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        21.0,
+        24.0,
+        28.0
+      ],
+      "EquivalentRgb": [
+        22.0,
+        24.0,
+        27.0
+      ],
+      "DisplayError": 1.0
+    },
+    {
+      "Index": 30,
+      "Normal": "unset",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        -0.6123724,
+        0.5,
+        -0.6123724
+      ],
+      "SourceSha256": "eda208fde9482fb4e96645a0200b716f4ffa8aaef779bf36d954a8e5b102415e",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 31,
+      "Normal": "flat",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        -0.61097646,
+        0.49659607,
+        -0.6165225
+      ],
+      "SourceSha256": "35f716e9e129a0993840f73a677684493b07a0c7054c7d6cfb4850ed62cbb6bb",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 32,
+      "Normal": "x-positive",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        0.2028803,
+        0.29396495,
+        -0.9340365
+      ],
+      "SourceSha256": "3e337392fdb85333b0229738c7b34ef173bf16d54c4ee38d2a144b1c7e4ad9e9",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 33,
+      "Normal": "x-negative",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        -0.9340365,
+        0.29396495,
+        0.2028803
+      ],
+      "SourceSha256": "9070ebfc01bb2b00fcbecb2175e26771d2cb014d39c1c02e34fd6d950399f631",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 34,
+      "Normal": "y-positive",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        -0.077189356,
+        0.9935777,
+        -0.08273539
+      ],
+      "SourceSha256": "d12800007e74466f19ced307050bf2ef281f3e49049bb684169c3bd776cdc55f",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    },
+    {
+      "Index": 35,
+      "Normal": "y-negative",
+      "SimpleLighting": true,
+      "Emissive": 1,
+      "Small": 0.1,
+      "Large": 0.5,
+      "Directionality": 0.4,
+      "AverageSize": 0.6,
+      "ExpectedGain": [
+        1,
+        1,
+        1
+      ],
+      "WorldNormal": [
+        -0.64564776,
+        -0.39885533,
+        -0.65119374
+      ],
+      "SourceSha256": "7db7749d2a9d9721ec935125b3e1e0c7e79aa39e1954bc5cd5a5e7b854f84dd8",
+      "Profile": "compound",
+      "Yaw": 45,
+      "Pitch": 30,
+      "NativeRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "EquivalentRgb": [
+        43.0,
+        43.0,
+        43.0
+      ],
+      "DisplayError": 0.0
+    }
+  ]
+}

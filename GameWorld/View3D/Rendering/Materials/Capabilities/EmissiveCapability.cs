@@ -34,6 +34,7 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities
         public void Apply(Effect effect, IScopedResourceLibrary resourceLibrary)
         {
             Emissive.Apply(effect, resourceLibrary);
+            EmissiveDistortion.Apply(effect, resourceLibrary);
 
             effect.Parameters["CapabilityFlag_ApplyEmissive"].SetValue(true);
 
@@ -43,6 +44,11 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities
             effect.Parameters["Emissive_GradientColours"].SetValue(GradientColours);
             effect.Parameters["Emissive_GradientTimes"].SetValue(GradientTimes);
             effect.Parameters["Emissive_FresnelStrength"].SetValue(EmissiveFresnelStrength);
+            effect.Parameters["Emissive_Direction"].SetValue(EmissiveDirection);
+            effect.Parameters["Emissive_Speed"].SetValue(EmissiveSpeed);
+            effect.Parameters["Emissive_DistortStrength"].SetValue(EmissiveDistortStrength);
+            effect.Parameters["Emissive_PulseSpeed"].SetValue(EmissivePulseSpeed);
+            effect.Parameters["Emissive_PulseStrength"].SetValue(EmissivePulseStrength);
         }
 
         public ICapability Clone()

@@ -22,6 +22,7 @@ namespace Shared.GameFormats.RigidModel.Vertex
         public Vector2 Uv { get; set; }
         public Vector2 Uv1 { get; set; }
         public Vector4 Colour { get; set; }
+        public Vector4? UnormColour { get; init; }
 
         public byte[] BoneIndex { get; set; }
         public float[] BoneWeight { get; set; }

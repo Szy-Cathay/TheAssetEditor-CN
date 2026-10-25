@@ -16,4 +16,10 @@
     <ProjectReference Include="..\MeshDecimator\MeshDecimator.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition="Exists('..\Vfx.Effekseer.Native\bin\$(Configuration)\AssetEditor.CN.Effekseer.dll')">
+    <None Include="..\Vfx.Effekseer.Native\bin\$(Configuration)\AssetEditor.CN.Effekseer.dll" Link="AssetEditor.CN.Effekseer.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Vfx.Effekseer.Native\bin\$(Configuration)\Effekseer.LICENSE.txt" Link="Effekseer.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Vfx.Effekseer.Native\bin\$(Configuration)\Effekseer.stb.LICENSE.txt" Link="Effekseer.stb.LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

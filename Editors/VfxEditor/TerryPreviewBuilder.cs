@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using System.Xml;
@@ -22,21 +22,25 @@ public sealed class TerryPreviewBuilder(LocalizationManager localization)
     {
         var files = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
         var effects = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var active = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var active = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var resources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         long totalBytes = 0;
         VisitEffect(Normalize(string.IsNullOrEmpty(sourcePath) ? "vfx\\untitled.xml" : sourcePath), currentBytes, EffectName, 0);
         return new(files, effects.Count);
 
-        string VisitEffect(string path, byte[] bytes, string alias, int depth)
+        string VisitEffect(string path, byte[] bytes, string alias, int depth, int eventEdges = 0)
         {
-            if (depth > 64 || !active.Add(path))
+            if (depth > 64)
                 throw new InvalidDataException(localization.GetFormat("Vfx.Terry.Cycle", path));
-            if (effects.TryGetValue(path, out var existing))
+            if (active.TryGetValue(path, out var activeEvents))
             {
-                active.Remove(path);
-                return existing;
+                // Event children can select other layers from the same library without a static recursion.
+                if (eventEdges > activeEvents && effects.TryGetValue(path, out var eventAlias)) return eventAlias;
+                throw new InvalidDataException(localization.GetFormat("Vfx.Terry.Cycle", path));
             }
+            if (effects.TryGetValue(path, out var existing))
+                return existing;
+            active.Add(path, eventEdges);
             var document = VfxDocument.Read(bytes);
             effects.Add(path, alias);
             document.Root.Element("vfx")!.SetAttributeValue("enable_in_ted", "true");
@@ -44,12 +48,26 @@ public sealed class TerryPreviewBuilder(LocalizationManager localization)
             {
                 var value = (string?)reference.Attribute("vfx_ref");
                 if (string.IsNullOrWhiteSpace(value)) continue;
-                var childPath = Normalize(value);
-                if (!childPath.StartsWith("vfx\\", StringComparison.OrdinalIgnoreCase)) childPath = "vfx\\" + childPath;
-                if (!childPath.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)) childPath += ".xml";
-                var child = Resolve(childPath);
-                var childAlias = "ae_cn_preview_" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(childPath)))[..16];
-                reference.SetAttributeValue("vfx_ref", VisitEffect(childPath, child.File.DataSource.ReadData(), childAlias, depth + 1));
+                reference.SetAttributeValue("vfx_ref", VisitDependency(value, depth, eventEdges));
+            }
+            foreach (var emitter in document.Root.Element("vfx")!.Elements("emitters").Elements("emitter"))
+            {
+                var events = new HashSet<XElement>();
+                var qualities = new[] { "0", "1", "2" }.Concat(emitter.Elements().Attributes("quality").Select(x => x.Value)).Distinct();
+                foreach (var quality in qualities)
+                {
+                    XElement? Property(string name) => emitter.Elements().Where(x => (string?)x.Attribute("name") == name
+                        && ((string?)x.Attribute("quality") is null or "0" || (string?)x.Attribute("quality") == quality))
+                        .OrderBy(x => (string?)x.Attribute("quality") == quality ? 1 : 0).LastOrDefault();
+                    if ((string?)Property("EventEnable")?.Attribute("value") != "true") continue;
+                    foreach (var name in new[] { "OnParticleSpawn", "OnParticleDeath" })
+                        if (Property(name) is { Name.LocalName: "property_event" } particleEvent) events.Add(particleEvent);
+                }
+                foreach (var particleEvent in events)
+                {
+                    var value = (string?)particleEvent.Attribute("vfx_name");
+                    if (!string.IsNullOrWhiteSpace(value)) particleEvent.SetAttributeValue("vfx_name", VisitDependency(value, depth, eventEdges + 1));
+                }
             }
             VisitXmlResources(document.Root, depth);
             var text = string.Concat(document.Root.Nodes().Select(node => node.ToString(SaveOptions.DisableFormatting)));
@@ -61,15 +79,25 @@ public sealed class TerryPreviewBuilder(LocalizationManager localization)
         TerryPreviewResource Resolve(string path) => resolve(path)
             ?? throw new InvalidDataException(localization.GetFormat("Vfx.Terry.MissingResource", path));
 
+        string VisitDependency(string value, int depth, int eventEdges)
+        {
+            var path = Normalize(value);
+            if (!path.StartsWith("vfx\\", StringComparison.OrdinalIgnoreCase)) path = "vfx\\" + path;
+            if (!path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)) path += ".xml";
+            var child = Resolve(path);
+            var alias = "ae_cn_preview_" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path)))[..16];
+            return VisitEffect(path, child.File.DataSource.ReadData(), alias, depth + 1, eventEdges);
+        }
+
         void VisitXmlResources(XElement root, int depth, bool skipGeometry = false)
         {
-            var values = root.DescendantsAndSelf().Attributes().Where(x => x.Name != "vfx_ref").Select(x => x.Value)
+            var values = root.DescendantsAndSelf().Attributes().Where(x => x.Name != "vfx_ref" && x.Name != "vfx_name").Select(x => x.Value)
                 .Concat(root.DescendantsAndSelf().Where(x => !x.HasElements && (!skipGeometry || x.Name != "geometry")).Select(x => x.Value));
             foreach (var value in values)
             {
                 var candidate = value.Trim();
                 var extension = Path.GetExtension(candidate).ToLowerInvariant();
-                if (extension is ".dds" or ".wsmodel" or ".rigid_model_v2" or ".material"
+                if (extension is ".dds" or ".wsmodel" or ".rigid_model_v2" or ".material" or ".anim"
                     || extension == ".xml" && (candidate.Contains('/') || candidate.Contains('\\')))
                     VisitResource(Normalize(candidate), depth + 1);
             }
@@ -82,7 +110,7 @@ public sealed class TerryPreviewBuilder(LocalizationManager localization)
             var resource = Resolve(path);
             var extension = Path.GetExtension(path).ToLowerInvariant();
             // Original textures already belong to the game; only inspect structured dependencies.
-            if (resource.IsOfficial && (extension == ".dds" || extension == ".rigid_model_v2" && !readModelTextures)) return;
+            if (resource.IsOfficial && (extension is ".dds" or ".anim" || extension == ".rigid_model_v2" && !readModelTextures)) return;
             var bytes = resource.File.DataSource.ReadData();
             if (!resource.IsOfficial) Add(path, bytes);
             if (extension is ".wsmodel" or ".material" or ".xml")

@@ -9,6 +9,8 @@ using GameWorld.Core.Rendering;
 using GameWorld.Core.Rendering.RenderItems;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Services;
+using GameWorld.Core.Utility;
+using GameWorld.Core.Vfx;
 using Microsoft.Xna.Framework;
 using Serilog;
 using Shared.Core.ErrorHandling;
@@ -50,7 +52,10 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             RenderEngineComponent resourceLibrary,
             ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,
             IPackFileService packFileService,
-            AnimationsContainerComponent animationsContainerComponent)
+            AnimationsContainerComponent animationsContainerComponent,
+            IVfxPreviewFactory? vfxFactory = null,
+            IDeviceResolver? devices = null,
+            VfxPreviewDocumentStore? liveDocuments = null)
         {
             var resourceResolver = new MetaDataResourceResolver(
                 packFileService);
@@ -59,7 +64,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 resourceLibrary,
                 skeletonAnimationLookUpHelper,
                 resourceResolver,
-                animationsContainerComponent);
+                animationsContainerComponent,
+                vfxFactory, devices, liveDocuments);
             _ruleBuilder = new(resourceResolver);
         }
 
@@ -141,6 +147,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         private readonly ISkeletonAnimationLookUpHelper _skeletonAnimationLookUpHelper;
         private readonly MetaDataResourceResolver _resourceResolver;
         private readonly AnimationsContainerComponent _animationsContainerComponent;
+        private readonly IVfxPreviewFactory? _vfxFactory;
+        private readonly IDeviceResolver? _devices;
+        private readonly VfxPreviewDocumentStore? _liveDocuments;
 
         private static Color s_color = Color.Black;
         private static Color s_selectedColor = Color.Red;
@@ -175,13 +184,19 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             RenderEngineComponent resourceLibrary,
             ISkeletonAnimationLookUpHelper skeletonAnimationLookUpHelper,
             MetaDataResourceResolver resourceResolver,
-            AnimationsContainerComponent animationsContainerComponent)
+            AnimationsContainerComponent animationsContainerComponent,
+            IVfxPreviewFactory? vfxFactory = null,
+            IDeviceResolver? devices = null,
+            VfxPreviewDocumentStore? liveDocuments = null)
         {
             _complexMeshLoader = complexMeshLoader;
             _resourceLibrary = resourceLibrary;
             _skeletonAnimationLookUpHelper = skeletonAnimationLookUpHelper;
             _resourceResolver = resourceResolver;
             _animationsContainerComponent = animationsContainerComponent;
+            _vfxFactory = vfxFactory;
+            _devices = devices;
+            _liveDocuments = liveDocuments;
         }
 
         public void AppendInstances(
@@ -1446,7 +1461,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             ICollection<MetaDataBuildDiagnostic> diagnostics)
         {
             var source = (ParsedMetadataAttribute)effect;
-            _resourceResolver.CheckEffect(
+            AddEffectSettingsDiagnostics(effect, source, owner, diagnostics);
+            var resource = _resourceResolver.CheckEffect(
                 source,
                 owner,
                 effect.VfxName,
@@ -1481,7 +1497,83 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         boneName: effect.NodeIndex.ToString()));
                 }
             }
+            if (resource != null && _vfxFactory != null && _devices != null && _liveDocuments != null)
+            {
+                var documentSource = new VfxPreviewDocumentSource(_resourceResolver.Files, resource, _liveDocuments);
+                var particles = new VfxPreviewSceneNode(_vfxFactory, _devices, documentSource);
+                var scale = GetEffectScale(effect);
+                particles.ModelMatrix = Matrix.CreateScale(scale);
+                particles.IsVisible = scale != 0;
+                var start = GetActiveTimeRange(source)?.StartTime ?? 0;
+                var attachmentSamples = new Dictionary<float, Matrix>();
+                AnimationClip? sampledClip = null;
+                particles.LocalAttachmentAtTime = seconds =>
+                {
+                    var clip = skeleton?.Skeleton?.AnimationPlayer?.AnimationClip;
+                    if (!ReferenceEquals(clip, sampledClip)) { sampledClip = clip; attachmentSamples.Clear(); }
+                    if (attachmentSamples.TryGetValue(seconds, out var matrix)) return matrix;
+                    matrix = SampleEffectAttachment(effect, skeleton, seconds + start);
+                    if (attachmentSamples.Count >= 4096) attachmentSamples.Clear();
+                    attachmentSamples[seconds] = matrix;
+                    return matrix;
+                };
+                try { node.AddObject(particles); }
+                catch { particles.Dispose(); throw; }
+                try
+                {
+                    var snapshot = documentSource.Read();
+                    IReadOnlyList<VfxPreviewDiagnostic> previewDiagnostics = snapshot == null
+                        ? [new VfxPreviewDiagnostic(documentSource.Path, "", "", "Vfx.Preview.LiveDocumentInvalid")]
+                        : VfxPreviewInspector.Inspect(snapshot).Diagnostics;
+                    foreach (var diagnostic in previewDiagnostics.DistinctBy(x => x.ReasonKey))
+                        diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, diagnostic.ReasonKey, documentSource.Path));
+                }
+                catch
+                {
+                    diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, "Vfx.Preview.InvalidData", documentSource.Path));
+                }
+                return new EffectMetaInstance(instance, particles, GetActiveTimeRange(source));
+            }
             return instance;
+        }
+
+        private static Matrix SampleEffectAttachment(IEffectMeta effect, ISkeletonProvider? provider, float sceneTime)
+        {
+            var scale = GetEffectScale(effect);
+            var local = Matrix.CreateScale(scale) * Matrix.CreateFromQuaternion(new Quaternion(effect.Orientation)) * Matrix.CreateTranslation(effect.Position);
+            var skeleton = provider?.Skeleton;
+            if (!effect.Tracking || skeleton == null || effect.NodeIndex < 0 || effect.NodeIndex >= skeleton.BoneCount) return local;
+            var player = skeleton.AnimationPlayer;
+            if (player == null || !player.IsEnabled || player.AnimationClip == null || player.Duration.TotalSeconds <= 0)
+                return local * skeleton.GetAnimatedWorldTranform(effect.NodeIndex);
+            var frame = AnimationSampler.Sample((float)(Math.Max(0, sceneTime) / player.Duration.TotalSeconds),
+                skeleton, player.AnimationClip, player.AnimationRules);
+            return local * frame.GetSkeletonAnimatedWorld(skeleton, effect.NodeIndex);
+        }
+
+        private static float GetEffectScale(IEffectMeta effect) => effect switch
+        {
+            Effect_v3 value => value.Scale,
+            Effect_v7 value => value.Scale,
+            Effect_v11 value => value.Scale,
+            Effect_v12 value => value.Scale,
+            _ => 1,
+        };
+
+        private static void AddEffectSettingsDiagnostics(IEffectMeta effect, ParsedMetadataAttribute source,
+            MetaDataDocumentOwner owner, ICollection<MetaDataBuildDiagnostic> diagnostics)
+        {
+            var type = effect switch { Effect_v11 value => value.EffectType, Effect_v12 value => value.EffectType, _ => 0 };
+            var terrain = effect switch { Effect_v7 value => value.TerrainMutable, Effect_v11 value => value.TerrainMutable,
+                Effect_v12 value => value.TerrainMutable, _ => false };
+            var distance = effect switch { Effect_v7 value => value.DistanceCulled, Effect_v11 value => value.DistanceCulled,
+                Effect_v12 value => value.DistanceCulled, _ => false };
+            var legacy = effect switch { Effect_v1 value => value.BoolUnknown, Effect_v2 value => value.BoolUnknown, _ => "" };
+            if (type != 0) diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, "SuperView.Diagnostics.EffectTypeUnsupported"));
+            if (terrain) diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, "SuperView.Diagnostics.EffectTerrainUnsupported"));
+            if (distance) diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, "SuperView.Diagnostics.EffectDistanceCullingUnsupported"));
+            if (effect is Effect_v12) diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, "SuperView.Diagnostics.EffectParentScaleUnsupported"));
+            if (!string.IsNullOrEmpty(legacy)) diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, "SuperView.Diagnostics.EffectLegacyFlagUnsupported"));
         }
 
         private IMetaDataInstance CreateSpatialMarker(

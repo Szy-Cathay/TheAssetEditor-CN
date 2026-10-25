@@ -14,7 +14,8 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities.Utility
             { TextureType.MaterialMap, "GlossTexture"},
             { TextureType.BaseColour, "DiffuseTexture"},
             { TextureType.Normal, "NormalTexture"},
-            { TextureType.Emissive, "Emissive_Texture"}
+            { TextureType.Emissive, "Emissive_Texture"},
+            { TextureType.EmissiveDistortion, "Emissive_DistortionTexture"}
         };
 
         static public readonly Dictionary<TextureType, string> UseTextureTypeToParamName = new()
@@ -26,7 +27,8 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities.Utility
             { TextureType.MaterialMap, "UseGloss"},
             { TextureType.BaseColour, "UseDiffuse"},
             { TextureType.Normal, "UseNormal"},
-            { TextureType.Emissive, "Emissive_UseTexture"}
+            { TextureType.Emissive, "Emissive_UseTexture"},
+            { TextureType.EmissiveDistortion, "Emissive_UseDistortionTexture"}
         };
     }
 

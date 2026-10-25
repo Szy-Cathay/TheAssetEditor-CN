@@ -31,4 +31,26 @@
     <Using Include="NUnit.Framework" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Vfx/Fixtures/NativeVerticalForce.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeParticleForceCurves.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeConstantForceDamping.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeExpandedConstantForceDamping.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeIntermediateCrossConstantForceDamping.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeUvTransforms.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeUvAsymmetric.dds" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeStaticAtlasCells.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeStaticAtlas.dds" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeHorizontalGeometry.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeDefaultVerticalMotion.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeMaterialCompositing.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeSimpleEmissive.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeCombinedLighting.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeSmokeLighting.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeAnalyticCurves.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeMixedCurves.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeRigidOrientation.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeEntangleTiming.json" />
+  </ItemGroup>
+
 </Project>

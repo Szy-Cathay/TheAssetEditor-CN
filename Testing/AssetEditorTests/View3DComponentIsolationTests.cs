@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Windows;
 using AssetEditor.Services;
 using Editors.AnimationMeta.SuperView.Editing;
@@ -10,6 +10,8 @@ using GameWorld.Core.Components.Navigation;
 using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Utility;
+using GameWorld.Core.Vfx;
+using Editors.VfxEditor;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Content;
@@ -97,6 +99,20 @@ public class View3DComponentIsolationTests
         Assert.IsFalse(
             game.AddedComponents.Any(
                 component => component is KitbashModelGizmoComponent));
+    }
+
+    [TestMethod]
+    public void VfxScene_AddsCoreAndPreviewOnceWithoutModelSelection()
+    {
+        var game = new RecordingWpfGame();
+        var core = CreateCoreComponentSet();
+        using var preview = new VfxPreviewComponent(Mock.Of<IVfxPreviewFactory>(), Mock.Of<IDeviceResolver>(), null!);
+        using var scene = new VfxScenePreview(game, new ComponentInserter(game), core, preview);
+        Assert.AreEqual(0, game.AddedComponents.Count);
+        scene.Start();
+        scene.Start();
+        CollectionAssert.AreEqual(core.Components.Concat(new IGameComponent[] { preview }).ToArray(), game.AddedComponents);
+        Assert.IsFalse(game.AddedComponents.Any(x => x is ReferenceObjectSelectionComponent or KitbashSelectionInputComponent or KitbashSelectionOverlayComponent or KitbashModelGizmoComponent));
     }
 
     [TestMethod]

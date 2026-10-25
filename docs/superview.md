@@ -165,7 +165,7 @@
 
 `MetaDataBuilder.Build` 先应用 persistent metadata，再应用当前 animation metadata。若 animation metadata 包含格式定义中的 `DisablePersistant_v10`，则跳过 persistent 部分。保留代码中的格式拼写，不要为了文字正确而重命名二进制定义。
 
-两层来源的预览仍保留各自 `ParsedMetadataAttribute` 引用。后续选中、增量替换、批量显隐和保存都依赖对象身份，不应按字段值或 tag 文本猜来源。
+两层来源的预览仍保留各自 `ParsedMetadataAttribute` 引用。后续选中、增量替换、批量显隐和保存都依赖对象身份，不应按字段值或 tag 文本猜来源。复制时保存字段快照，每次粘贴必须从快照创建独立源对象；重复粘贴和跨文档粘贴不能复用剪贴板中的同一个引用，否则编辑会串联且单项预览无法按身份替换。直接 Meta Editor 与超级视图的两个子编辑器共用这条命令契约。
 
 ### 7.2 支持的输出
 
@@ -202,6 +202,18 @@
 
 替换实例时先完成新实例建立，再有序清理旧实例；失败不能让源属性从列表消失。
 
+### 7.5 Effect 的共享特效预览
+
+`EffectMetaInstance` 保留原有 Effect 标记、选择、Gizmo 和显隐规则，并把只负责绘制的 `VfxPreviewSceneNode` 挂在标记下。粒子节点不能被当作模型选择或编辑。`Effect_v3/v5/v7/v11/v12.Scale` 仅作用于粒子，并在当前变换与历史出生采样使用相同值；无该字段的版本保留 1。零缩放不绘制粒子但保留元数据标记。时间为主动画时间减去 tag 开始时间。开始与结束相同的 Effect 表示触发时刻：跨过该点后仍按 VFX 自身 CycleDuration 显示粒子尾段，不要求播放器正好采中该浮点秒；已确认的普通非瞬时范围继续沿用原来的开始／结束门控。尾段扩展不改 authored time、时间轴标记或用户的“整段显示”覆盖值，IsEnabled 仍可隐藏。首次尚未加载运行时时允许初始化一次以取得真实时长，不用固定猜测时长截断。多条同名或不同名 Effect 保留各自源对象、时间、挂点、运行时和诊断；选择其中一条或增量替换它不能移除其他实例。
+
+根/骨骼历史由当前动画及规则的只读采样提供，用于世界空间粒子的出生位置；不能通过反复 seek 主播放器取得历史姿态。当前父级世界变换与标记使用同一条场景变换链，避免父级旋转或缩放后粒子与标记分离。游戏语义转换、深度和材质限制见 `architecture.md` 的 VFX 章节，真实粒子可见不代表完成游戏原生对照。受限恒力与阻尼沿用同一转换和模拟边界，Effect 的缩放、旋转或时间倍率不会放宽该范围；超界时保留诊断并省略恒力。
+
+`VfxPreviewDocumentSource` 按实际 PackFile 引用解析根文件与引用依赖，优先读取 VFX 编辑器发布的未保存快照。依赖修改仅重建受影响的 Effect；无效快照停止该项粒子，修正后恢复。预览诊断归属原 META 对象，不改变双文档 dirty、Undo 或保存。清理实例时必须同时释放粒子、资源源对象和诊断订阅。
+
+Position、Orientation 以及 Tracking=true 时的有效 NodeIndex 已进入标记和骨骼历史。EffectType 的非普通行为、TerrainMutable、DistanceCulled、旧版 BoolUnknown 以及 v12 的 ScalesWithParent 尚未完整还原：有相关请求时追加该源对象的预览警告；v12 明确提示父级缩放选项当前未区分，不把沿用父级矩阵描述为已经实现该开关。警告不改变原始值、文档 dirty 或保存门禁，也不猜测未知布尔的跟随语义。
+
+Effect 通过共享场景绘制参数读取 `GameWeatherStore` 中明确选择的只读天气快照，与独立 VFX 编辑器使用同一光照和普通面片法线候选材质。天气变化在下一次绘制生效，不重建 META、不改变时间或保存状态；清除天气恢复原候选颜色。天气曝光设置仅作只读记录，未应用的曝光与色调诊断也走同一路径，不据此增加粒子亮度补偿。模型灯光仍独立，具体天气字段、坐标约定及未标定范围见架构文档。
+
 ## 8. 预览实例生命周期
 
 所有预览实例实现 `IMetaDataInstance`，至少提供 `Update` 和 `CleanUp`。主要类型：
@@ -209,6 +221,7 @@
 | 类型 | 行为 | 清理责任 |
 | --- | --- | --- |
 | `DrawableMetaInstance` | 位置/方向标记，可跟随骨骼，可有时间范围 | 从父节点移除标记 |
+| `EffectMetaInstance` | Effect 标记及共享粒子预览，跟随时间与根/骨骼变换 | 移除标记，释放粒子、快照源和订阅 |
 | `CombatMetaDataInstance` | 战斗分类标记，使用实时位置与参考变换 | 从父节点移除节点 |
 | `PropInstance` | 普通模型 Prop，按骨骼/根附着 | 移除节点并标记附属 player 删除 |
 | `AnimatedPropInstance` | 自带动画的 Prop，与主时间同步/循环 | 移除节点并标记附属 player 删除 |
@@ -435,6 +448,7 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 | 双文档、保存、dirty | `MetaDataEditorViewModelTests`、`MetaDataEditorMultiSelectTests` | 两页签修改、部分缺失、保存/重开 |
 | 空间 Gizmo | `CombatMetaDataEditSessionTests`、`SpatialMetaDataCatalogTests` | 根/骨骼附着、平移/旋转、取消/撤销/重做 |
 | 预览构建/资源失败 | `MetaDataBuildResultTests`、`MetaDataBuilderMissingResourceTests` | 真实 Fragment、模型、动画、Effect 和诊断表现 |
+| Effect 粒子/实时快照 | `EffectVfxPreviewTests`、VFX 转换/模拟与离屏像素测试 | 游戏/Terry 同时间、同挂点、同摄像机对照；实机交互需单独授权 |
 | 时间与同步 | `MetaDataPreviewTimeTests` | 播放/暂停/seek/循环、瞬时 tag 与整段 tag |
 | 检查索引/时间轴 | `MetaDataInspectionIndexTests`、`MetaDataEditorViewModelTests`、`UiAnimationMetadataFamilyGallery` | 双文档同值项、无效范围、点击导航、四主题/高对比度、空状态和缩放 |
 | 字段 UI/批量控制 | `MetaDataAttributeControlTests` | 两页签、直接 Meta Editor、中文 UI 和焦点 |

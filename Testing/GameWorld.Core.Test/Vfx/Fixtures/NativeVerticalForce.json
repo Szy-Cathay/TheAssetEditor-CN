@@ -1,0 +1,435 @@
+{
+  "Origin": "Terry native WGC, fixed diagnostic emitters derived from cine_embers, force-only held-out cohorts",
+  "RawRecordingSha256": "2ec5f4db4588e0aeb334dc32b8685fef10e1e6821d108620b42d65ac23e9772a",
+  "RawForceY": 100,
+  "PixelsPerWorldUnit": 85,
+  "PixelTolerance": 3,
+  "InitialSpeed": 0,
+  "Drag": 0,
+  "EmitterRotation": "0 0 0",
+  "RootRotation": "0 0 0",
+  "RootScale": "1 1 1",
+  "CohortZeroUsedForHypothesisSelection": true,
+  "Points": [
+    {
+      "Cohort": 1,
+      "SourceSeconds": 4.2133419,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 1.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 4.3033576,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 1.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 4.4067271,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 4.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 4.5134097,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 7.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 4.6167268,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 10.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 4.7233924,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 15
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 4.8167115,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 21
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 4.9167052,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 27
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.0233584,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 34.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.133341,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 43.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.2400387,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 54
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.3267036,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 63
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.4333553,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 73.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.5200065,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 84
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.62336,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 97.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.7333803,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 112.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.8167249,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 123
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 5.9233784,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 139.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.0133633,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 151.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.1133732,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 169.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.2200344,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 187.5
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.3133758,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 205.53333333333336
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.4200618,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 226.53333333333336
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.5134026,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 244.56701030927834
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.6167182,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 265.5670103092783
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.716707,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 288.06779661016947
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.8233484,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 313.53367875647666
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 6.9133325,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 331.53367875647666
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 7.003343,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 352.53367875647666
+    },
+    {
+      "Cohort": 1,
+      "SourceSeconds": 7.0933352,
+      "BirthLowerSeconds": 4.10667,
+      "BirthUpperSeconds": 4.2133419,
+      "DisplacementPixels": 376.53367875647666
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 9.1266629,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 0
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 9.2299897,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 1.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 9.3366782,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 1.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 9.4433506,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 4.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 9.5466783,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 7.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 9.6533412,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 13.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 9.7433343,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 18
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 9.8400196,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 22.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 9.9333665,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 28.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.0233565,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 36
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.1300173,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 43.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.2167144,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 52.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.3233836,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 64.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.4133753,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 72
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.5133608,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 85.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.6200104,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 97.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.7100185,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 109.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.8000304,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 121.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 10.8966796,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 136.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.0000365,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 151.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.1033762,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 169.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.1933995,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 186
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.2767342,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 199.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.3833821,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 220.5
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.4867083,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 241.53333333333333
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.5800223,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 259.5333333333333
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.6700301,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 277.5670103092783
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.7733727,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 301.5670103092783
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.8600302,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 324.06779661016947
+    },
+    {
+      "Cohort": 2,
+      "SourceSeconds": 11.9500348,
+      "BirthLowerSeconds": 9.0233354,
+      "BirthUpperSeconds": 9.1266629,
+      "DisplacementPixels": 343.53367875647666
+    }
+  ]
+}

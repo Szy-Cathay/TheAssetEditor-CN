@@ -15,6 +15,7 @@ public sealed class VfxFieldViewModel : ObservableObject
     public VfxField Model { get; }
     public string Label { get; }
     public string Description { get; }
+    public string ToolTip => string.Join("\n\n", new[] { Model.Name, Description, AdjustmentHint, RelatedHint, GestureHint }.Where(x => x.Length > 0));
     public string AdjustmentHint { get; }
     public string RelatedHint { get; }
     public bool HasRelatedHint => RelatedHint.Length > 0;

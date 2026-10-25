@@ -1,11 +1,15 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using System.Xml.Linq;
 using Editors.VfxEditor;
+using GameWorld.Core.Vfx;
+using GameWorld.Core.Rendering;
 using Moq;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
@@ -19,6 +23,115 @@ namespace AssetEditorTests;
 [TestClass]
 public class VfxEditorTests
 {
+    [TestMethod]
+    public void PreviewQuality_IsIndependentOfFieldFiltersAndLayerSelectionWithoutEditingFiles() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var store = new VfxPreviewDocumentStore();
+            var context = new Context(store);
+            var editor = context.Editor;
+            var original = context.File.DataSource.ReadData();
+            var refresh = typeof(VfxEditorViewModel).GetMethod("RefreshScenePreview", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            try
+            {
+                editor.PreviewQuality = "1";
+                editor.Quality = "2";
+                editor.SelectedLayer = editor.Layers.Single(layer => layer.Model.Kind == "Reference");
+                Assert.AreEqual("All", editor.Quality);
+                refresh.Invoke(editor, [null, EventArgs.Empty]);
+                Assert.IsTrue(store.TryGet(context.File, out var snapshot));
+                Assert.AreEqual("1", snapshot!.Quality, "The whole composition must retain the chosen preview quality.");
+                editor.PreviewQuality = "2";
+                editor.Quality = "All";
+                refresh.Invoke(editor, [null, EventArgs.Empty]);
+                Assert.IsTrue(store.TryGet(context.File, out snapshot));
+                Assert.AreEqual("2", snapshot!.Quality);
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                Assert.IsFalse(editor.UndoCommand.CanExecute(null));
+                CollectionAssert.AreEqual(original, context.File.DataSource.ReadData());
+                context.Save.VerifyNoOtherCalls();
+
+            }
+            finally { editor.Close(); }
+        });
+
+    [TestMethod]
+    public void WeatherSelection_UsesSharedReadOnlyStateWithoutSavingOrDirtyingTheDocument() => WithEditor((_, _) =>
+    {
+        var weather = new GameWeatherStore(); var context = new Context(weather: weather); var editor = context.Editor;
+        var xml = "<environment_file><lighting use_custom_ambient_cube_colours='true' ambient_cube_hdr_scaler='1' ambient_scale='1' sun_direction_azimuth='90' sun_direction_elevation='30' sun_colour_scale='20000'>"
+            + "<sun_colour r='1' g='1' b='1'/>" + string.Concat(new[] { "left", "right", "top", "bottom", "front", "back" }.Select(face => $"<ambient_cube_{face} r='0.5' g='0.5' b='0.5'/>")) + "</lighting></environment_file>";
+        var file = PackFile.CreateFromBytes("control.environment", Encoding.UTF8.GetBytes(xml));
+        context.Files.Setup(x => x.GetFullPath(file, It.IsAny<PackFileContainer?>())).Returns("weather/control.environment");
+        context.Dialogs.Setup(x => x.DisplayBrowseDialog(It.IsAny<List<string>>())).Returns(new BrowseDialogResultFile(true, file));
+        var before = context.File.DataSource.ReadData();
+        try
+        {
+            editor.SelectWeatherCommand.Execute(null);
+            Assert.AreEqual("weather/control.environment", weather.Current!.SourcePath);
+            Assert.IsTrue(editor.WeatherStatus.Contains("weather/control.environment", StringComparison.Ordinal));
+            Assert.IsFalse(editor.HasUnsavedChanges);
+            context.Dialogs.Setup(x => x.DisplayBrowseDialog(It.IsAny<List<string>>())).Returns(new BrowseDialogResultFile(false, null!));
+            editor.SelectWeatherCommand.Execute(null);
+            Assert.IsNotNull(weather.Current);
+            var invalid = PackFile.CreateFromBytes("broken.environment", Encoding.UTF8.GetBytes("<broken/>"));
+            context.Dialogs.Setup(x => x.DisplayBrowseDialog(It.IsAny<List<string>>())).Returns(new BrowseDialogResultFile(true, invalid));
+            editor.SelectWeatherCommand.Execute(null);
+            Assert.AreEqual("weather/control.environment", weather.Current.SourcePath);
+            editor.ClearWeatherCommand.Execute(null);
+            Assert.IsNull(weather.Current);
+            Assert.AreEqual(LocalizationManager.Instance.Get("Vfx.Preview.WeatherNone"), editor.WeatherStatus);
+            Assert.IsFalse(editor.HasUnsavedChanges); Assert.IsNull(context.Saved);
+            CollectionAssert.AreEqual(before, context.File.DataSource.ReadData());
+            context.Save.VerifyNoOtherCalls();
+        }
+        finally { editor.Close(); }
+    });
+
+    [TestMethod]
+    public void ScenePreviewPanel_RendersFourThemesWithoutSavingOrEnablingModelEditing() => WithEditor((editor, context) =>
+    {
+        var previous = ThemesController.CurrentTheme;
+        try
+        {
+            var diagnosticKeys = new[] { "Vfx.Preview.InitialMotionUncalibrated", "Vfx.Preview.DragCandidate", "Vfx.Preview.LightingCandidate", "Vfx.Preview.ConstantForceDampingCandidate", "Vfx.Preview.UvTransformCandidate", "Vfx.Preview.AnalyticCurveCalibrated", "Vfx.Preview.BezierCandidate", "Vfx.Preview.SoulPanningMaterialCandidate", "Vfx.Preview.ProjectedDecalCandidate", "Vfx.Preview.FlatGroundReceiver", "Vfx.Preview.FixedSpeedAtlasCandidate", "Vfx.Preview.FlatTerrainCandidate", "Vfx.Preview.FlatTerrainDepthUnavailable", "Vfx.Preview.TerrainDecalBasisUnsupported" };
+            var diagnostics = diagnosticKeys.Select(key => LocalizationManager.Instance.Get(key)).ToArray();
+            for (var index = 0; index < diagnostics.Length; ++index)
+                Assert.AreNotEqual(diagnosticKeys[index], diagnostics[index], "Preview limitations must load their Chinese text.");
+            typeof(VfxEditorViewModel).GetProperty(nameof(VfxEditorViewModel.ScenePreviewDiagnostics))!.SetValue(editor, diagnostics);
+            foreach (var theme in new[] { ThemeType.DarkTheme, ThemeType.LightTheme, ThemeType.HighContrastDark, ThemeType.HighContrastLight })
+            {
+                ThemesController.SetTheme(theme);
+                var view = new VfxEditorView { DataContext = editor };
+                view.Measure(new Size(1440, 900));
+                view.Arrange(new Rect(0, 0, 1440, 900));
+                view.UpdateLayout();
+                var panel = (Grid)view.FindName("ScenePreviewPanel");
+                Assert.IsTrue(panel.ActualWidth > 240, theme.ToString());
+                ((TabControl)view.FindName("Inspector")).SelectedIndex = 2;
+                var limitations = (ItemsControl)view.FindName("PreviewDiagnostics");
+                view.UpdateLayout();
+                foreach (var diagnostic in diagnostics)
+                    Assert.IsTrue(Descendants(limitations).OfType<TextBlock>().Any(text => text.Text == diagnostic && text.ActualHeight > 0), theme.ToString());
+                var bitmap = new RenderTargetBitmap(1440, 900, 96, 96, PixelFormats.Pbgra32);
+                bitmap.Render(view);
+                var output = Environment.GetEnvironmentVariable("ASSETEDITOR_VFX_RENDER_OUTPUT");
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    Directory.CreateDirectory(output);
+                    var encoder = new PngBitmapEncoder();
+                    encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                    using var stream = File.Create(Path.Combine(output, $"vfx-scene-panel-{theme}.png"));
+                    encoder.Save(stream);
+                }
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                context.Save.Verify(x => x.Save(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<bool>()), Times.Never);
+                view.DataContext = null;
+            }
+        }
+        finally { editor.Close(); ThemesController.SetTheme(previous); }
+    });
+
     private const string Curve = "alpha_min,8388608,1;0.0,0.0,linear,linear,-0.05,0.0,0.05,0.0,0;0.5,1.0,spline,spline,-0.2,0.3,0.2,0.3,0;1.0,0.0,linear,linear,-0.05,0.0,0.05,0.0,0:alpha,0;0,0";
     private const string UnorderedCurve = "alpha_min,8388608,1;0.0,0.0,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.0,sine,linear,-0.05,0.0,0.05,0.0,0;0.15,1.0,sine,log3,-0.05,0.0,0.05,0.0,0:alpha,1;0,0";
     private static string Constant(string name, double value) => $"{name},16711680,0;0.0,{value.ToString(CultureInfo.InvariantCulture)},linear,linear,-0.05,0.0,0.05,0.0,1";
@@ -144,7 +257,7 @@ public class VfxEditorTests
         Assert.IsFalse(editor.HasUnsavedChanges);
         context.Dialogs.Verify(x => x.ShowDialogBox(It.Is<string>(text => text.Contains("循环引用")), It.IsAny<string>(), UiMessageBoxIcon.Warning), Times.Once);
 
-        var fresh = new VfxEditorViewModel(context.Files.Object, context.Save.Object, context.Dialogs.Object, Mock.Of<IEditorCreator>(), editor.Localization, Mock.Of<ITerryPreviewService>());
+        var fresh = new VfxEditorViewModel(context.Files.Object, context.Save.Object, context.Dialogs.Object, Mock.Of<IEditorCreator>(), editor.Localization);
         fresh.NewComposition();
         fresh.AddReferenceCommand.Execute(null);
         Assert.AreEqual(1, fresh.Layers.Count(x => x.Model.Kind == "Reference"));
@@ -209,7 +322,7 @@ public class VfxEditorTests
         editor.Search = "淡入淡出";
         Assert.AreEqual("curve_alpha", editor.SelectedField!.Model.Name);
         Assert.AreEqual("0", editor.SelectedField.Model.Quality);
-        Assert.IsTrue(editor.SelectedField.Curve!.ChannelHint.Contains("不是开始"));
+        Assert.IsTrue(editor.SelectedField.Curve!.ChannelHint.Contains("下限不是动画起始值"));
         editor.Search = "";
         Assert.IsTrue(editor.VisibleFields.All(x => x.IsCommon));
         Assert.IsFalse(editor.HasUnsavedChanges);
@@ -244,7 +357,8 @@ public class VfxEditorTests
         var field = Field(editor, "payload");
         Assert.IsFalse(field.HasGuidance);
         Assert.IsFalse(field.IsCommon);
-        Assert.IsTrue(field.Label.Contains("待说明"));
+        Assert.AreEqual(field.Model.Name, field.Label);
+        Assert.IsTrue(field.ToolTip.Contains("尚未确认"));
         Assert.IsTrue(field.Description.Contains("尚未确认"));
         Assert.IsTrue(field.AdjustmentHint.Contains("不提供猜测"));
         editor.Category = "Advanced";
@@ -313,6 +427,30 @@ public class VfxEditorTests
         Assert.ThrowsException<ArgumentOutOfRangeException>(() => curve.Channels[0].MovePoint(1, 0.5, double.NaN));
         Assert.IsFalse(VfxCurve.TryParse("unknown:future", out _));
     }
+
+    [TestMethod]
+    public void CurveEditing_EmptyAuthoredChannelsSurviveSavingAndUndo() => WithEditor((editor, context) =>
+    {
+        var text = Constant("x_min", 0.15) + "|" + Constant("x_max", 0.2)
+            + "|z_min,4210816,1|z_max,4210943,1:x,1;0,1|z,0;2,3";
+        Assert.IsTrue(VfxCurve.TryParse(text, out var curve));
+        Assert.AreEqual(text, curve!.ToString());
+        Assert.AreEqual(0, curve.Channels[2].Points.Count);
+        context.File.DataSource = new MemorySource(Encoding.UTF8.GetBytes(Sample.Replace(Curve, text)));
+        editor.LoadFile(context.File);
+        var field = Field(editor, "curve_alpha");
+        Assert.IsFalse(field.IsOpaque);
+        field.Curve!.SelectedChannel = field.Curve.Channels[2];
+        Assert.IsNull(field.Curve.SelectedPoint);
+        field.Curve.SelectedChannel = field.Curve.Channels[0];
+        field.Curve.SelectedPoint!.Value.Text = "0.25";
+        Assert.IsTrue(editor.Save());
+        Assert.AreEqual(text.Replace("0.0,0.15,linear", "0.0,0.25,linear"),
+            VfxDocument.Read(context.Saved!).Layers[0].Fields.First(x => x.Name == "curve_alpha").RawValue);
+        editor.UndoCommand.Execute(null);
+        Assert.IsTrue(editor.Save());
+        CollectionAssert.AreEqual(context.File.DataSource.ReadData(), context.Saved!);
+    });
 
     [TestMethod]
     public void CurveEditing_UnorderedKeysRemainEditableWithoutReorderingStoredData()
@@ -410,6 +548,203 @@ public class VfxEditorTests
     });
 
     [TestMethod]
+    public void KeyboardShortcuts_UndoRedoAndSaveUseTheDocumentCommandsWithoutSystemInput() => WithEditor((editor, context) =>
+    {
+        var view = new VfxEditorView { DataContext = editor };
+        var original = Field(editor, "LifeTime").Values[0].Text;
+        Field(editor, "LifeTime").Values[0].Text = "1.5";
+        Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control));
+        Assert.AreEqual(original, Field(editor, "LifeTime").Values[0].Text);
+        Assert.IsFalse(editor.HasUnsavedChanges);
+        Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.AreEqual("1.5", Field(editor, "LifeTime").Values[0].Text);
+        Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control));
+        Assert.IsTrue(Shortcut(view, Key.Y, ModifierKeys.Control));
+        Assert.AreEqual("1.5", Field(editor, "LifeTime").Values[0].Text);
+        Assert.IsTrue(Shortcut(view, Key.S, ModifierKeys.Control));
+        Assert.IsNotNull(context.Saved);
+        Assert.IsFalse(editor.HasUnsavedChanges);
+        view.DataContext = null;
+    });
+
+    [DataTestMethod]
+    [DataRow(Key.Z, ModifierKeys.None)]
+    [DataRow(Key.Z, ModifierKeys.Control | ModifierKeys.Alt)]
+    [DataRow(Key.Y, ModifierKeys.Control | ModifierKeys.Shift)]
+    [DataRow(Key.S, ModifierKeys.Control | ModifierKeys.Shift)]
+    [DataRow(Key.G, ModifierKeys.Control)]
+    public void KeyboardShortcuts_UnsupportedCombinationsDoNotConsumeOrEdit(Key key, ModifierKeys modifiers) => WithEditor((editor, context) =>
+    {
+        var view = new VfxEditorView { DataContext = editor };
+        Field(editor, "LifeTime").Values[0].Text = "1.5";
+        Assert.IsFalse(Shortcut(view, key, modifiers));
+        Assert.AreEqual("1.5", Field(editor, "LifeTime").Values[0].Text);
+        Assert.IsTrue(editor.HasUnsavedChanges);
+        Assert.IsNull(context.Saved);
+        view.DataContext = null;
+    });
+
+    [TestMethod]
+    public void KeyboardShortcuts_SupportedEmptyHistoryIsConsumedButMissingEditorIsNot() => WithEditor((editor, _) =>
+    {
+        var view = new VfxEditorView { DataContext = editor };
+        Assert.IsFalse(editor.UndoCommand.CanExecute(null));
+        Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control));
+        Assert.IsTrue(Shortcut(view, Key.Y, ModifierKeys.Control));
+        Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control | ModifierKeys.Shift));
+        Assert.IsFalse(editor.HasUnsavedChanges);
+        view.DataContext = null;
+        Assert.IsFalse(Shortcut(view, Key.Z, ModifierKeys.Control));
+    });
+
+    [TestMethod]
+    public void PreviewTransforms_UndoRedoAndResetPreserveDocumentAndPlaybackAndDetachOnClose() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var scene = CreateTestScene(true, out var interaction);
+            var context = new Context(scenePreview: scene); var editor = context.Editor;
+            var view = new VfxEditorView { DataContext = editor };
+            try
+            {
+                editor.PreviewAllCommand.Execute(null); RefreshScene(editor);
+                scene.Preview.Update(new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(1.25)));
+                scene.Preview.IsPlaying = false;
+                var original = DocumentBytes(editor); var beforeTime = scene.Preview.CurrentTime;
+                var translated = Microsoft.Xna.Framework.Matrix.CreateTranslation(2, 3, 4);
+                CommitPreviewTranslation(interaction!, new(2, 3, 4));
+                Assert.AreEqual(translated, interaction!.Target.World);
+                Assert.IsTrue(editor.UndoCommand.CanExecute(null));
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control));
+                Assert.AreEqual(Microsoft.Xna.Framework.Matrix.Identity, interaction.Target.World);
+                Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control | ModifierKeys.Shift));
+                Assert.AreEqual(translated, interaction.Target.World);
+                editor.ResetEmitterCommand.Execute(null);
+                Assert.AreEqual(Microsoft.Xna.Framework.Matrix.Identity, interaction.Target.World);
+                editor.UndoCommand.Execute(null);
+                Assert.AreEqual(translated, interaction.Target.World);
+                editor.RedoCommand.Execute(null);
+                Assert.AreEqual(Microsoft.Xna.Framework.Matrix.Identity, interaction.Target.World);
+                Assert.AreEqual(beforeTime, scene.Preview.CurrentTime);
+                Assert.IsFalse(scene.Preview.IsPlaying);
+                Assert.IsFalse(PreviewTimer(editor).IsEnabled);
+                Assert.IsNull(typeof(VfxPreviewComponent).GetField("_pending", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(scene.Preview));
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                CollectionAssert.AreEqual(original, DocumentBytes(editor));
+                CollectionAssert.AreEqual(original, context.File.DataSource.ReadData());
+                context.Save.VerifyNoOtherCalls();
+                editor.LoadFile(context.File);
+                Assert.IsFalse(editor.UndoCommand.CanExecute(null));
+                Assert.IsFalse(editor.RedoCommand.CanExecute(null));
+                editor.Close();
+                CommitPreviewTranslation(interaction, new(7, 8, 9));
+                Assert.IsFalse(editor.UndoCommand.CanExecute(null), "Closed editors must not record later scene events.");
+            }
+            finally { view.DataContext = null; editor.Close(); scene.Dispose(); }
+        });
+
+    [TestMethod]
+    public void PreviewTransforms_InterleaveWithDocumentHistoryAndSavepointsWithoutDirtyingOrLosingOrder() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var scene = CreateTestScene(true, out var interaction);
+            var context = new Context(scenePreview: scene); var editor = context.Editor;
+            var original = Field(editor, "LifeTime").Values[0].Text;
+            try
+            {
+                CommitPreviewTranslation(interaction!, new(1, 0, 0));
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                Field(editor, "LifeTime").Values[0].Text = "1.5";
+                CommitPreviewTranslation(interaction!, new(1, 0, 0));
+                Assert.IsTrue(editor.Save());
+                var saved = context.Saved!;
+                editor.UndoCommand.Execute(null);
+                Assert.AreEqual(new Microsoft.Xna.Framework.Vector3(1, 0, 0), interaction!.Target.Position);
+                Assert.AreEqual("1.5", Field(editor, "LifeTime").Values[0].Text);
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                editor.UndoCommand.Execute(null);
+                Assert.AreEqual(original, Field(editor, "LifeTime").Values[0].Text);
+                Assert.IsTrue(editor.HasUnsavedChanges);
+                editor.UndoCommand.Execute(null);
+                Assert.AreEqual(Microsoft.Xna.Framework.Vector3.Zero, interaction.Target.Position);
+                Assert.IsTrue(editor.HasUnsavedChanges);
+                for (var index = 0; index < 3; index++) editor.RedoCommand.Execute(null);
+                Assert.AreEqual(new Microsoft.Xna.Framework.Vector3(2, 0, 0), interaction.Target.Position);
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                CollectionAssert.AreEqual(saved, DocumentBytes(editor));
+                editor.UndoCommand.Execute(null);
+                CommitPreviewTranslation(interaction, new(5, 0, 0));
+                Assert.IsFalse(editor.RedoCommand.CanExecute(null), "A new preview gesture must branch the same chronological history.");
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                editor.UndoCommand.Execute(null);
+                Assert.AreEqual(new Microsoft.Xna.Framework.Vector3(1, 0, 0), interaction.Target.Position);
+                editor.UndoCommand.Execute(null);
+                Assert.AreEqual(original, Field(editor, "LifeTime").Values[0].Text);
+                Assert.IsTrue(editor.HasUnsavedChanges);
+                editor.UndoCommand.Execute(null);
+                Assert.AreEqual(Microsoft.Xna.Framework.Vector3.Zero, interaction.Target.Position);
+            }
+            finally { editor.Close(); scene.Dispose(); }
+        });
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void PreviewTransforms_UndoCancelsTheActiveGestureBeforeConsumingACommittedStep(bool boxSelection) =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var scene = CreateTestScene(true, out var interaction);
+            var context = new Context(scenePreview: scene); var editor = context.Editor;
+            var view = new VfxEditorView { DataContext = editor };
+            try
+            {
+                interaction!.Select();
+                CommitPreviewTranslation(interaction, new(1, 0, 0));
+                if (boxSelection)
+                {
+                    interaction.Select(false);
+                    typeof(VfxEmitterInteractionComponent).GetField("_selectionBeforeBox", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(interaction, true);
+                    typeof(VfxEmitterInteractionComponent).GetField("_isBoxSelecting", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(interaction, true);
+                }
+                else
+                {
+                    interaction.BeginTransform();
+                    interaction.ApplyTransform(GameWorld.Core.Components.Gizmo.ModalPreviewReplacement.Translate(new(5, 0, 0), GameWorld.Core.Components.Gizmo.PivotType.ObjectCenter));
+                }
+                Assert.IsTrue(interaction.HasActiveInteraction);
+                Assert.IsFalse(editor.RedoCommand.CanExecute(null));
+                Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control));
+                Assert.IsFalse(interaction.HasActiveInteraction);
+                Assert.IsTrue(interaction.IsSelected);
+                Assert.AreEqual(new Microsoft.Xna.Framework.Vector3(1, 0, 0), interaction.Target.Position);
+                Assert.IsTrue(editor.UndoCommand.CanExecute(null), "Cancelling an active operation must preserve the preceding committed step.");
+                Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control));
+                Assert.AreEqual(Microsoft.Xna.Framework.Vector3.Zero, interaction.Target.Position);
+                Assert.IsTrue(Shortcut(view, Key.Y, ModifierKeys.Control));
+                Assert.AreEqual(new Microsoft.Xna.Framework.Vector3(1, 0, 0), interaction.Target.Position);
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                context.Save.VerifyNoOtherCalls();
+            }
+            finally { view.DataContext = null; editor.Close(); scene.Dispose(); }
+        });
+
+    private static bool Shortcut(VfxEditorView view, Key key, ModifierKeys modifiers) => (bool)typeof(VfxEditorView)
+        .GetMethod("TryExecuteShortcut", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(view, [key, modifiers])!;
+
+    private static byte[] DocumentBytes(VfxEditorViewModel editor) => ((VfxDocument)typeof(VfxEditorViewModel)
+        .GetField("_document", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(editor)!).Write();
+
+    private static DispatcherTimer PreviewTimer(VfxEditorViewModel editor) => (DispatcherTimer)typeof(VfxEditorViewModel)
+        .GetField("_scenePreviewTimer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(editor)!;
+
+    private static void CommitPreviewTranslation(VfxEmitterInteractionComponent interaction, Microsoft.Xna.Framework.Vector3 offset)
+    {
+        interaction.BeginTransform();
+        interaction.ApplyTransform(GameWorld.Core.Components.Gizmo.ModalPreviewReplacement.Translate(offset, GameWorld.Core.Components.Gizmo.PivotType.ObjectCenter));
+        typeof(VfxEmitterInteractionComponent).GetMethod("EndTransform", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(interaction, null);
+    }
+
+    [TestMethod]
     public void InvalidHiddenValuesAndRanges_BlockSaveWithoutDiscardingEdits() => WithEditor((editor, context) =>
     {
         Field(editor, "cell").Values[0].Text = "2.5";
@@ -461,27 +796,15 @@ public class VfxEditorTests
         WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
         {
             var previous = ThemesController.CurrentTheme;
-            Window? window = null;
             try
             {
                 var context = new Context();
                 var editor = context.Editor;
-                context.Terry.Setup(x => x.PreviewAsync(It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<PackFileContainer>(), It.IsAny<CancellationToken>()))
-                    .ReturnsAsync(new TerryPreviewResult("preview.terry", "water_trail", 4, 8));
-                editor.PreviewCommand.ExecuteAsync(null).GetAwaiter().GetResult();
                 editor.SelectedField = Field(editor, "curve_alpha");
-                var view = new VfxEditorView { DataContext = editor };
-                window = new Window
-                {
-                    Content = view, Width = 1140, Height = 800, Style = new Style(typeof(Window)),
-                    WindowStyle = WindowStyle.None, ResizeMode = ResizeMode.NoResize,
-                    ShowInTaskbar = false, ShowActivated = false,
-                    WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000
-                };
-                window.Show();
                 foreach (var theme in Enum.GetValues<ThemeType>())
                 {
                     ThemesController.SetTheme(theme);
+                    var view = new VfxEditorView { DataContext = editor };
                     view.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     view.Measure(new Size(1140, 800));
                     view.Arrange(new Rect(0, 0, 1140, 800));
@@ -509,16 +832,51 @@ public class VfxEditorTests
                         }
                     }
                     Assert.IsFalse(editor.HasUnsavedChanges);
+                    view.DataContext = null;
                 }
-                view.DataContext = null;
+                editor.Close();
             }
             finally
             {
-                window?.Close();
                 ThemesController.SetTheme(previous);
             }
         });
     }
+
+    [TestMethod]
+    public void Workspace_UsesCompactViewportMenusAndRightInspectorWithoutEditingTheDocument() => WithEditor((editor, context) =>
+    {
+        var original = context.File.DataSource.ReadData();
+        var view = new VfxEditorView { DataContext = editor };
+        view.Measure(new Size(1140, 800)); view.Arrange(new Rect(0, 0, 1140, 800)); view.UpdateLayout();
+        var workspace = (Grid)view.FindName("Workspace");
+        var scene = (Grid)view.FindName("ScenePreviewPanel");
+        var inspector = (TabControl)view.FindName("Inspector");
+        Assert.AreEqual(3, workspace.ColumnDefinitions.Count, "There must be no extra layer column beside the global file tree.");
+        Assert.AreEqual(0, Grid.GetColumn(scene)); Assert.AreEqual(2, Grid.GetColumn(inspector));
+        var toolbar = (WrapPanel)view.FindName("SceneToolbar");
+        Assert.IsTrue(toolbar.ActualHeight > 0 && toolbar.ActualHeight <= 28, $"Compact menu row: {toolbar.ActualHeight}");
+        Assert.IsTrue(Descendants(toolbar).OfType<Menu>().Any());
+        var menu = Descendants(toolbar).OfType<Menu>().Single();
+        CollectionAssert.AreEqual(new[] { editor.Localization.Get("Vfx.Menu.File"), editor.Localization.Get("Vfx.Menu.Edit"), editor.Localization.Get("Vfx.Menu.View") },
+            menu.Items.Cast<MenuItem>().Select(item => item.Header.ToString()).ToArray());
+        Assert.IsFalse(menu.Items.Cast<MenuItem>().Any(item => Equals(item.Header, editor.Localization.Get("Vfx.Menu.Transform"))));
+        Assert.IsFalse(Descendants(view).OfType<TextBlock>().Any(text => text.Text == editor.Localization.Get("Vfx.WelcomeHint")));
+        Assert.AreEqual("透明度曲线", Field(editor, "curve_alpha").Label);
+        var field = Field(editor, "curve_alpha");
+        Assert.IsTrue(field.ToolTip.Contains(field.Description)); Assert.IsTrue(field.ToolTip.Contains(field.AdjustmentHint));
+        Assert.IsTrue(field.ToolTip.Contains(field.Model.Name));
+        var source = Descendants(view).OfType<ComboBox>().Single(x => ReferenceEquals(x.ItemsSource, editor.Layers));
+        source.SelectedItem = editor.Layers.Single(x => x.Model.Kind == "Reference");
+        Assert.AreSame(source.SelectedItem, editor.SelectedLayer);
+        inspector.SelectedIndex = 1; view.UpdateLayout();
+        Assert.IsTrue(((Grid)view.FindName("LayerPanel")).ActualWidth >= 360);
+        Assert.AreSame(editor.Layers, ((ListBox)view.FindName("LayerList")).ItemsSource);
+        CollectionAssert.AreEqual(original, context.File.DataSource.ReadData());
+        Assert.IsFalse(editor.HasUnsavedChanges); Assert.IsFalse(editor.UndoCommand.CanExecute(null));
+        context.Save.Verify(x => x.Save(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<bool>()), Times.Never);
+        view.DataContext = null;
+    });
 
     [TestMethod]
     public void InlineParameterEditor_KeepsEditsWhenSwitchingSearchingAndUndoing() => WithEditor((editor, context) =>
@@ -577,7 +935,7 @@ public class VfxEditorTests
         Assert.AreEqual("animation_hu1e_test", reference.Label);
         editor.SelectedLayer = reference;
         Assert.IsTrue(editor.SelectedField!.IsVector);
-        CollectionAssert.AreEqual(new[] { "X 方向", "Y 高度", "Z 方向" }, editor.SelectedField.Values.Select(x => x.Label).ToArray());
+        CollectionAssert.AreEqual(new[] { "X 轴", "Y 轴", "Z 轴" }, editor.SelectedField.Values.Select(x => x.Label).ToArray());
         Assert.IsFalse(editor.HasUnsavedChanges);
         CollectionAssert.AreEqual(bytes, context.File.DataSource.ReadData());
     });
@@ -643,7 +1001,7 @@ public class VfxEditorTests
                 files.AddFilesToPack(project, [new NewPackFileEntry("vfx", source)]);
                 var file = files.FindFile("vfx\\water_trail.xml", project)!;
                 var dialogs = Mock.Of<IStandardDialogs>();
-                var editor = new VfxEditorViewModel(files, new FileSaveService(files, dialogs), dialogs, Mock.Of<IEditorCreator>(), LocalizationManager.Instance, Mock.Of<ITerryPreviewService>());
+                var editor = new VfxEditorViewModel(files, new FileSaveService(files, dialogs), dialogs, Mock.Of<IEditorCreator>(), LocalizationManager.Instance);
                 editor.LoadFile(file);
                 Field(editor, "SpawnSpacing").Values[0].Text = "0.2";
                 Assert.IsTrue(editor.Save());
@@ -659,7 +1017,7 @@ public class VfxEditorTests
                 compositionDialogs.Setup(x => x.DisplaySaveDialog(files, It.IsAny<List<string>>()))
                     .Returns(new SaveDialogResult(true, null, "vfx\\combined.xml"));
                 var composition = new VfxEditorViewModel(files, new FileSaveService(files, compositionDialogs.Object),
-                    compositionDialogs.Object, Mock.Of<IEditorCreator>(), LocalizationManager.Instance, Mock.Of<ITerryPreviewService>());
+                    compositionDialogs.Object, Mock.Of<IEditorCreator>(), LocalizationManager.Instance);
                 composition.NewComposition();
                 composition.AddReferenceCommand.Execute(null);
                 composition.DuplicateLayerCommand.Execute(null);
@@ -697,9 +1055,12 @@ public class VfxEditorTests
             {
                 Assert.IsTrue(VfxCurve.TryParse(field.RawValue, out var curve), $"{file}: {field.Name}");
                 Assert.AreEqual(field.RawValue, curve!.ToString(), $"{file}: {field.Name}");
-                var channel = curve.Channels[0];
-                channel.MovePoint(0, channel.Points[0].Time, channel.Points[0].Value + 0.125);
-                field.Element.Value = curve.ToString();
+                var channel = curve.Channels.FirstOrDefault(x => x.Points.Count != 0);
+                if (channel != null)
+                {
+                    channel.MovePoint(0, channel.Points[0].Time, channel.Points[0].Value + 0.125);
+                    field.Element.Value = curve.ToString();
+                }
             }
             var roundTrip = VfxDocument.Read(document.Write());
             Assert.IsTrue(XNode.DeepEquals(document.Root, roundTrip.Root), file);
@@ -708,40 +1069,303 @@ public class VfxEditorTests
     }
 
     [TestMethod]
-    public void PreviewButton_PassesUnsavedEditsWithoutSavingOrClearingUndo() => WithEditor((editor, context) =>
-    {
-        byte[]? previewBytes = null;
-        context.Terry.Setup(x => x.PreviewAsync(It.IsAny<byte[]>(), "vfx\\water_trail.xml", It.IsAny<PackFileContainer>(), It.IsAny<CancellationToken>()))
-            .Returns((byte[] bytes, string _, PackFileContainer _, CancellationToken _) =>
+    public void LiveEdits_ArePublishedWhileRenderWorkRemainsQueued() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var store = new VfxPreviewDocumentStore();
+            var context = new Context(store);
+            var editor = context.Editor;
+            var original = context.File.DataSource.ReadData();
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            var frame = new DispatcherFrame();
+            var deadline = new DispatcherTimer(DispatcherPriority.Send) { Interval = TimeSpan.FromSeconds(2) };
+            DispatcherOperation? queuedRender = null;
+            var rendering = true;
+            var renderCount = 0;
+            var published = false;
+            void Render()
             {
-                previewBytes = bytes;
-                return Task.FromResult(new TerryPreviewResult("preview.terry", "water_trail", 1, 1));
-            });
-        Field(editor, "LifeTime").Values[0].Text = "1.5";
-        editor.PreviewCommand.ExecuteAsync(null).GetAwaiter().GetResult();
-        Assert.IsNotNull(previewBytes);
-        Assert.AreEqual("1.5", VfxDocument.Read(previewBytes).Root.Descendants("ranged_property").Single(x => (string?)x.Attribute("name") == "LifeTime").Attribute("min")!.Value);
-        Assert.IsTrue(editor.HasUnsavedChanges);
-        Assert.IsTrue(editor.UndoCommand.CanExecute(null));
-        Assert.IsNull(context.Saved);
-        StringAssert.Contains(editor.PreviewStatus, "已在 Terry 打开");
-        editor.UndoCommand.Execute(null);
+                renderCount++;
+                if (rendering) queuedRender = dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(Render));
+            }
+            void Published(object file)
+            {
+                if (!ReferenceEquals(file, context.File)) return;
+                published = true;
+                frame.Continue = false;
+            }
+            deadline.Tick += (_, _) => frame.Continue = false;
+            store.Changed += Published;
+            try
+            {
+                Field(editor, "LifeTime").Values[0].Text = "1.5";
+                queuedRender = dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(Render));
+                deadline.Start();
+                Dispatcher.PushFrame(frame);
+                Assert.IsTrue(renderCount > 0);
+                Assert.IsTrue(published, "Continuous rendering must not starve the debounced live preview update.");
+                Assert.IsTrue(store.TryGet(context.File, out var snapshot));
+                StringAssert.Contains(Encoding.UTF8.GetString(snapshot!.GameBytes), "min=\"1.5\"");
+                CollectionAssert.AreEqual(original, context.File.DataSource.ReadData());
+                Assert.IsNull(context.Saved);
+            }
+            finally
+            {
+                rendering = false;
+                deadline.Stop();
+                queuedRender?.Abort();
+                store.Changed -= Published;
+                editor.Close();
+            }
+        });
+
+    [TestMethod]
+    public void UnsavedEdits_ArePublishedForSharedScenesWithoutAnEditorRuntime() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var store = new VfxPreviewDocumentStore();
+            var context = new Context(store);
+            var editor = context.Editor;
+            var original = context.File.DataSource.ReadData();
+            var refresh = typeof(VfxEditorViewModel).GetMethod("RefreshScenePreview", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            void Refresh() => refresh.Invoke(editor, [null, EventArgs.Empty]);
+            try
+            {
+                Assert.IsNull(editor.PreviewWorld);
+                Field(editor, "LifeTime").Values[0].Text = "1.5";
+                Refresh();
+                Assert.IsTrue(store.TryGet(context.File, out var snapshot));
+                Assert.IsNotNull(snapshot);
+                StringAssert.Contains(Encoding.UTF8.GetString(snapshot.GameBytes), "min=\"1.5\"");
+                Assert.IsTrue(editor.HasUnsavedChanges);
+                Assert.IsTrue(editor.UndoCommand.CanExecute(null));
+                Field(editor, "LifeTime").Values[0].Text = "invalid";
+                Refresh();
+                Assert.IsTrue(store.TryGet(context.File, out snapshot));
+                Assert.IsNull(snapshot);
+                editor.UndoCommand.Execute(null);
+                Refresh();
+                Assert.IsTrue(store.TryGet(context.File, out snapshot));
+                Assert.IsNotNull(snapshot);
+                CollectionAssert.AreEqual(original, context.File.DataSource.ReadData());
+                context.Save.Verify(x => x.Save(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<bool>()), Times.Never);
+
+            }
+            finally { editor.Close(); }
+            Assert.IsFalse(store.TryGet(context.File, out _));
+        });
+
+    [TestMethod]
+    public void ReferencedUnsavedEdits_RefreshTheEditorsOwnSceneAndNeverFallBackToInvalidSavedData() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var store = new VfxPreviewDocumentStore();
+            var context = new Context(store, scenePreview: CreateTestScene());
+            var editor = context.Editor;
+            var owner = new object();
+            const string path = @"vfx\child.xml";
+            var original = Encoding.UTF8.GetBytes("original child bytes");
+            var child = PackFile.CreateFromBytes("child.xml", original);
+            var container = context.Files.Object.GetAllPackfileContainers().Single();
+            container.FileList.Add(path, child);
+            context.Files.Setup(x => x.FindFile(path, container)).Returns(child);
+            var refresh = typeof(VfxEditorViewModel).GetMethod("RefreshScenePreview", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            var timer = (System.Windows.Threading.DispatcherTimer)typeof(VfxEditorViewModel)
+                .GetField("_scenePreviewTimer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(editor)!;
+            void Refresh() => refresh.Invoke(editor, [null, EventArgs.Empty]);
+            try
+            {
+                    Refresh();
+                Assert.IsFalse(timer.IsEnabled, "Publishing the root snapshot must not schedule its own reload forever.");
+                Assert.IsTrue(store.TryGet(context.File, out var root));
+                CollectionAssert.AreEqual(original, root!.Resolve(path)!);
+                var edited = Encoding.UTF8.GetBytes("unsaved child bytes");
+                store.Publish(owner, child, new(edited, path, _ => null));
+                Assert.IsTrue(timer.IsEnabled, "Only a dependency actually resolved by this preview should schedule a reload.");
+                Refresh();
+                Assert.IsTrue(store.TryGet(context.File, out root));
+                CollectionAssert.AreEqual(edited, root!.Resolve(path)!);
+                var unrelatedOwner = new object();
+                store.Publish(unrelatedOwner, new object(), null);
+                Assert.IsFalse(timer.IsEnabled);
+                store.Remove(unrelatedOwner);
+                store.Publish(owner, child, null);
+                Assert.IsTrue(timer.IsEnabled);
+                Refresh();
+                Assert.IsTrue(store.TryGet(context.File, out root));
+                Assert.ThrowsException<InvalidDataException>(() => root!.Resolve(path));
+                store.Publish(owner, child, new(edited, path, _ => null));
+                Assert.IsTrue(timer.IsEnabled);
+                Refresh();
+                Assert.IsTrue(store.TryGet(context.File, out root));
+                CollectionAssert.AreEqual(edited, root!.Resolve(path)!);
+                CollectionAssert.AreEqual(original, child.DataSource.ReadData());
+                Assert.IsFalse(editor.HasUnsavedChanges);
+                Assert.IsNull(context.Saved);
+
+            }
+            finally { editor.Close(); store.Remove(owner); }
+            Assert.IsFalse(timer.IsEnabled);
+        });
+
+
+    [TestMethod]
+    public void PreviewScope_DefaultsAreStructuralAndNeverUseTheFileName() => WithEditor((editor, context) =>
+    {
+        Assert.IsFalse(editor.HasPreviewSelection, "A multi-root source requires an explicit scope.");
+        editor.PreviewAllCommand.Execute(null);
+        Assert.AreEqual(2, editor.Layers.Count(layer => layer.IsIncludedInPreview));
+        var composition = PackFile.CreateFromBytes("arbitrary-source-name.xml", Encoding.UTF8.GetBytes(Sample.Replace("construction_type=\"1\"", "construction_type=\"2\"")));
+        editor.LoadFile(composition);
+        Assert.AreEqual(2, editor.Layers.Count(layer => layer.IsIncludedInPreview));
+        var single = VfxDocument.Read(Encoding.UTF8.GetBytes(Sample));
+        single.Root.Element("vfx_references")!.Remove();
+        editor.LoadFile(PackFile.CreateFromBytes("arbitrary-multi-effect-name.xml", single.Write()));
+        Assert.AreEqual(1, editor.Layers.Count(layer => layer.IsIncludedInPreview));
         Assert.IsFalse(editor.HasUnsavedChanges);
+        context.Save.VerifyNoOtherCalls();
     });
 
     [TestMethod]
-    public void PreviewButton_DisablesInvalidValuesAndShowsLaunchFailure() => WithEditor((editor, context) =>
+    public void PreviewScope_OnlyCombinationAndEmptyAffectOwnSceneButNotSavedOrSharedBytes() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var store = new VfxPreviewDocumentStore();
+            var scene = CreateTestScene();
+            var context = new Context(store, scenePreview: scene);
+            var editor = context.Editor;
+            var original = context.File.DataSource.ReadData();
+            var emitter = editor.Layers.Single(layer => layer.Model.Kind == "Emitter");
+            var reference = editor.Layers.Single(layer => layer.Model.Kind == "Reference");
+            try
+            {
+                emitter.PreviewOnlyCommand.Execute(null); RefreshScene(editor);
+                var local = PendingScene(scene);
+                CollectionAssert.AreEqual(new[] { emitter.Model.Name }, local.RootSelection!.EmitterIds.ToArray());
+                Assert.AreEqual(0, local.RootSelection.ReferenceNames.Count);
+                editor.SelectedLayer = reference; editor.Quality = "All"; editor.PreviewQuality = "1";
+                Assert.IsTrue(emitter.IsIncludedInPreview); Assert.IsFalse(reference.IsIncludedInPreview);
+                reference.IsIncludedInPreview = true; RefreshScene(editor);
+                Assert.IsNull(PendingScene(scene).RootSelection, "Selecting all preserves the complete original contract.");
+                editor.PreviewNoneCommand.Execute(null); RefreshScene(editor);
+                Assert.AreEqual(0, PendingScene(scene).RootSelection!.EmitterIds.Count);
+                Assert.AreEqual(0, PendingScene(scene).RootSelection!.ReferenceNames.Count);
+                Assert.IsTrue(store.TryGet(context.File, out var shared));
+                Assert.IsNull(shared!.RootSelection, "Local choices must not contaminate SuperView snapshots.");
+                CollectionAssert.AreEqual(original, shared.GameBytes);
+                CollectionAssert.AreEqual(original, context.File.DataSource.ReadData());
+                Assert.IsFalse(editor.HasUnsavedChanges); Assert.IsFalse(editor.UndoCommand.CanExecute(null));
+                Field(editor, "LifeTime").Values[0].Text = "1.5"; RefreshScene(editor);
+                Assert.IsTrue(store.TryGet(context.File, out shared));
+                StringAssert.Contains(Encoding.UTF8.GetString(shared!.GameBytes), "min=\"1.5\"");
+                Assert.IsNull(shared.RootSelection); Assert.IsTrue(editor.HasUnsavedChanges);
+                editor.UndoCommand.Execute(null); Assert.IsFalse(editor.HasUnsavedChanges);
+                context.Save.VerifyNoOtherCalls();
+            }
+            finally { editor.Close(); scene.Dispose(); }
+        });
+
+    [TestMethod]
+    public void InvalidEdits_RestoreThePriorPlayingPausedOrCollapsedState() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            foreach (var (playing, expanded, collapseDuringError) in new[]
+                     { (true, true, false), (false, true, false), (true, false, false), (true, true, true), (false, true, true) })
+            {
+                var scene = CreateTestScene();
+                var context = new Context(scenePreview: scene);
+                var editor = context.Editor;
+                try
+                {
+                    editor.PreviewAllCommand.Execute(null); RefreshScene(editor);
+                    scene.Preview.Update(new Microsoft.Xna.Framework.GameTime());
+                    scene.Preview.IsPlaying = playing;
+                    editor.Playback.IsEnabled.Value = expanded;
+                    var expected = scene.Preview.IsPlaying;
+                    Field(editor, "LifeTime").Values[0].Text = "invalid";
+                    RefreshScene(editor); RefreshScene(editor);
+                    Assert.IsFalse(scene.Preview.IsLoaded); Assert.IsFalse(scene.Preview.IsPlaying);
+                    if (collapseDuringError) editor.Playback.IsEnabled.Value = false;
+                    editor.UndoCommand.Execute(null); RefreshScene(editor);
+                    scene.Preview.Update(new Microsoft.Xna.Framework.GameTime());
+                    Assert.IsTrue(scene.Preview.IsLoaded);
+                    Assert.AreEqual(expected && !collapseDuringError, scene.Preview.IsPlaying);
+                    Assert.AreEqual(expanded && !collapseDuringError, editor.Playback.IsEnabled.Value);
+                    editor.Playback.IsEnabled.Value = true;
+                    Assert.AreEqual(playing, scene.Preview.IsPlaying, "An invalid edit must not replace the user's playback intent.");
+                    Assert.IsFalse(editor.HasUnsavedChanges);
+                }
+                finally { editor.Close(); scene.Dispose(); }
+            }
+        });
+
+    [TestMethod]
+    public void LoadedPreview_RendersTheSharedSecondsPlayerAcrossThemesWithoutOpeningAWindow() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var scene = CreateTestScene();
+            var context = new Context(scenePreview: scene);
+            var editor = context.Editor;
+            var previous = ThemesController.CurrentTheme;
+            try
+            {
+                editor.PreviewAllCommand.Execute(null); RefreshScene(editor);
+                scene.Preview.Update(new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(2.5)));
+                foreach (var theme in new[] { ThemeType.DarkTheme, ThemeType.LightTheme, ThemeType.HighContrastDark, ThemeType.HighContrastLight })
+                {
+                    ThemesController.SetTheme(theme);
+                    var view = new VfxEditorView { DataContext = editor };
+                    view.Measure(new Size(1440, 900)); view.Arrange(new Rect(0, 0, 1440, 900)); view.UpdateLayout();
+                    var player = (AnimationEditor.Common.AnimationPlayer.AnimationPlayerView)view.FindName("PlaybackPanel");
+                    Assert.AreSame(editor.Playback, player.DataContext);
+                    Assert.IsFalse(player.ShowFrameInformation);
+                    Assert.IsTrue(((FrameworkElement)player.FindName("PlaybackCommandRow")).ActualHeight > 0);
+                    var slider = Descendants(player).OfType<Slider>().Single();
+                    Assert.AreEqual(8d, slider.Maximum); Assert.AreEqual(2.5d, slider.Value);
+                    var buttons = Descendants(player).OfType<Button>().Where(button => button.Visibility == Visibility.Visible).ToArray();
+                    Assert.IsTrue(buttons.Any(button => System.Windows.Automation.AutomationProperties.GetName(button) == "跳到开始"));
+                    Assert.IsTrue(buttons.Any(button => System.Windows.Automation.AutomationProperties.GetName(button) == "跳到末尾"));
+                    Assert.IsFalse(buttons.Any(button => System.Windows.Automation.AutomationProperties.GetName(button) == editor.Localization.Get("SharedAnimPlayer.NextFrame")));
+                    var output = Environment.GetEnvironmentVariable("ASSETEDITOR_VFX_RENDER_OUTPUT");
+                    if (!string.IsNullOrWhiteSpace(output))
+                    {
+                        Directory.CreateDirectory(output);
+                        var bitmap = new RenderTargetBitmap(1440, 900, 96, 96, PixelFormats.Pbgra32); bitmap.Render(view);
+                        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                        using var stream = File.Create(Path.Combine(output, $"vfx-loaded-seconds-player-{theme}.png")); encoder.Save(stream);
+                    }
+                    Assert.IsFalse(editor.HasUnsavedChanges);
+                    view.DataContext = null;
+                }
+            }
+            finally { editor.Close(); scene.Dispose(); ThemesController.SetTheme(previous); }
+        });
+
+    private static void RefreshScene(VfxEditorViewModel editor) => typeof(VfxEditorViewModel)
+        .GetMethod("RefreshScenePreview", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+        .Invoke(editor, [null, EventArgs.Empty]);
+
+    private static VfxPreviewSnapshot PendingScene(VfxScenePreview scene) => (VfxPreviewSnapshot)typeof(VfxPreviewComponent)
+        .GetField("_pending", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(scene.Preview)!;
+
+    private static VfxScenePreview CreateTestScene() => CreateTestScene(false, out _);
+
+    private static VfxScenePreview CreateTestScene(bool withInteraction, out VfxEmitterInteractionComponent? interaction)
     {
-        Field(editor, "LifeTime").Values[0].Text = "invalid";
-        Assert.IsFalse(editor.PreviewCommand.CanExecute(null));
-        editor.UndoCommand.Execute(null);
-        Assert.IsTrue(editor.PreviewCommand.CanExecute(null));
-        context.Terry.Setup(x => x.PreviewAsync(It.IsAny<byte[]>(), It.IsAny<string>(), It.IsAny<PackFileContainer>(), It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new IOException("missing-test-resource"));
-        editor.PreviewCommand.ExecuteAsync(null).GetAwaiter().GetResult();
-        StringAssert.Contains(editor.PreviewStatus, "missing-test-resource");
-        Assert.IsNull(context.Saved);
-    });
+        var preview = new Mock<IVfxPreview>();
+        preview.SetupGet(value => value.Diagnostics).Returns(Array.Empty<VfxPreviewDiagnostic>());
+        preview.SetupGet(value => value.CycleDuration).Returns(8);
+        preview.SetupGet(value => value.EmitterCount).Returns(1);
+        preview.SetupGet(value => value.TotalEmitterCount).Returns(1);
+        var factory = new Mock<IVfxPreviewFactory>();
+        factory.Setup(value => value.Create(It.IsAny<Microsoft.Xna.Framework.Graphics.GraphicsDevice>())).Returns(preview.Object);
+        var component = new VfxPreviewComponent(factory.Object, Mock.Of<GameWorld.Core.Utility.IDeviceResolver>(), null!);
+        var core = new GameWorld.Core.Components.View3DCoreComponentSet(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
+        var mouse = new Mock<GameWorld.Core.Components.Input.IMouseComponent>(); mouse.SetupProperty(value => value.MouseOwner);
+        interaction = withInteraction ? new VfxEmitterInteractionComponent(mouse.Object, Mock.Of<GameWorld.Core.Components.Input.IKeyboardComponent>(), null!,
+            Mock.Of<GameWorld.Core.Utility.IDeviceResolver>(), null!, component) : null;
+        return new VfxScenePreview(Mock.Of<IWpfGame>(), Mock.Of<GameWorld.Core.Components.IComponentInserter>(), core, component, interaction);
+    }
 
     private static VfxFieldViewModel Field(VfxEditorViewModel editor, string name) =>
         editor.Layers[0].Fields.First(x => x.Model.Name == name);
@@ -768,12 +1392,11 @@ public class VfxEditorTests
         public Mock<IPackFileService> Files { get; } = new();
         public Mock<IFileSaveService> Save { get; } = new();
         public Mock<IStandardDialogs> Dialogs { get; } = new();
-        public Mock<ITerryPreviewService> Terry { get; } = new();
         public PackFile File { get; } = PackFile.CreateFromBytes("water_trail.xml", Encoding.UTF8.GetBytes(Sample));
         public byte[]? Saved { get; private set; }
         public VfxEditorViewModel Editor { get; }
 
-        public Context()
+        public Context(VfxPreviewDocumentStore? livePreviews = null, GameWeatherStore? weather = null, VfxScenePreview? scenePreview = null)
         {
             var container = new PackFileContainer("project");
             container.FileList.Add("vfx\\water_trail.xml", File);
@@ -790,7 +1413,7 @@ public class VfxEditorTests
             });
             var localization = new LocalizationManager();
             localization.LoadLanguage();
-            Editor = new VfxEditorViewModel(Files.Object, Save.Object, Dialogs.Object, Mock.Of<IEditorCreator>(), localization, Terry.Object);
+            Editor = new VfxEditorViewModel(Files.Object, Save.Object, Dialogs.Object, Mock.Of<IEditorCreator>(), localization, scenePreview: scenePreview, livePreviews: livePreviews, weather: weather);
             Editor.LoadFile(File);
         }
     }

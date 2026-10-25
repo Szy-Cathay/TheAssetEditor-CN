@@ -1,4 +1,5 @@
 ﻿<UserControl x:Class="AnimationEditor.Common.AnimationPlayer.AnimationPlayerView"
+             x:Name="PlayerRoot"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -16,6 +17,7 @@
     <UserControl.Resources>
         <ResourceDictionary>
             <basecontrol:HostTemplateSelector x:Key="TimelineAnnotationSelector" />
+            <BooleanToVisibilityConverter x:Key="FrameInformationVisibility" />
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
@@ -46,16 +48,26 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center">
                         <Button
-                            Click="{s:MethodBinding SetAnimationFirstFrame}"
-                            AutomationProperties.Name="{loc:Loc SharedAnimPlayer.FirstFrame}"
-                            ToolTip="{loc:Loc SharedAnimPlayer.FirstFrame}"
-                            Style="{StaticResource AeButton.Icon}">
+                            Click="{s:MethodBinding SetAnimationFirstFrame}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource AeButton.Icon}">
+                                    <Setter Property="AutomationProperties.Name" Value="{loc:Loc SharedAnimPlayer.FirstFrame}" />
+                                    <Setter Property="ToolTip" Value="{loc:Loc SharedAnimPlayer.FirstFrame}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowFrameInformation, ElementName=PlayerRoot}" Value="False">
+                                            <Setter Property="AutomationProperties.Name" Value="{loc:Loc SharedAnimPlayer.Start}" />
+                                            <Setter Property="ToolTip" Value="{loc:Loc SharedAnimPlayer.Start}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                             <Canvas Width="16" Height="16">
                                 <Path Data="M 3,3 L 3,13 M 13,3 L 5,8 L 13,13 Z" Fill="{DynamicResource AeBrush.TextPrimary}" Stroke="{DynamicResource AeBrush.TextPrimary}" StrokeEndLineCap="Round" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeThickness="1.5" />
                             </Canvas>
                         </Button>
                         <Button
                             Click="{s:MethodBinding SetAnimationPrivFrame}"
+                            Visibility="{Binding ShowFrameInformation, ElementName=PlayerRoot, Converter={StaticResource FrameInformationVisibility}}"
                             AutomationProperties.Name="{loc:Loc SharedAnimPlayer.PreviousFrame}"
                             ToolTip="{loc:Loc SharedAnimPlayer.PreviousFrame}"
                             Style="{StaticResource AeButton.Icon}">
@@ -95,6 +107,7 @@
                         </ToggleButton>
                         <Button
                             Click="{s:MethodBinding SetAnimationNextFrame}"
+                            Visibility="{Binding ShowFrameInformation, ElementName=PlayerRoot, Converter={StaticResource FrameInformationVisibility}}"
                             AutomationProperties.Name="{loc:Loc SharedAnimPlayer.NextFrame}"
                             ToolTip="{loc:Loc SharedAnimPlayer.NextFrame}"
                             Style="{StaticResource AeButton.Icon}">
@@ -103,10 +116,19 @@
                             </Canvas>
                         </Button>
                         <Button
-                            Click="{s:MethodBinding SetAnimationLastFrame}"
-                            AutomationProperties.Name="{loc:Loc SharedAnimPlayer.LastFrame}"
-                            ToolTip="{loc:Loc SharedAnimPlayer.LastFrame}"
-                            Style="{StaticResource AeButton.Icon}">
+                            Click="{s:MethodBinding SetAnimationLastFrame}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource AeButton.Icon}">
+                                    <Setter Property="AutomationProperties.Name" Value="{loc:Loc SharedAnimPlayer.LastFrame}" />
+                                    <Setter Property="ToolTip" Value="{loc:Loc SharedAnimPlayer.LastFrame}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowFrameInformation, ElementName=PlayerRoot}" Value="False">
+                                            <Setter Property="AutomationProperties.Name" Value="{loc:Loc SharedAnimPlayer.End}" />
+                                            <Setter Property="ToolTip" Value="{loc:Loc SharedAnimPlayer.End}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
                             <Canvas Width="16" Height="16">
                                 <Path Data="M 3,3 L 11,8 L 3,13 Z M 13,3 L 13,13" Fill="{DynamicResource AeBrush.TextPrimary}" Stroke="{DynamicResource AeBrush.TextPrimary}" StrokeEndLineCap="Round" StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeThickness="1.5" />
                             </Canvas>
@@ -117,6 +139,7 @@
                 <WrapPanel
                     x:Name="PlaybackInformationRow"
                     Grid.Row="1"
+                    Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}"
                     Margin="0,4,0,0"
                     HorizontalAlignment="Center">
                     <TextBlock
@@ -134,7 +157,7 @@
                         Margin="12,2,0,2"
                         VerticalAlignment="Center"
                         Style="{StaticResource AeText.Technical}"
-                        Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
+                        Visibility="{Binding ShowFrameInformation, ElementName=PlayerRoot, Converter={StaticResource FrameInformationVisibility}}">
                         <Run Text="{loc:Loc SharedAnimPlayer.Frame}" />
                         <Run Text="{Binding SelectedAnimationCurrentFrame.Value}" />
                         <Run Text=" / " />
@@ -143,7 +166,7 @@
                     <TextBlock
                         Margin="12,2,0,2"
                         VerticalAlignment="Center"
-                        Visibility="{Binding PlayerControlsVisibility.Value, Mode=OneWay}">
+                        Visibility="{Binding ShowFrameInformation, ElementName=PlayerRoot, Converter={StaticResource FrameInformationVisibility}}">
                         <Run Text="{Binding SelectedAnimationFps.Value, StringFormat=N2}" />
                         <Run Text="{loc:Loc SharedAnimPlayer.Fps}" />
                     </TextBlock>

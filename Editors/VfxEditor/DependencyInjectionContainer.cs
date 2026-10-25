@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Shared.Core.DependencyInjection;
 using Shared.Core.ToolCreation;
 
@@ -10,7 +10,8 @@ public class DependencyInjectionContainer : DependencyContainer
     {
         services.AddTransient<VfxEditorView>();
         services.AddScoped<VfxEditorViewModel>();
-        services.AddSingleton<ITerryPreviewService, TerryPreviewService>();
+        services.AddScoped<VfxScenePreview>();
+        services.AddScoped<VfxEmitterInteractionComponent>();
     }
 
     public override void RegisterTools(IEditorDatabase database)

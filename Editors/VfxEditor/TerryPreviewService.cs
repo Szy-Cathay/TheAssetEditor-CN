@@ -100,7 +100,7 @@ public sealed class TerryPreviewService(IPackFileService files, ApplicationSetti
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            Shared.Core.ErrorHandling.Logging.Create<TerryPreviewService>().Warning(exception, "Could not deactivate Terry preview");
+            global::Shared.Core.ErrorHandling.Logging.Create<TerryPreviewService>().Warning(exception, "Could not deactivate Terry preview");
         }
         finally { process.Dispose(); }
     }

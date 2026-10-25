@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Xml.Linq;
 using Editors.VfxEditor;
 using Moq;
@@ -75,12 +75,64 @@ public class TerryPreviewTests
         StringAssert.Contains(exception.Message, "vfx\\textures\\missing.dds");
     }
 
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ExplicitModelAnimation_PreservesModBytesAndReusesOfficialClips(bool official)
+    {
+        var bytes = new byte[] { 8, 0, 0, 0, 42 };
+        var source = Effect(content: "<emitter id=\"animated\" type=\"continuous_rigid\"><property_rigid_data name=\"RigidData\"><rigid_entry><AnimFile value=\"animations/custom.anim\"/></rigid_entry></property_rigid_data></emitter>");
+        var original = source.ToArray();
+        var package = Builder().Build(source, "vfx\\animated.xml", path => path == "animations\\custom.anim" ? Resource(bytes, official) : null);
+        Assert.AreEqual(!official, package.Files.ContainsKey("animations\\custom.anim"));
+        if (!official) CollectionAssert.AreEqual(bytes, package.Files["animations\\custom.anim"]);
+        CollectionAssert.AreEqual(original, source);
+    }
+
     [TestMethod]
     public void ReferenceBackToCurrentEffect_IsRejected()
     {
         var bytes = Effect(Reference("loop"));
         var exception = Assert.ThrowsException<InvalidDataException>(() => Builder().Build(bytes, "vfx\\loop.xml", _ => Resource(bytes)));
         StringAssert.Contains(exception.Message, "循环");
+    }
+
+    [DataTestMethod]
+    [DataRow("OnParticleSpawn")]
+    [DataRow("OnParticleDeath")]
+    public void EnabledParticleEvent_CollectsAndAliasesPrivateChildWithoutStaticReference(string eventName)
+    {
+        var source = Effect(content: $"<emitter id=\"helper\" type=\"continuous_rigid\"><property name=\"EventEnable\" value=\"true\"/><property_event name=\"{eventName}\" vfx_name=\"private_child\" track_scale=\"true\"/></emitter>");
+        var original = source.ToArray();
+        var package = Builder().Build(source, "vfx/parent.xml", path => path == "vfx\\private_child.xml" ? Resource(Effect()) : null);
+        Assert.AreEqual(2, package.EffectCount);
+        var document = VfxDocument.Read(package.Files["vfx\\" + TerryPreviewBuilder.EffectName + ".xml"]);
+        var particleEvent = document.Root.Descendants("property_event").Single();
+        Assert.IsTrue(package.Files.ContainsKey("vfx\\" + particleEvent.Attribute("vfx_name")!.Value + ".xml"));
+        Assert.AreEqual("true", particleEvent.Attribute("track_scale")!.Value);
+        CollectionAssert.AreEqual(original, source);
+    }
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void DisabledOrOmittedEvent_DoesNotResolveAnInactivePlaceholder(bool omitted)
+    {
+        var enable = omitted ? "" : "<property name=\"EventEnable\" value=\"false\"/>";
+        var calls = 0;
+        var source = Effect(content: $"<emitter id=\"helper\" type=\"continuous_rigid\">{enable}<property_event name=\"OnParticleSpawn\" vfx_name=\"unused\"/></emitter>");
+        var package = Builder().Build(source, "vfx/parent.xml", _ => { calls++; return null; });
+        Assert.AreEqual(1, package.EffectCount); Assert.AreEqual(0, calls);
+    }
+
+    [TestMethod]
+    public void ParticleEventBackToCurrentEffect_ReusesTheAlreadyAssignedAlias()
+    {
+        var source = Effect(content: "<emitter id=\"helper\" type=\"continuous_rigid\"><property name=\"EventEnable\" value=\"true\"/><property_event name=\"OnParticleSpawn\" vfx_name=\"parent\"/></emitter>");
+        var package = Builder().Build(source, "vfx/parent.xml", _ => Resource(source));
+        Assert.AreEqual(1, package.EffectCount);
+        var document = VfxDocument.Read(package.Files["vfx\\" + TerryPreviewBuilder.EffectName + ".xml"]);
+        Assert.AreEqual(TerryPreviewBuilder.EffectName, document.Root.Descendants("property_event").Single().Attribute("vfx_name")!.Value);
     }
 
     [TestMethod]

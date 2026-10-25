@@ -33,6 +33,7 @@ namespace GameWorld.Core
 
             // Settings
             serviceCollection.AddScoped<SceneRenderParametersStore>();
+            serviceCollection.AddSingleton<Rendering.GameWeatherStore>();
             serviceCollection.AddSingleton<FactionColourSettingsService>();
             serviceCollection.AddTransient<
                 IFactionColourSettingsDialogService,
@@ -41,6 +42,9 @@ namespace GameWorld.Core
             // Services
             serviceCollection.AddSingleton<ISkeletonAnimationLookUpHelper, SkeletonAnimationLookUpHelper>();
             serviceCollection.AddScoped<FocusSelectableObjectService>();
+            serviceCollection.AddScoped<Vfx.IVfxPreviewFactory, Vfx.EffekseerVfxPreviewFactory>();
+            serviceCollection.AddSingleton<Vfx.VfxPreviewDocumentStore>();
+            serviceCollection.AddScoped<Vfx.VfxPreviewComponent>();
             serviceCollection.AddScoped<ComplexMeshLoader>();
             serviceCollection.AddTransient<ModelSkeletonResolver>();
             serviceCollection.AddScoped<Rmv2ModelNodeLoader>();

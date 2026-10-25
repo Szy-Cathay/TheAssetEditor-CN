@@ -1,4 +1,4 @@
-using Shared.Core.PackFiles;
+﻿using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
 using Serilog;
 using Shared.Core.ErrorHandling;
@@ -11,6 +11,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         private readonly ILogger _logger =
             Logging.Create<MetaDataResourceResolver>();
         private readonly IPackFileService _packFileService;
+        public IPackFileService Files => _packFileService;
 
         public MetaDataResourceResolver(IPackFileService packFileService)
         {
@@ -41,7 +42,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 "SuperView.Diagnostics.MissingAnimation",
                 diagnostics);
 
-        public void CheckEffect(
+        public PackFile? CheckEffect(
             ParsedMetadataAttribute source,
             MetaDataDocumentOwner owner,
             string effectName,
@@ -50,7 +51,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             var path = string.IsNullOrWhiteSpace(effectName)
                 ? ""
                 : $@"vfx\{effectName}.xml";
-            FindRequired(
+            return FindRequired(
                 source,
                 owner,
                 path,

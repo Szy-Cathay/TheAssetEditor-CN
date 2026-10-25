@@ -46,6 +46,7 @@ namespace GameWorld.Core.Components.Rendering
         bool _cullingEnabled = false;
         bool _bigSceneDepthBiasMode = false;
         bool _drawGlow = true;
+        private float _materialTimeSeconds;
         private readonly PendingRenderCapture _pendingCapture =
             new();
 
@@ -278,7 +279,9 @@ namespace GameWorld.Core.Components.Rendering
                 return;
             }
 
-            var commonShaderParameters = CommonShaderParameterBuilder.Build(_camera, _sceneLightParameters, screenHeight, screenWidth);
+            _materialTimeSeconds = (float)gameTime.TotalGameTime.TotalSeconds;
+            var commonShaderParameters = CommonShaderParameterBuilder.Build(_camera, _sceneLightParameters, screenHeight, screenWidth)
+                with { MaterialTimeSeconds = _materialTimeSeconds };
             commonShaderParameters = PrepareViewportShading(device, commonShaderParameters);
 
             _defaultRenderTarget = RenderTargetHelper.GetRenderTarget(device, _defaultRenderTarget, enableMsaa: true);
@@ -331,6 +334,7 @@ namespace GameWorld.Core.Components.Rendering
             // Editing modes deliberately skip texture-driven emissive bloom.
             var hasEmissiveItems =
                 shadingPipeline.EnableBloom &&
+                ViewportShadingPolicy.AllowsEmissiveBloom(commonShaderParameters.GameWeather) &&
                 _renderItems[RenderBuckedId.Normal]
                     .Any(item => item.SupportsTechnique(
                         RenderingTechnique.Emissive));
@@ -480,6 +484,7 @@ namespace GameWorld.Core.Components.Rendering
                                 RenderingTechnique.Normal));
 
                 var hasEmissiveItems =
+                    ViewportShadingPolicy.AllowsEmissiveBloom(_sceneLightParameters.GameWeather) &&
                     _renderItems[RenderBuckedId.Normal]
                         .Any(item =>
                             item.IncludeInPhotoCapture &&
@@ -611,7 +616,7 @@ namespace GameWorld.Core.Components.Rendering
                 _camera,
                 _sceneLightParameters,
                 height,
-                width);
+                width) with { MaterialTimeSeconds = _materialTimeSeconds };
             PhotoCaptureSceneRenderer.Draw(
                 device,
                 parameters,

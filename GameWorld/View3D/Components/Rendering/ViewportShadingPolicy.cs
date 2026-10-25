@@ -1,4 +1,5 @@
 using Microsoft.Xna.Framework.Graphics;
+using GameWorld.Core.Rendering;
 
 namespace GameWorld.Core.Components.Rendering;
 
@@ -9,6 +10,10 @@ public readonly record struct ViewportShadingPipeline(
 
 public static class ViewportShadingPolicy
 {
+    // Missing weather is unknown; only an explicit zero disables the model glow.
+    public static bool AllowsEmissiveBloom(GameEnvironmentLighting? weather) =>
+        weather?.BloomEmissiveStrength != 0;
+
     public static ViewportShadingPipeline Resolve(
         ViewportShadingMode mode)
     {
