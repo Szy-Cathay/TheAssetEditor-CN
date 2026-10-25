@@ -1,0 +1,95 @@
+{
+  "Source": "R12 Terry static atlas controls",
+  "RawSha256": "5ad93407ef506f9d8308d1c8bdefeddbbc8ffd5ade932fa65c7114152c3fdcd8",
+  "TextureSha256": "60e83e66d17e58a8ae9d27f86739a264d0d2ce2e3dac5016a87cc234f9e4a0e5",
+  "RoiImages": 104,
+  "Cases": [
+    {
+      "Name": "atlas-00",
+      "Random": false,
+      "Cell": 0,
+      "StableCohorts": 25,
+      "StableCohortColours": {
+        "Blue": 25
+      },
+      "Sha256": "736f9f5e9a03daf35c4d266de44546b0cf3d3c540915bedb351814c7f577cd87"
+    },
+    {
+      "Name": "atlas-01",
+      "Random": false,
+      "Cell": 1,
+      "StableCohorts": 25,
+      "StableCohortColours": {
+        "Red": 25
+      },
+      "Sha256": "502f7c7ca397cc8a2a3fe08172ff0c75622d3757b208e36001dec5888df0875f"
+    },
+    {
+      "Name": "atlas-02",
+      "Random": false,
+      "Cell": 2,
+      "StableCohorts": 25,
+      "StableCohortColours": {
+        "Blue": 25
+      },
+      "Sha256": "3929aa1c37e39754fede8577ab30f0ddb4e50025b2561691ae2f4f3b715b6daa"
+    },
+    {
+      "Name": "atlas-03",
+      "Random": true,
+      "Cell": 0,
+      "StableCohorts": 25,
+      "StableCohortColours": {
+        "Blue": 12,
+        "Red": 13
+      },
+      "Sha256": "761691e69281287ffeb097cdff785cca35fed3018c136da5badbe4755a3d05f1"
+    },
+    {
+      "Name": "atlas-04",
+      "Random": true,
+      "Cell": 1,
+      "StableCohorts": 25,
+      "StableCohortColours": {
+        "Blue": 7,
+        "Red": 18
+      },
+      "Sha256": "99c981ec6aeecd3d22b7b4cb4220e21b15e4c970057d7f182a2c8dee0be2dcdb"
+    },
+    {
+      "Name": "atlas-05",
+      "Random": true,
+      "Cell": 2,
+      "StableCohorts": 25,
+      "StableCohortColours": {
+        "Blue": 6,
+        "Red": 19
+      },
+      "Sha256": "1a5cf87218f0480d573c985c07d72a19ff97a8c14ebc5727632cd3aba0dd29af"
+    },
+    {
+      "Name": "atlas-06",
+      "Random": true,
+      "Cell": -1,
+      "StableCohorts": 25,
+      "StableCohortColours": {
+        "Blue": 10,
+        "Red": 15
+      },
+      "Sha256": "632f997b25f94b7b33cf86689f89cea6d7ea6447075111ae59146dba1c58e6b2"
+    },
+    {
+      "Name": "atlas-07",
+      "Random": true,
+      "Cell": 99,
+      "StableCohorts": 25,
+      "StableCohortColours": {
+        "Blue": 15,
+        "Red": 10
+      },
+      "Sha256": "e4b7706feb655be5a81b7e50b60978cb52488453f89808004ef2a7cfc8738bee"
+    }
+  ],
+  "ExactRandomSequenceProven": false,
+  "NegativeCellSupportEnabled": false
+}

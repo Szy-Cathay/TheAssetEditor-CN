@@ -36,6 +36,8 @@ namespace Shared.GameFormats.RigidModel.Vertex.Formats
                 Uv1 = VertexLoadHelper.CreatVector2HalfFloat(vertexData.uvExtra).ToVector2(),
 
                 Colour = VertexLoadHelper.CreatVector4Byte(vertexData.RGBA).ToVector4(),
+                // Preserve colour bytes independently of the legacy packed-normal interpretation.
+                UnormColour = new Vector4(vertexData.RGBA[0], vertexData.RGBA[1], vertexData.RGBA[2], vertexData.RGBA[3]) / 255f,
 
                 BoneIndex = new byte[0],
                 BoneWeight = new float[0]

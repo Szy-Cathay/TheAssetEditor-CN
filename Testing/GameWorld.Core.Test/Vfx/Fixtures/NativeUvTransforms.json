@@ -1,0 +1,130 @@
+{
+  "Source": "R11 Terry WGC static rectangular opaque sprites; native palette reference with authored (1,0,1) colour; TL/TR/BL/BR interior labels",
+  "RawSha256": "de7acb505ea272d21b711434811a939418eb71aefbb8059e500fee0a4f085cf2",
+  "NativeFrames": 485,
+  "Cases": [
+    {
+      "Name": "case-00",
+      "Orientation": "untouched",
+      "FlipU": 0,
+      "FlipV": 0,
+      "ExpectedCorners": "MKBR",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "4be60d569715fb7f615e7324fcc00aa6c268424243e6656cb5310c4465874894"
+    },
+    {
+      "Name": "case-01",
+      "Orientation": "untouched",
+      "FlipU": 0,
+      "FlipV": 1,
+      "ExpectedCorners": "BRMK",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "9a15a1494376cee2809bddda10ded26880c8afa428767c613b02367898d99f4d"
+    },
+    {
+      "Name": "case-02",
+      "Orientation": "untouched",
+      "FlipU": 1,
+      "FlipV": 0,
+      "ExpectedCorners": "KMRB",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "b29598bef3ecd65f841707062574b2f08f696c69fe593df8f8df987b8f0b1326"
+    },
+    {
+      "Name": "case-03",
+      "Orientation": "untouched",
+      "FlipU": 1,
+      "FlipV": 1,
+      "ExpectedCorners": "RBKM",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "85b43eee660d160105845719ae97fa12f2dffb4068d7c3e8ae647f154ec23d41"
+    },
+    {
+      "Name": "case-04",
+      "Orientation": "90_degrees_ccw",
+      "FlipU": 0,
+      "FlipV": 0,
+      "ExpectedCorners": "KRMB",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "225ba00961246b5ca3ddd42c8423ec53ef0fe26a406cf600454fbf11f766daaf"
+    },
+    {
+      "Name": "case-05",
+      "Orientation": "90_degrees_ccw",
+      "FlipU": 0,
+      "FlipV": 1,
+      "ExpectedCorners": "RKBM",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "232a505997bedd3e947605a4b190aee2366b30b90e660fc4e67509bf56ab5c67"
+    },
+    {
+      "Name": "case-06",
+      "Orientation": "90_degrees_ccw",
+      "FlipU": 1,
+      "FlipV": 0,
+      "ExpectedCorners": "MBKR",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "ba0013e4921d90aef3c4944d0f460f8aeab0c4a4e1dfa9c10b5d3e0bb2a45e16"
+    },
+    {
+      "Name": "case-07",
+      "Orientation": "90_degrees_ccw",
+      "FlipU": 1,
+      "FlipV": 1,
+      "ExpectedCorners": "BMRK",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "e36c3cbc48b611cb876b4091b4fc90afc58077b89d5326fa9a34499378faf963"
+    },
+    {
+      "Name": "case-08",
+      "Orientation": "90_degrees_cw",
+      "FlipU": 0,
+      "FlipV": 0,
+      "ExpectedCorners": "BMRK",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "b6d0bdc94a717444f20b1ca0888dea59cb7734571cb63b808065db4f9cb2f1dd"
+    },
+    {
+      "Name": "case-09",
+      "Orientation": "90_degrees_cw",
+      "FlipU": 0,
+      "FlipV": 1,
+      "ExpectedCorners": "MBKR",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "6efce8adcea493f79f7fa7eba31a3eca47a134857362d5e17247e2ba8b970347"
+    },
+    {
+      "Name": "case-10",
+      "Orientation": "90_degrees_cw",
+      "FlipU": 1,
+      "FlipV": 0,
+      "ExpectedCorners": "RKBM",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "9ce9401d16c0305c64c7f0d1171d5dc3c010370c588805b3f83244148543b294"
+    },
+    {
+      "Name": "case-11",
+      "Orientation": "90_degrees_cw",
+      "FlipU": 1,
+      "FlipV": 1,
+      "ExpectedCorners": "KRMB",
+      "NativeCohorts": 24,
+      "NativeObservedFrames": 69,
+      "SourceCaseSha256": "f83ea257c396912e6919aaaaff8442046d86a6f31b233b2deda9c78d553e1e4d"
+    }
+  ],
+  "TextureSha256": "b78641a8247fd7a3a9a5b10f17ecc52dfed8ecf9e3a7b4b82600a06a5695aa55",
+  "ProbabilityRuleProven": false,
+  "RandomSeedMatched": false
+}

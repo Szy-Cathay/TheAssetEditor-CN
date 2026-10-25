@@ -58,7 +58,8 @@ namespace Editors.AnimationMeta.MetaEditor.Commands
             if (pastObject == null || pastObject.Items.Count == 0)
                 return;
 
-            controller.ParsedFile.Attributes.AddRange(pastObject.Items);
+            // Every paste needs new source identities for independent editing and preview replacement.
+            controller.ParsedFile.Attributes.AddRange(pastObject.Items.Select(item => ReflectionHelper.CreateShallowCopy(item)));
             controller.UpdateView();
         }
     }

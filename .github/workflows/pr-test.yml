@@ -23,8 +23,37 @@ jobs:
     - name: Install dependencies
       run: dotnet restore AssetEditor.CN.sln
 
+    - name: Build the pinned VFX native runtime
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $commit = '92fdeb349c0c7eab9dfaf152047f22dec2fa102d'
+        $source = Join-Path $env:RUNNER_TEMP 'aecn-effekseer-170e'
+        git init $source
+        if ($LASTEXITCODE -ne 0) { throw 'Effekseer repository initialization failed.' }
+        git -C $source remote add origin https://github.com/effekseer/Effekseer.git
+        if ($LASTEXITCODE -ne 0) { throw 'Effekseer remote configuration failed.' }
+        git -C $source fetch --depth 1 origin $commit
+        if ($LASTEXITCODE -ne 0) { throw 'Pinned Effekseer fetch failed.' }
+        git -C $source checkout --detach $commit
+        if ($LASTEXITCODE -ne 0) { throw 'Pinned Effekseer checkout failed.' }
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+        $visualStudio = & $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 Microsoft.VisualStudio.Component.VC.CMake.Project -property installationPath
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($visualStudio)) { throw 'Visual Studio C++ and CMake tools are required.' }
+        ./GameWorld/Vfx.Effekseer.Native/Build.ps1 -EffekseerSource $source -VisualStudioDirectory $visualStudio -Configuration Release
+
     - name: Build the project
       run: dotnet build AssetEditor.CN.sln --configuration Release --no-restore
+
+    - name: Verify VFX native deployment
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $output = (& dotnet msbuild AssetEditor/AssetEditor.csproj -property:Configuration=Release -getProperty:TargetDir -nologo).Trim()
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($output)) { throw 'Cannot resolve the main program output directory.' }
+        foreach ($name in @('AssetEditor.CN.Effekseer.dll', 'Effekseer.LICENSE.txt', 'Effekseer.stb.LICENSE.txt')) {
+          if (!(Test-Path -LiteralPath (Join-Path $output $name) -PathType Leaf)) { throw "Missing VFX runtime deployment: $name" }
+        }
 
     - name: Run all tests
       # Native input tests must own the shared Windows desktop without competing test windows.

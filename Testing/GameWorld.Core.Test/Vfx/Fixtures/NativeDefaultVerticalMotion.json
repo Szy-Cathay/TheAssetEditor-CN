@@ -1,0 +1,400 @@
+{
+  "Source": "Native Terry R14 per-particle colour clock; fixed vertical direction, depth10, FOV60, 540x980. Clock calibrated using simultaneous static colour palette and independent static spatial origin.",
+  "RawSha256": "0f764931b4e0d7bc734faac3cdff8b866b81ca5d14a91f0dbfda3256dcebd854",
+  "InitialSpeed": -10,
+  "Damping": 0.1,
+  "ForceY": -981.000061,
+  "ControlLife": 0.4,
+  "PixelsPerUnit": 84.870489570875,
+  "PixelTolerance": 3,
+  "AgeMethod": "Per-particle vs_colour normalized-life ramp, calibrated by static palette in the same frame. Age interval includes one displayed channel level each side for R and B quantization; not a fitted temporal offset.",
+  "ClockCalibration": "Choose only monotone, nonclipped R/B ratio palette with at least 24 distinct levels and largest red span, independently of position residuals. R/B removes the observed spatial brightness variation in the constant-blue references.",
+  "UnforcedClockControl": {
+    "Forced": false,
+    "Points": 20,
+    "AgeRange": [
+      0.01423037477692945,
+      0.2021505376344086
+    ],
+    "MaximumError": 3.3549809584764034,
+    "MaximumAgeIntervalError": 0,
+    "Over3PixelIntervalPoints": 0
+  },
+  "Limits": [
+    "Age is an interval from displayed colour quantization, not an exact wall clock.",
+    "No force, speed, damping, or per-moving-trace origin was fitted.",
+    "Native seed, tiny default horizontal components, arbitrary directions, other parameter tuples, and full lighting are not calibrated."
+  ],
+  "Points": [
+    {
+      "SourceImage": "roi-24.png",
+      "ImageSha256": "fe9fcb40059723964c0842eace1fabfa1785cf80cc5b71273dd6d778276e5540",
+      "AgeInterval": [
+        0.07705273062042227,
+        0.08326875107206555
+      ],
+      "OriginY": 149.8480420486202,
+      "ObservedY": 218.0
+    },
+    {
+      "SourceImage": "roi-29.png",
+      "ImageSha256": "868d40fd0026248710e16e1fe6b1d59a0f6c05959e9bddcba8d418fc547b4ed0",
+      "AgeInterval": [
+        0.1539333714150221,
+        0.16451612903225804
+      ],
+      "OriginY": 149.8480420486202,
+      "ObservedY": 292.0
+    },
+    {
+      "SourceImage": "roi-34.png",
+      "ImageSha256": "229f45418679a5edb7214f7678322dd0fda4804e9232840535d7eb66200a3b59",
+      "AgeInterval": [
+        0.2554077543776188,
+        0.27224837902553206
+      ],
+      "OriginY": 149.8480420486202,
+      "ObservedY": 402.0
+    },
+    {
+      "SourceImage": "roi-39.png",
+      "ImageSha256": "40571e3f1c56b52b3653479a2879e11daf5a79881fc272e51ae8cc0ddb386e39",
+      "AgeInterval": [
+        0.3475741645150922,
+        0.3718455123985078
+      ],
+      "OriginY": 149.80573435631248,
+      "ObservedY": 509.7
+    },
+    {
+      "SourceImage": "roi-69.png",
+      "ImageSha256": "07e6544bd508e724ac6bcfee08852d25f57a3afaa7fcbcc439496d81f534f777",
+      "AgeInterval": [
+        0.0611279665499212,
+        0.06785379568884724
+      ],
+      "OriginY": 149.82135935631248,
+      "ObservedY": 204.61111111111111
+    },
+    {
+      "SourceImage": "roi-74.png",
+      "ImageSha256": "e744e58e420be969210ced809fa98acd739f41f28053eadd42f98793bef0fd47",
+      "AgeInterval": [
+        0.1829006031995804,
+        0.19354838709677422
+      ],
+      "OriginY": 149.82135935631248,
+      "ObservedY": 321.0
+    },
+    {
+      "SourceImage": "roi-79.png",
+      "ImageSha256": "dabebad5bab6ad332a0a4344f0dd046c6e49648c0f20b7a52c09fee24b7026e8",
+      "AgeInterval": [
+        0.29218679727385505,
+        0.30770842061164644
+      ],
+      "OriginY": 149.82135935631248,
+      "ObservedY": 435.0
+    },
+    {
+      "SourceImage": "roi-109.png",
+      "ImageSha256": "4bc9d41305f87ae1118256b1354753ea17dac4adb646c9ee603d04361455b75c",
+      "AgeInterval": [
+        0.05892760815621966,
+        0.06499655074797923
+      ],
+      "OriginY": 149.88265743323558,
+      "ObservedY": 202.5
+    },
+    {
+      "SourceImage": "roi-114.png",
+      "ImageSha256": "31f8e12727bfa5485067934f59c57df205be881c2f365a30b27372c0ce6e5e64",
+      "AgeInterval": [
+        0.1829006031995804,
+        0.19354838709677422
+      ],
+      "OriginY": 149.84816224092788,
+      "ObservedY": 321.9473684210526
+    },
+    {
+      "SourceImage": "roi-119.png",
+      "ImageSha256": "320a671ef8efca2734901bc74a82d95449e2d4d88a6cab5ea498103ca9e2725a",
+      "AgeInterval": [
+        0.2941184461403365,
+        0.3079313406333235
+      ],
+      "OriginY": 149.80573435631248,
+      "ObservedY": 438.0
+    },
+    {
+      "SourceImage": "roi-144.png",
+      "ImageSha256": "96194cc34a9044a73d10b19834189801f7048b4197cd44be402bbae0821309b7",
+      "AgeInterval": [
+        0.0611279665499212,
+        0.06785379568884724
+      ],
+      "OriginY": 149.8480420486202,
+      "ObservedY": 203.0
+    },
+    {
+      "SourceImage": "roi-149.png",
+      "ImageSha256": "940c05de4dcc0e6b4fc7bba461c351242bd2b022bbc872f78a5011b18e823b4c",
+      "AgeInterval": [
+        0.19627589824285346,
+        0.210752688172043
+      ],
+      "OriginY": 149.8480420486202,
+      "ObservedY": 336.9473684210526
+    },
+    {
+      "SourceImage": "roi-154.png",
+      "ImageSha256": "f99d2a2d19e9d2e7a1a210637eaff10a30db6bb3a5a93862b807dc1cd48d6621",
+      "AgeInterval": [
+        0.33477462904781163,
+        0.35954026771999126
+      ],
+      "OriginY": 149.8480420486202,
+      "ObservedY": 486.0
+    },
+    {
+      "SourceImage": "roi-179.png",
+      "ImageSha256": "6fed1e72987b413135cf5dfec5f00c5612e55bb4bb62e7faefd5c2fa36a26f7d",
+      "AgeInterval": [
+        0.10559080666230197,
+        0.11615290648861794
+      ],
+      "OriginY": 149.85697062004874,
+      "ObservedY": 245.0
+    },
+    {
+      "SourceImage": "roi-184.png",
+      "ImageSha256": "7187e3ea63c6d9c6c51efead07d409b739d3517dadc08eeb8da562502d6346b7",
+      "AgeInterval": [
+        0.2089693154996066,
+        0.2236559139784946
+      ],
+      "OriginY": 149.85697062004874,
+      "ObservedY": 351.0
+    },
+    {
+      "SourceImage": "roi-189.png",
+      "ImageSha256": "451699d6c8e79c30131bb178dfac297e0664aa1a98f4946b2e82b258c15e3455",
+      "AgeInterval": [
+        0.3475741645150922,
+        0.3718455123985078
+      ],
+      "OriginY": 149.85697062004874,
+      "ObservedY": 507.6666666666667
+    },
+    {
+      "SourceImage": "roi-214.png",
+      "ImageSha256": "41d36f40ebb931068727d74ae2bad05ef85f249603e67725f1a482d895e9fe8a",
+      "AgeInterval": [
+        0.07650388327581777,
+        0.08301033095505983
+      ],
+      "OriginY": 149.85697062004874,
+      "ObservedY": 216.61111111111111
+    },
+    {
+      "SourceImage": "roi-219.png",
+      "ImageSha256": "6051286089326f31c878ffd9f44ab2836351e8ac1b084a9f655ea6e4af2960d2",
+      "AgeInterval": [
+        0.19242066614214534,
+        0.2064516129032258
+      ],
+      "OriginY": 149.91610731668544,
+      "ObservedY": 336.0
+    },
+    {
+      "SourceImage": "roi-224.png",
+      "ImageSha256": "1cd396d08cd5884c4d7d3b1b91f75e4a7b5bcc4cb1dab28dd9eca5834026b606",
+      "AgeInterval": [
+        0.33477462904781163,
+        0.35954026771999126
+      ],
+      "OriginY": 149.91610731668544,
+      "ObservedY": 484.0
+    },
+    {
+      "SourceImage": "roi-249.png",
+      "ImageSha256": "55c091a52e4d27420f0ee1ef2545538e9be8c45d447c94d9910baaf39dfdf590",
+      "AgeInterval": [
+        0.06329276006232548,
+        0.07043982990674434
+      ],
+      "OriginY": 149.89034974092786,
+      "ObservedY": 205.5
+    },
+    {
+      "SourceImage": "roi-254.png",
+      "ImageSha256": "a04a40526cea0b716d33c39b8c111d77332479917c417b432447995355c30643",
+      "AgeInterval": [
+        0.2089693154996066,
+        0.2236559139784946
+      ],
+      "OriginY": 149.89034974092786,
+      "ObservedY": 353.0526315789474
+    },
+    {
+      "SourceImage": "roi-259.png",
+      "ImageSha256": "af1ffb6bc9597a0c81b8609d7b2a8f8e2ccef5a66dbd0daf14ddce5bb647c89a",
+      "AgeInterval": [
+        0.33477462904781163,
+        0.35954026771999126
+      ],
+      "OriginY": 149.89034974092786,
+      "ObservedY": 485.0
+    },
+    {
+      "SourceImage": "roi-284.png",
+      "ImageSha256": "9dc374c7e829ee6b08b3e683e30396e8a689f860c724e513a1f6f47bf3b7deda",
+      "AgeInterval": [
+        0.11265587058284135,
+        0.12183497336033772
+      ],
+      "OriginY": 149.98774793097311,
+      "ObservedY": 249.61111111111111
+    },
+    {
+      "SourceImage": "roi-289.png",
+      "ImageSha256": "57980c06c7afd7c5eae5561d7cbcc903d3d9438a259ef7cddc07d12a4909172b",
+      "AgeInterval": [
+        0.2258938718419442,
+        0.24086021505376345
+      ],
+      "OriginY": 149.94109600958458,
+      "ObservedY": 371.0
+    },
+    {
+      "SourceImage": "roi-294.png",
+      "ImageSha256": "9ab9a36d0cd3cf6f185e03586ebab866ea6e983ac73fc0d49d10259bc8bed7ab",
+      "AgeInterval": [
+        0.3475741645150922,
+        0.3718455123985078
+      ],
+      "OriginY": 149.9085315591097,
+      "ObservedY": 509.7
+    },
+    {
+      "SourceImage": "roi-319.png",
+      "ImageSha256": "05aa24ce95b92e095ba87f190a92ecdb088db709fffee1b463d950c7cf10ac56",
+      "AgeInterval": [
+        0.10912333862257165,
+        0.11899393992447782
+      ],
+      "OriginY": 149.8480420486202,
+      "ObservedY": 245.61111111111111
+    },
+    {
+      "SourceImage": "roi-324.png",
+      "ImageSha256": "bc55cce59d711be222fed8b8f0636ad326db6e28288870beb25628903a1b93fb",
+      "AgeInterval": [
+        0.2089693154996066,
+        0.2236559139784946
+      ],
+      "OriginY": 149.80573435631248,
+      "ObservedY": 353.0526315789474
+    },
+    {
+      "SourceImage": "roi-329.png",
+      "ImageSha256": "74bf5809d917501b04d693e0e559cfa6c12b4b6d6541d0527f136b0f14f7d1e7",
+      "AgeInterval": [
+        0.3475741645150922,
+        0.3718455123985078
+      ],
+      "OriginY": 149.80573435631248,
+      "ObservedY": 502.75757575757575
+    },
+    {
+      "SourceImage": "roi-354.png",
+      "ImageSha256": "0d836de28e7442d27e565a8de42ea18614665b860320678f3cd49a1759865d69",
+      "AgeInterval": [
+        0.033012290078406906,
+        0.03677915774184356
+      ],
+      "OriginY": 149.80573435631248,
+      "ObservedY": 176.58204334365325
+    },
+    {
+      "SourceImage": "roi-359.png",
+      "ImageSha256": "c2eb238980fd02e7060ce85976c640ee24ab38451a08b10437109eeac5417e7e",
+      "AgeInterval": [
+        0.1539333714150221,
+        0.16451612903225804
+      ],
+      "OriginY": 149.80573435631248,
+      "ObservedY": 292.0
+    },
+    {
+      "SourceImage": "roi-364.png",
+      "ImageSha256": "9f705cabc8ed9af1639a3b68bac2f021f1479bc49f3212c1425be200c7cf83a0",
+      "AgeInterval": [
+        0.2941184461403365,
+        0.3079313406333235
+      ],
+      "OriginY": 149.8739161744943,
+      "ObservedY": 435.0
+    },
+    {
+      "SourceImage": "roi-389.png",
+      "ImageSha256": "fa93e0025dbb5b35718095634c1df750df84fc0b40bdafb3b73eb08f9edaa859",
+      "AgeInterval": [
+        0.044764752163650674,
+        0.04959957344708078
+      ],
+      "OriginY": 149.88859535496294,
+      "ObservedY": 188.0
+    },
+    {
+      "SourceImage": "roi-394.png",
+      "ImageSha256": "3bd4c7a05f4fb91ec555e629b16369005454a29247e436fa38f3e9900a039350",
+      "AgeInterval": [
+        0.17942127808374864,
+        0.1903225806451613
+      ],
+      "OriginY": 149.89628766265525,
+      "ObservedY": 320.0526315789474
+    },
+    {
+      "SourceImage": "roi-399.png",
+      "ImageSha256": "284971a8638a53a0a3b4eecd339d8b24c25fa9d80d9b4244e884afa83063c1ab",
+      "AgeInterval": [
+        0.31464211279435095,
+        0.3401222854733291
+      ],
+      "OriginY": 149.91610731668544,
+      "ObservedY": 466.0
+    },
+    {
+      "SourceImage": "roi-424.png",
+      "ImageSha256": "ac5a9417735c32c6e26dbed9470aca00bca9b0c0454e2e0c4d4248e7c09268ca",
+      "AgeInterval": [
+        0.016515723418491095,
+        0.019435891127153205
+      ],
+      "OriginY": 149.916223866802,
+      "ObservedY": 161.5527950310559
+    },
+    {
+      "SourceImage": "roi-429.png",
+      "ImageSha256": "e06edd4cc4241e187a27b588a849a402ddfed42f5e46e1c75c299e5dc24d6ede",
+      "AgeInterval": [
+        0.13343823760818252,
+        0.1442333186036235
+      ],
+      "OriginY": 149.9487883172769,
+      "ObservedY": 274.5
+    },
+    {
+      "SourceImage": "roi-434.png",
+      "ImageSha256": "b7ae2942d9953d1955709bee8fe8be99139770a062437094bc221af44a448e18",
+      "AgeInterval": [
+        0.2735080220649237,
+        0.2978040840485351
+      ],
+      "OriginY": 149.87496512554327,
+      "ObservedY": 415.5
+    }
+  ]
+}

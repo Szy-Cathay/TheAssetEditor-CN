@@ -26,7 +26,7 @@ public sealed class VfxCurve
         {
             var parts = rawChannel.Split(';');
             var header = parts[0].Split(',');
-            if (header.Length != 3 || parts.Length < 2 || string.IsNullOrWhiteSpace(header[0]))
+            if (header.Length != 3 || string.IsNullOrWhiteSpace(header[0]))
                 return false;
             var points = new List<VfxCurvePoint>();
             foreach (var rawPoint in parts.Skip(1))
@@ -56,7 +56,7 @@ public sealed class VfxCurveChannel(string header, string name, IReadOnlyList<Vf
     public string Name { get; } = name;
     // Display order must not change the serialized key order or discard coincident keys.
     public IReadOnlyList<VfxCurvePoint> Points { get; } = points.OrderBy(x => x.Time).ToArray();
-    public override string ToString() => header + ";" + string.Join(';', points.Select(x => x.ToString()));
+    public override string ToString() => points.Count == 0 ? header : header + ";" + string.Join(';', points.Select(x => x.ToString()));
 
     public bool CanMovePoint(int index, double time) => double.IsFinite(time) && Math.Abs(time) <= float.MaxValue
         && (time == Points[index].Time
@@ -80,6 +80,17 @@ public sealed class VfxCurvePoint
     public double Value => double.Parse(_tokens[1], CultureInfo.InvariantCulture);
     public string InMode => _tokens[2];
     public string OutMode => _tokens[3];
+
+    public bool TryGetHandles(out (double Time, double Value) incoming, out (double Time, double Value) outgoing)
+    {
+        incoming = outgoing = default;
+        if (!VfxCurve.TryNumber(_tokens[4], out var ix) || !VfxCurve.TryNumber(_tokens[5], out var iy)
+            || !VfxCurve.TryNumber(_tokens[6], out var ox) || !VfxCurve.TryNumber(_tokens[7], out var oy))
+            return false;
+        incoming = (ix, iy);
+        outgoing = (ox, oy);
+        return true;
+    }
 
     internal VfxCurvePoint(string[] tokens) => _tokens = tokens;
 

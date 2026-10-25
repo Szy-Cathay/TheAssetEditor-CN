@@ -1,0 +1,339 @@
+{
+  "Version": 1,
+  "Source": "Terry native fixed-camera controls, default sky/grass prefab, camera0/6/-10,FOV60,540x980; no photometric fitting",
+  "PixelTolerance": 3,
+  "Encoding": [
+    {
+      "Gray": 64,
+      "Brightness": 0.004,
+      "TextureRgb": [
+        18.0,
+        18.0,
+        19.0
+      ],
+      "LinearReferenceRgb": [
+        18.0,
+        18.0,
+        19.0
+      ],
+      "Source": "lighting-native",
+      "Indices": [
+        24,
+        25,
+        26
+      ]
+    },
+    {
+      "Gray": 128,
+      "Brightness": 0.004,
+      "TextureRgb": [
+        52.0,
+        52.0,
+        52.0
+      ],
+      "LinearReferenceRgb": [
+        52.0,
+        52.0,
+        52.0
+      ],
+      "Source": "lighting-native",
+      "Indices": [
+        27,
+        28,
+        29
+      ]
+    },
+    {
+      "Gray": 64,
+      "Brightness": 0.04,
+      "TextureRgb": [
+        86.0,
+        86.0,
+        86.0
+      ],
+      "LinearReferenceRgb": [
+        86.0,
+        86.0,
+        86.0
+      ],
+      "Source": "lighting-native",
+      "Indices": [
+        30,
+        31,
+        32
+      ]
+    },
+    {
+      "Gray": 128,
+      "Brightness": 0.04,
+      "TextureRgb": [
+        182.0,
+        182.0,
+        182.0
+      ],
+      "LinearReferenceRgb": [
+        182.0,
+        182.0,
+        182.0
+      ],
+      "Source": "lighting-native",
+      "Indices": [
+        33,
+        34,
+        35
+      ]
+    },
+    {
+      "Gray": 128,
+      "Brightness": 0.02,
+      "TextureRgb": [
+        127.0,
+        127.0,
+        127.0
+      ],
+      "LinearReferenceRgb": [
+        127.0,
+        127.0,
+        127.0
+      ],
+      "Source": "composite-typed-native",
+      "Indices": [
+        42,
+        43,
+        44
+      ]
+    },
+    {
+      "Gray": 64,
+      "Brightness": 0.02,
+      "TextureRgb": [
+        57.0,
+        57.0,
+        57.0
+      ],
+      "LinearReferenceRgb": [
+        57.0,
+        57.0,
+        57.0
+      ],
+      "Source": "composite-typed-native",
+      "Indices": [
+        45,
+        46,
+        47
+      ]
+    }
+  ],
+  "Overlap": [
+    {
+      "Indices": [
+        30,
+        31,
+        32
+      ],
+      "Count": 2,
+      "Texel": 128,
+      "SingleRgb": [
+        65.0,
+        83.0,
+        111.0
+      ],
+      "MultipleParticlesRgb": [
+        72.0,
+        83.0,
+        104.0
+      ],
+      "MultipleReferencesRgb": [
+        72.0,
+        83.0,
+        104.0
+      ],
+      "MaximumChannelError": 0.0
+    },
+    {
+      "Indices": [
+        33,
+        34,
+        35
+      ],
+      "Count": 3,
+      "Texel": 128,
+      "SingleRgb": [
+        65.0,
+        83.0,
+        111.0
+      ],
+      "MultipleParticlesRgb": [
+        78.0,
+        83.0,
+        98.0
+      ],
+      "MultipleReferencesRgb": [
+        78.0,
+        83.0,
+        98.0
+      ],
+      "MaximumChannelError": 0.0
+    },
+    {
+      "Indices": [
+        36,
+        37,
+        38
+      ],
+      "Count": 2,
+      "Texel": 192,
+      "SingleRgb": [
+        69.0,
+        85.0,
+        112.0
+      ],
+      "MultipleParticlesRgb": [
+        80.0,
+        87.0,
+        105.0
+      ],
+      "MultipleReferencesRgb": [
+        80.0,
+        87.0,
+        105.0
+      ],
+      "MaximumChannelError": 0.0
+    },
+    {
+      "Indices": [
+        39,
+        40,
+        41
+      ],
+      "Count": 3,
+      "Texel": 192,
+      "SingleRgb": [
+        69.0,
+        85.0,
+        112.0
+      ],
+      "MultipleParticlesRgb": [
+        87.0,
+        88.0,
+        100.0
+      ],
+      "MultipleReferencesRgb": [
+        87.0,
+        88.0,
+        100.0
+      ],
+      "MaximumChannelError": 0.0
+    }
+  ],
+  "EvidenceImages": {
+    "lighting-native": [
+      {
+        "File": "frame-0.png",
+        "Sha256": "75650b1b13d83fdc874818394c381a25d9e9844848d26a37831571962899dea8"
+      },
+      {
+        "File": "frame-1.png",
+        "Sha256": "24aaf871d971e3aeb5fa4d34f95b323e139d6388660d5f17c5d79466f1447308"
+      },
+      {
+        "File": "frame-2.png",
+        "Sha256": "2b1b344c50c6d7b1c80c58deac6a4e1961c2a74fc012e9079e22c37f23be7b8a"
+      },
+      {
+        "File": "frame-3.png",
+        "Sha256": "8df58c7a21dd11f2457f615e6a1d6c7a5112f94f38f6753439c408f7d8dc2e71"
+      },
+      {
+        "File": "frame-4.png",
+        "Sha256": "dc30ececaa7180f03c95b10e28adb072245a27756ccbd16d0ddfa3e57ac91b51"
+      },
+      {
+        "File": "frame-5.png",
+        "Sha256": "cd5cc603877651635964189c4a97c2f2f58d44a4a013a0a72777ec7f666f21c2"
+      },
+      {
+        "File": "frame-6.png",
+        "Sha256": "ce72c0c42567a535f6f5f8ed41fbb85ba0ab5c7823f3181f5ded050ebca0ed67"
+      },
+      {
+        "File": "frame-7.png",
+        "Sha256": "9400ef1c33cc1f8d3761df33cce4ad6e7aef652cbb2454c367ec8aacc4b4f338"
+      },
+      {
+        "File": "frame-8.png",
+        "Sha256": "d961c463b5863256eb3052fd2f156bc4570f58516dce943b89c48fb2bcbf315a"
+      },
+      {
+        "File": "frame-9.png",
+        "Sha256": "3f14f73e534675733f554f1f7e6977cadf56d10af3a49ce4a17588365836fb90"
+      },
+      {
+        "File": "frame-10.png",
+        "Sha256": "1a87f2e7f0a0289768c6ec36571af17fefcc3422712f4bda914c75ff928566b7"
+      },
+      {
+        "File": "frame-11.png",
+        "Sha256": "5e5d06202b6699e2b8d2b619913989d963cdc11c46e276ca5fc2126be81fcb6c"
+      }
+    ],
+    "composite-typed-native": [
+      {
+        "File": "frame-0.png",
+        "Sha256": "bb52652aa75e9b6509037ca33c1b7b5c922cad95efa6a442f00b8e694a24b46f"
+      },
+      {
+        "File": "frame-1.png",
+        "Sha256": "72d9dcd0d5e94c2f17c53a351c20062d9230bb068d8e6fe2f30f0f8c65521ecf"
+      },
+      {
+        "File": "frame-2.png",
+        "Sha256": "205e249926207e1970475646ff71edfa2471e792e8f2a56630cd61a992bce84a"
+      },
+      {
+        "File": "frame-3.png",
+        "Sha256": "1a2a59de6a4f086f99579785794b05f01aec92e633f23b4b6eebe6383622aeab"
+      },
+      {
+        "File": "frame-4.png",
+        "Sha256": "9626ee73a3153d87d42c2cf54293e28545f2c05a106f160c75672feec631f659"
+      },
+      {
+        "File": "frame-5.png",
+        "Sha256": "12ed388b3936e6cc07f5f030518794a40bd3c04dc46e48081b16d7c3bae9f5c7"
+      },
+      {
+        "File": "frame-6.png",
+        "Sha256": "a95e3522f6f70f0ea8ae3abf5b16990c41b774eaba14908b0d2381c3392dbfc4"
+      },
+      {
+        "File": "frame-7.png",
+        "Sha256": "59494b17ca99044356e6fd2753402ed40e083a219eab971c535775f4c0e11e4c"
+      },
+      {
+        "File": "frame-8.png",
+        "Sha256": "1519661116dbd4563cee2c794b6e875fdd0a7bdbdae713c3aeba5f0056f1d052"
+      },
+      {
+        "File": "frame-9.png",
+        "Sha256": "345526a5220398863b53716f875348801b63b3c299415f95f5f5675aa9d4c422"
+      },
+      {
+        "File": "frame-10.png",
+        "Sha256": "95b642622c0648ba083d21d139da7c1ff3fffe12547d872fb2bcb609c373b3a3"
+      },
+      {
+        "File": "frame-11.png",
+        "Sha256": "1f07355a7426197cc1383a55a310d58ea106844e400d4fd84363a9fcdeed27aa"
+      }
+    ]
+  },
+  "NativeRawSha256": {
+    "lighting-native": "71245a5fabe66b60b2246629c8d64d5b70b6aa318ec493618eb2017e50d75920",
+    "composite-typed-native": "6f3c1e769e0c0bb017b26f047cc299a82140c00a18259c4f6195f7911953a2e3"
+  },
+  "ReadableShaderSha256": "400709701111e07657e3936b3008352303de0419c0aed399eb924174cfe9566e",
+  "Excluded": "Untyped true controls are diagnostic only. Alpha metamer results above the3-level tolerance, universal emissive/environment/exposure conversion, and full native transparency/MBOIT remain uncalibrated.",
+  "ProductEditedBeforeNativeCapture": false,
+  "GlobalStepChanged": false
+}

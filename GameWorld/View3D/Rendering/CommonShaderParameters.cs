@@ -25,7 +25,11 @@ namespace GameWorld.Core.Rendering
         Microsoft.Xna.Framework.Graphics.Texture2D? ViewportMatcap = null,
         Microsoft.Xna.Framework.Graphics.Texture2D? ViewportGeometry = null,
         Microsoft.Xna.Framework.Graphics.TextureCube? ViewportDiffuse = null,
-        Microsoft.Xna.Framework.Graphics.TextureCube? ViewportSpecular = null
+        Microsoft.Xna.Framework.Graphics.TextureCube? ViewportSpecular = null,
+        GameEnvironmentLighting? GameWeather = null,
+        float? VfxGroundHeight = null,
+        float MaterialTimeSeconds = 0,
+        SharpDX.Direct3D11.ShaderResourceView? VfxSoftDepth = null
         );
 
 }

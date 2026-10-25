@@ -1,0 +1,231 @@
+{
+  "Scope": "Rigid particle rotation only. Six fixed controls on original Ulrika cone plus independent original ice geometry support X then Y then Z. Neutral white material, zero motion/spin, fixed camera/root; no source edits or screen fitting. Basis vectors express the order inferred from native silhouettes, not a measured native matrix. Projection bounds differ <=2 pixels per edge; maximum symmetric Euclidean contour distance 2.236 pixels, so the original strict 2-pixel contour gate remains not passed. Photometry, model-spin composition and arbitrary attachment transforms are not native-accepted.",
+  "SourceInputSha256": "9980b5a1eaac1aded3af98a186cec7ae6abf389581175b3cfb0c6a275b52224f",
+  "NativeFrames": [
+    {
+      "Frame": 5,
+      "Sha256": "55443a18bae3dfa748492a47353616cb10f72b16378f69777345e89c795e8051"
+    },
+    {
+      "Frame": 20,
+      "Sha256": "d52404361f0a1dba3f3f6f697c3b78dcb305c686310f2407c31d6ae5a2db16de"
+    },
+    {
+      "Frame": 45,
+      "Sha256": "e6666a0716ebdf133fb7b4ab88010ed85dd310f2b02dc6a074c638dc327d9408"
+    },
+    {
+      "Frame": 80,
+      "Sha256": "dce26245ae152b4da115137c063160a9d0dee8b69252ebcbeb919dfdb38a4113"
+    },
+    {
+      "Frame": 110,
+      "Sha256": "3a0354c8a094d9207fe66f581fe4af6c58a11f6aa02de8fbdfba00dcde447e27"
+    }
+  ],
+  "IceNativeFrames": [
+    {
+      "Frame": 5,
+      "Sha256": "00d1ec5d782089f430e61d6a8fb310fe75a9345f9f0bcb9fe4f10247d5d4ec1d"
+    },
+    {
+      "Frame": 20,
+      "Sha256": "fdf39c8a06e774a51749347f6e829e54a8c9052287caed852365064c08cd6865"
+    },
+    {
+      "Frame": 45,
+      "Sha256": "a450c521638f6d1f2a05f574ab208fa43195d06c553e2b6160f8914c447aa758"
+    },
+    {
+      "Frame": 80,
+      "Sha256": "246cbf370c188452fe4dee76cbc4c02b443d552cce44c653c744a27b092a8a25"
+    },
+    {
+      "Frame": 110,
+      "Sha256": "3265e08a451e54bfe9d87e93f458b15f958b33927b3d2a7e2948da4f58e10d7d"
+    }
+  ],
+  "Camera": {
+    "Pitch": 55,
+    "Distance": 36,
+    "RootY": 4,
+    "Width": 1024,
+    "Height": 980
+  },
+  "Cases": [
+    {
+      "Index": 0,
+      "Angles": [
+        0,
+        0,
+        0
+      ],
+      "Right": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "Up": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "Backward": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "NativeBounds": [
+        206,
+        482,
+        257,
+        540
+      ]
+    },
+    {
+      "Index": 1,
+      "Angles": [
+        90,
+        0,
+        0
+      ],
+      "Right": [
+        1.0,
+        0.0,
+        -0.0
+      ],
+      "Up": [
+        0.0,
+        6.123233995736766e-17,
+        1.0
+      ],
+      "Backward": [
+        0.0,
+        -1.0,
+        6.123233995736766e-17
+      ],
+      "NativeBounds": [
+        303,
+        485,
+        354,
+        553
+      ]
+    },
+    {
+      "Index": 2,
+      "Angles": [
+        90,
+        0,
+        45
+      ],
+      "Right": [
+        0.7071067811865476,
+        0.7071067811865476,
+        -0.0
+      ],
+      "Up": [
+        -4.329780281177467e-17,
+        4.329780281177467e-17,
+        1.0
+      ],
+      "Backward": [
+        0.7071067811865476,
+        -0.7071067811865476,
+        6.123233995736766e-17
+      ],
+      "NativeBounds": [
+        426,
+        485,
+        477,
+        553
+      ]
+    },
+    {
+      "Index": 3,
+      "Angles": [
+        90,
+        0,
+        90
+      ],
+      "Right": [
+        6.123233995736766e-17,
+        1.0,
+        -0.0
+      ],
+      "Up": [
+        -6.123233995736766e-17,
+        3.749399456654644e-33,
+        1.0
+      ],
+      "Backward": [
+        1.0,
+        -6.123233995736766e-17,
+        6.123233995736766e-17
+      ],
+      "NativeBounds": [
+        549,
+        484,
+        600,
+        552
+      ]
+    },
+    {
+      "Index": 4,
+      "Angles": [
+        45,
+        30,
+        70
+      ],
+      "Right": [
+        0.29619813272602397,
+        0.8137976813493737,
+        -0.49999999999999994
+      ],
+      "Up": [
+        -0.543540643064687,
+        0.5740762748423126,
+        0.6123724356957946
+      ],
+      "Backward": [
+        0.7853854057126624,
+        0.09038674954636194,
+        0.6123724356957946
+      ],
+      "NativeBounds": [
+        682,
+        484,
+        741,
+        552
+      ]
+    },
+    {
+      "Index": 5,
+      "Angles": [
+        20,
+        60,
+        90
+      ],
+      "Right": [
+        3.0616169978683836e-17,
+        0.5000000000000001,
+        -0.8660254037844386
+      ],
+      "Up": [
+        -0.9396926207859084,
+        0.29619813272602386,
+        0.17101007166283438
+      ],
+      "Backward": [
+        0.34202014332566877,
+        0.8137976813493737,
+        0.4698463103929543
+      ],
+      "NativeBounds": [
+        802,
+        479,
+        875,
+        531
+      ]
+    }
+  ]
+}

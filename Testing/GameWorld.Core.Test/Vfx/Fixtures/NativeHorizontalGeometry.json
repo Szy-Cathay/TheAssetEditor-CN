@@ -1,0 +1,299 @@
+{
+  "Source": "R13 Terry fixed-axis and fixed-camera-depth horizontal geometry; source controls use force axes, product regression supplies the same velocity direction at birth",
+  "RawSha256": "4e1beaffb779bf4aee12b6eea1f5c59768758b53ffffdbc6dafad5261f2713aa",
+  "PixelTolerance": 3,
+  "ToleranceScope": "Same physical-pixel tolerance as prior native trajectory controls; covers observed window raster edges, not a fitted scale or trajectory",
+  "CameraPosition": [
+    0,
+    23.207294,
+    -24.57455
+  ],
+  "CameraTarget": [
+    0,
+    6,
+    0
+  ],
+  "Fov": 60,
+  "Viewport": [
+    540,
+    980
+  ],
+  "ControlsExcludeGroundOcclusion": true,
+  "NativeSeedAndAbsoluteClockAligned": false,
+  "NotCalibrated": [
+    "Uncapped nonzero stretch magnitude",
+    "Default spawn direction and initial velocity units",
+    "Random or dynamic force paths",
+    "Native postprocessing and lighting"
+  ],
+  "Cases": [
+    {
+      "Index": 1,
+      "Name": "geometry-01",
+      "Axis": "X",
+      "Horizontal": true,
+      "Stretch": 0,
+      "Cap": 1000,
+      "Scale": [
+        0.8,
+        0.6,
+        1
+      ],
+      "Position": [
+        -2,
+        12,
+        4.2012453
+      ],
+      "SourceSha256": "7defadb283144cecbc18be2c981ef1fc07299a513bc05ab948231c7de70d66cd",
+      "VisibleRoiFrames": 68,
+      "WidthRange": [
+        19,
+        21
+      ],
+      "HeightRange": [
+        11,
+        11
+      ]
+    },
+    {
+      "Index": 2,
+      "Name": "geometry-02",
+      "Axis": "X",
+      "Horizontal": true,
+      "Stretch": 0,
+      "Cap": 1,
+      "Scale": [
+        0.8,
+        0.6,
+        1
+      ],
+      "Position": [
+        2,
+        12,
+        4.2012453
+      ],
+      "SourceSha256": "e5246cbadfbb3472849c2c20349e115eb3afce8a12fb711375c44a1b2681ba22",
+      "VisibleRoiFrames": 68,
+      "WidthRange": [
+        18,
+        20
+      ],
+      "HeightRange": [
+        11,
+        11
+      ]
+    },
+    {
+      "Index": 3,
+      "Name": "geometry-03",
+      "Axis": "X",
+      "Horizontal": false,
+      "Stretch": 0,
+      "Cap": 1000,
+      "Scale": [
+        0.8,
+        0.6,
+        1
+      ],
+      "Position": [
+        6,
+        12,
+        4.2012453
+      ],
+      "SourceSha256": "aea3f10b70d00f9f7624586f1b83b9c18833579d3ef94bc6cd852f84bd6a8b71",
+      "VisibleRoiFrames": 71,
+      "WidthRange": [
+        24,
+        26
+      ],
+      "HeightRange": [
+        18,
+        18
+      ]
+    },
+    {
+      "Index": 5,
+      "Name": "geometry-05",
+      "Axis": "X",
+      "Horizontal": true,
+      "Stretch": 0,
+      "Cap": 0,
+      "Scale": [
+        0.8,
+        0.6,
+        1
+      ],
+      "Position": [
+        -2,
+        6,
+        0
+      ],
+      "SourceSha256": "782b3e7a779074d48c5687e26afbaae58727e74e6692ca401dcc49f75847cda9",
+      "VisibleRoiFrames": 0,
+      "WidthRange": null,
+      "HeightRange": null
+    },
+    {
+      "Index": 6,
+      "Name": "geometry-06",
+      "Axis": "X",
+      "Horizontal": true,
+      "Stretch": 2,
+      "Cap": 1,
+      "Scale": [
+        0.8,
+        0.6,
+        1
+      ],
+      "Position": [
+        2,
+        6,
+        0
+      ],
+      "SourceSha256": "f80a3a7cc0767c1deec737c68c4ea7a9fadb572765d6a6220b9975d5dd06ff01",
+      "VisibleRoiFrames": 68,
+      "WidthRange": [
+        18,
+        20
+      ],
+      "HeightRange": [
+        13,
+        13
+      ]
+    },
+    {
+      "Index": 7,
+      "Name": "geometry-07",
+      "Axis": "X",
+      "Horizontal": true,
+      "Stretch": 0,
+      "Cap": 1,
+      "Scale": [
+        1.6,
+        1.2,
+        1
+      ],
+      "Position": [
+        6,
+        6,
+        0
+      ],
+      "SourceSha256": "0c55d5e64b7079ee8e11ab236eddcb437f6131a13279d50acacc1a97abea2850",
+      "VisibleRoiFrames": 68,
+      "WidthRange": [
+        37,
+        39
+      ],
+      "HeightRange": [
+        27,
+        27
+      ]
+    },
+    {
+      "Index": 8,
+      "Name": "geometry-08",
+      "Axis": "Z",
+      "Horizontal": true,
+      "Stretch": 0,
+      "Cap": 1,
+      "Scale": [
+        0.8,
+        0.6,
+        1
+      ],
+      "Position": [
+        -6,
+        0,
+        -4.2012453
+      ],
+      "SourceSha256": "f15caa5b38bd02abd3312fdfc54c81d8e97d301d2145948170a87da7f64067b2",
+      "VisibleRoiFrames": 68,
+      "WidthRange": [
+        26,
+        26
+      ],
+      "HeightRange": [
+        13,
+        15
+      ]
+    },
+    {
+      "Index": 9,
+      "Name": "geometry-09",
+      "Axis": "Z",
+      "Horizontal": false,
+      "Stretch": 0,
+      "Cap": 1000,
+      "Scale": [
+        0.8,
+        0.6,
+        1
+      ],
+      "Position": [
+        -2,
+        0,
+        -4.2012453
+      ],
+      "SourceSha256": "12e75c830427c55f8d3a77630a964092ac8ba156d09d6accc2928894b4245253",
+      "VisibleRoiFrames": 71,
+      "WidthRange": [
+        24,
+        24
+      ],
+      "HeightRange": [
+        18,
+        19
+      ]
+    },
+    {
+      "Index": 10,
+      "Name": "geometry-10",
+      "Axis": "-X",
+      "Horizontal": true,
+      "Stretch": 0,
+      "Cap": 1,
+      "Scale": [
+        0.8,
+        0.6,
+        1
+      ],
+      "Position": [
+        2,
+        0,
+        -4.2012453
+      ],
+      "SourceSha256": "2798f0fe39fcb4b4a319a9ae9a1ca6cff2017818448fe5214e1702cfe0cfe1cf",
+      "VisibleRoiFrames": 68,
+      "WidthRange": [
+        18,
+        20
+      ],
+      "HeightRange": [
+        18,
+        18
+      ]
+    },
+    {
+      "Index": 11,
+      "Name": "geometry-11",
+      "Axis": "Y",
+      "Horizontal": true,
+      "Stretch": 0,
+      "Cap": 1,
+      "Scale": [
+        0.8,
+        0.6,
+        1
+      ],
+      "Position": [
+        6,
+        0,
+        -4.2012453
+      ],
+      "SourceSha256": "8815a2ed77d8c15ad012e8f8127517b8b4a799670d5c22fbf0f0dcc095c8d673",
+      "VisibleRoiFrames": 0,
+      "WidthRange": null,
+      "HeightRange": null
+    }
+  ]
+}

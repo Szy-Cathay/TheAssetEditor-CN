@@ -4,8 +4,9 @@ using Shared.Core.Settings;
 
 namespace GameWorld.Core.Components.Rendering
 {
-    public class SceneRenderParametersStore
+    public class SceneRenderParametersStore(GameWorld.Core.Rendering.GameWeatherStore? weather = null)
     {
+        public GameWorld.Core.Rendering.GameEnvironmentLighting? GameWeather => weather?.Current;
         private ViewportRenderSettings? _globalLighting;
         private int _lightingOverrideCount;
 

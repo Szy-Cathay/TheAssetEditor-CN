@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Automation;
@@ -139,7 +139,7 @@ internal static class TerryPreviewLauncher
                             && grid.GetItem(0, 0).Current.Name == TerryPreviewBuilder.EffectName
                             && value.Current.Value == TerryPreviewBuilder.EffectName)
                         {
-                            Shared.Core.ErrorHandling.Logging.CreateStatic(typeof(TerryPreviewLauncher))
+                            global::Shared.Core.ErrorHandling.Logging.CreateStatic(typeof(TerryPreviewLauncher))
                                 .Information("Terry preview is ready in process {ProcessId}; current effect filter verified", process.Id);
                             return;
                         }
@@ -156,7 +156,7 @@ internal static class TerryPreviewLauncher
             }
             await Task.Delay(300, cancellationToken);
         }
-        Shared.Core.ErrorHandling.Logging.CreateStatic(typeof(TerryPreviewLauncher))
+        global::Shared.Core.ErrorHandling.Logging.CreateStatic(typeof(TerryPreviewLauncher))
             .Warning("Could not prepare Terry preview VFX; tool activated {Activated}, filter applied {Filtered}", toolActivated, filterApplied);
         throw new IOException(localization.Get("Vfx.Terry.FilterUnavailable"));
     }

@@ -22,7 +22,7 @@ bool SelectionMaskEnabled;
 // **************************************************************************************************************************************
 GBufferMaterial GetMaterial(in PixelInputType input)
 {
-    GBufferMaterial material;
+    GBufferMaterial material = (GBufferMaterial)0;
 
     // default values
     material.diffuse = float4(0.2f, 0.2f, 0.2f, 1);
@@ -81,6 +81,9 @@ MainPixelOutput DefaultPixelShader(in PixelInputType input, bool bIsFrontFace : 
         alpha_test(material.diffuse.a);
 
     float3 normalizedViewDirection = -normalize(CameraPos - input.worldPosition);
+    if (CapabilityFlag_ApplyEmissive)
+        material.diffuse.rgb = ApplyTintAndFactionColours(material.diffuse.rgb, material.maskValue);
+    float3 emissiveColour = ApplyEmissiveMaterial(material, input.tex, -normalizedViewDirection);
 
     const float occlusion = 1.0f;
 
@@ -93,7 +96,8 @@ MainPixelOutput DefaultPixelShader(in PixelInputType input, bool bIsFrontFace : 
         occlusion);
 
     R2_5_StandardLightingModelMaterial_For_Lighting slm_uncompressed = R2_5_get_slm_for_lighting(standard_mat_compressed);
-    slm_uncompressed.Diffuse_Colour.rgb = ApplyTintAndFactionColours(slm_uncompressed.Diffuse_Colour.rgb, material.maskValue);
+    if (!CapabilityFlag_ApplyEmissive)
+        slm_uncompressed.Diffuse_Colour.rgb = ApplyTintAndFactionColours(slm_uncompressed.Diffuse_Colour.rgb, material.maskValue);
 
     float3 reflected_view_vec = reflect(normalizedViewDirection, slm_uncompressed.Normal);
 
@@ -121,14 +125,8 @@ MainPixelOutput DefaultPixelShader(in PixelInputType input, bool bIsFrontFace : 
     // Apply global constant light colour
     hdr_linear_col *= Constant_LightColour;
 
-    // Tone-map (AE 7.0 uses Uncharted2)
-    float3 ldr_linear_col = saturate(Uncharted2ToneMapping(hdr_linear_col));
-
-    // Use main light direction for emissive calculations
-    float3 emissiveColour = GetEmissiveColour(input.tex, material.maskValue, L_main, material.pixelNormal);
-
-    // Combine all colours
-    float3 color = ldr_linear_col + emissiveColour;
+    // Emission belongs in the HDR input, before the viewport's tone mapping.
+    float3 color = saturate(Uncharted2ToneMapping(hdr_linear_col + emissiveColour));
 
     MainPixelOutput output;
     output.Colour = ViewportSurfaceColour(_gamma(color));
@@ -157,8 +155,10 @@ MainPixelOutput SolidPixelShader(
 float4 EmissiveLayerPixelShader(in PixelInputType input, bool bIsFrontFace : SV_IsFrontFace) : SV_TARGET0
 {
     GBufferMaterial material = GetMaterial(input);
-    float3 normlizedViewDirection = normalize(input.viewDirection);
-    float3 emissiveColour = GetEmissiveColour(input.tex, material.maskValue, normlizedViewDirection, material.pixelNormal);
+    float3 normalizedViewDirection = normalize(CameraPos - input.worldPosition);
+    if (CapabilityFlag_ApplyEmissive)
+        material.diffuse.rgb = ApplyTintAndFactionColours(material.diffuse.rgb, material.maskValue);
+    float3 emissiveColour = ApplyEmissiveMaterial(material, input.tex, normalizedViewDirection);
 
     if (UseAlpha == 1)
         alpha_test(material.diffuse.a);

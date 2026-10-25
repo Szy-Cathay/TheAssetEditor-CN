@@ -1,0 +1,367 @@
+{
+  "Source": "Terry original executable, explicit fixed source direction and 10-unit depth; all control quality overrides identical",
+  "AgeMeasurement": "The same single particle encodes normalized age in its linear size (0.26 to 0.78); neighbouring 0.65 white square supplies only a static footprint reference. No independent-emitter birth synchrony or screenshot-time-as-age assumption.",
+  "Coverage": {
+    "Measurements": 708,
+    "MatchedIntervals": 705,
+    "Unresolved": 3
+  },
+  "Limitation": "Three observed transition samples remain outside the candidate phase intervals; preserve them and do not claim complete native timing, crossfade or random-seed fidelity.",
+  "Cases": [
+    {
+      "Capture": "native-single-particle-first",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-first\\roi-429.png",
+      "ImageSha256": "7519be40ba0f83709c572bdf16e66cb872ca6cd0e71f8da3452dbb71f253e78d",
+      "Case": 0,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 2,
+      "FrequencyStart": 0.5,
+      "FrequencyEnd": 0.5,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 1,
+      "PossibleCells": [
+        1,
+        2
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": false
+    },
+    {
+      "Capture": "native-single-particle-first",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-first\\roi-254.png",
+      "ImageSha256": "474fa8a24b68fc9009620d98db3f36a5e8345f01fc8f73bba0b1603a73a47565",
+      "Case": 1,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 4,
+      "FrequencyStart": 0.5,
+      "FrequencyEnd": 0.5,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 3,
+      "PossibleCells": [
+        0,
+        2,
+        3
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": true
+    },
+    {
+      "Capture": "native-single-particle-first",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-first\\roi-219.png",
+      "ImageSha256": "9ca8312cafc20242c073e0ca03e0e3475dfad421adfa08529e3c0b2f7a5dab3a",
+      "Case": 2,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 2,
+      "FrequencyStart": 0.6,
+      "FrequencyEnd": 0.7,
+      "WhiteWidth": 57,
+      "FullWidth": 45,
+      "PhaseInterval": [
+        0.39101694915254226,
+        0.588181818181818
+      ],
+      "ObservedCell": 2,
+      "PossibleCells": [
+        1,
+        2,
+        3
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": true
+    },
+    {
+      "Capture": "native-single-particle-first",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-first\\roi-259.png",
+      "ImageSha256": "29d5fe8599b04d60326929acd168520c63d23696be87fd562b14e721bc187fb9",
+      "Case": 3,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 4,
+      "FrequencyStart": 0.6,
+      "FrequencyEnd": 0.7,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 0,
+      "PossibleCells": [
+        0,
+        1,
+        3
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": false
+    },
+    {
+      "Capture": "native-single-particle-first",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-first\\roi-219.png",
+      "ImageSha256": "9ca8312cafc20242c073e0ca03e0e3475dfad421adfa08529e3c0b2f7a5dab3a",
+      "Case": 4,
+      "Mode": "using_particle_lifetime",
+      "LifeSeconds": 2,
+      "FrequencyStart": 0.5,
+      "FrequencyEnd": 0.5,
+      "WhiteWidth": 57,
+      "FullWidth": 45,
+      "PhaseInterval": [
+        0.39101694915254226,
+        0.588181818181818
+      ],
+      "ObservedCell": 0,
+      "PossibleCells": [
+        0,
+        1
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": false
+    },
+    {
+      "Capture": "native-single-particle-first",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-first\\roi-259.png",
+      "ImageSha256": "29d5fe8599b04d60326929acd168520c63d23696be87fd562b14e721bc187fb9",
+      "Case": 5,
+      "Mode": "using_particle_lifetime",
+      "LifeSeconds": 4,
+      "FrequencyStart": 0.5,
+      "FrequencyEnd": 0.5,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 0,
+      "PossibleCells": [
+        0,
+        1
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": false
+    },
+    {
+      "Capture": "native-single-particle-validation",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-validation\\roi-284.png",
+      "ImageSha256": "66176dbd2301860a5a7765a5ef34dee048c30208d16ee2f8a37a643132d966c8",
+      "Case": 0,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 2,
+      "FrequencyStart": 0.5,
+      "FrequencyEnd": 0.5,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 1,
+      "PossibleCells": [
+        1,
+        2
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": false
+    },
+    {
+      "Capture": "native-single-particle-validation",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-validation\\roi-119.png",
+      "ImageSha256": "b2889852728b85e5198c7ba244f60bae157dca77ab246962d1329c780bbf52d3",
+      "Case": 1,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 4,
+      "FrequencyStart": 0.5,
+      "FrequencyEnd": 0.5,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 3,
+      "PossibleCells": [
+        0,
+        2,
+        3
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": true
+    },
+    {
+      "Capture": "native-single-particle-validation",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-validation\\roi-284.png",
+      "ImageSha256": "66176dbd2301860a5a7765a5ef34dee048c30208d16ee2f8a37a643132d966c8",
+      "Case": 2,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 2,
+      "FrequencyStart": 0.6,
+      "FrequencyEnd": 0.7,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 2,
+      "PossibleCells": [
+        1,
+        2
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": true
+    },
+    {
+      "Capture": "native-single-particle-validation",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-validation\\roi-124.png",
+      "ImageSha256": "94c1aef95c564146ed90e4ab8f89569f7038896f29f7e994f7cb18d3e68efb31",
+      "Case": 3,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 4,
+      "FrequencyStart": 0.6,
+      "FrequencyEnd": 0.7,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 0,
+      "PossibleCells": [
+        0,
+        1,
+        3
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": false
+    },
+    {
+      "Capture": "native-single-particle-validation",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-validation\\roi-284.png",
+      "ImageSha256": "66176dbd2301860a5a7765a5ef34dee048c30208d16ee2f8a37a643132d966c8",
+      "Case": 4,
+      "Mode": "using_particle_lifetime",
+      "LifeSeconds": 2,
+      "FrequencyStart": 0.5,
+      "FrequencyEnd": 0.5,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 0,
+      "PossibleCells": [
+        0,
+        1
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": false
+    },
+    {
+      "Capture": "native-single-particle-validation",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-validation\\roi-124.png",
+      "ImageSha256": "94c1aef95c564146ed90e4ab8f89569f7038896f29f7e994f7cb18d3e68efb31",
+      "Case": 5,
+      "Mode": "using_particle_lifetime",
+      "LifeSeconds": 4,
+      "FrequencyStart": 0.5,
+      "FrequencyEnd": 0.5,
+      "WhiteWidth": 57,
+      "FullWidth": 42,
+      "PhaseInterval": [
+        0.32745762711864396,
+        0.52
+      ],
+      "ObservedCell": 0,
+      "PossibleCells": [
+        0,
+        1
+      ],
+      "Fits": true,
+      "RejectsNormalizedOnly": false
+    }
+  ],
+  "UnresolvedTransitions": [
+    {
+      "Capture": "native-single-particle-first",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-first\\roi-489.png",
+      "ImageSha256": "ec7fd8261e56c18cb37a9649b5e4caadf14cc6f44606286aa87d5471e7a7c2ba",
+      "Case": 3,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 4,
+      "FrequencyStart": 0.6,
+      "FrequencyEnd": 0.7,
+      "WhiteWidth": 57,
+      "FullWidth": 44,
+      "PhaseInterval": [
+        0.3698305084745762,
+        0.5654545454545453
+      ],
+      "ObservedCell": 2,
+      "PossibleCells": [
+        0,
+        1,
+        3
+      ],
+      "Fits": false,
+      "RejectsNormalizedOnly": true
+    },
+    {
+      "Capture": "native-single-particle-first",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-first\\roi-69.png",
+      "ImageSha256": "de6098b947861116a61416c89611e6d709c948349837d5456dd64ef4eb881786",
+      "Case": 3,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 4,
+      "FrequencyStart": 0.6,
+      "FrequencyEnd": 0.7,
+      "WhiteWidth": 57,
+      "FullWidth": 44,
+      "PhaseInterval": [
+        0.3698305084745762,
+        0.5654545454545453
+      ],
+      "ObservedCell": 2,
+      "PossibleCells": [
+        0,
+        1,
+        3
+      ],
+      "Fits": false,
+      "RejectsNormalizedOnly": true
+    },
+    {
+      "Capture": "native-single-particle-validation",
+      "Image": "atlas-controls-v7-native\\session\\native-single-particle-validation\\roi-339.png",
+      "ImageSha256": "d1acb3ec594522c89b83199c6a810873f96210d8ec05fd12cdaa8330a98842e9",
+      "Case": 3,
+      "Mode": "fixed_animation_speed",
+      "LifeSeconds": 4,
+      "FrequencyStart": 0.6,
+      "FrequencyEnd": 0.7,
+      "WhiteWidth": 57,
+      "FullWidth": 44,
+      "PhaseInterval": [
+        0.3698305084745762,
+        0.5654545454545453
+      ],
+      "ObservedCell": 2,
+      "PossibleCells": [
+        0,
+        1,
+        3
+      ],
+      "Fits": false,
+      "RejectsNormalizedOnly": true
+    }
+  ]
+}

@@ -21,6 +21,8 @@ using Shared.GameFormats.AnimationMeta.Parsing;
 using Shared.GameFormats.Animation;
 using Shared.Core.PackFiles.Models;
 using GameWorld.Core.Animation;
+using GameWorld.Core.Vfx;
+using Editors.AnimationMeta.SuperView.Visualisation.Instances;
 
 namespace Editors.AnimationMeta.SuperView
 {
@@ -37,6 +39,7 @@ namespace Editors.AnimationMeta.SuperView
         private readonly CombatMetaDataEditSession _combatEditSession;
         private readonly CombatMetaDataGizmoComponent _combatGizmo;
         private readonly MetaDataMarkerPickerComponent _markerPicker;
+        private readonly VfxPreviewDocumentStore? _vfxDocuments;
         private CombatMetaDataPoint _selectedSplashPoint =
             CombatMetaDataPoint.SplashStart;
         private CombatMetaDataTransformMode _selectedTransformMode =
@@ -388,7 +391,8 @@ namespace Editors.AnimationMeta.SuperView
             IMetaDataBuilder metaDataFactory,
             CombatMetaDataEditSession combatEditSession,
             CombatMetaDataGizmoComponent combatGizmo,
-            MetaDataMarkerPickerComponent markerPicker)
+            MetaDataMarkerPickerComponent markerPicker,
+            VfxPreviewDocumentStore? vfxDocuments = null)
             : base(editorHostParameters)
         {
             EditorContentVerticalScrollBarVisibility =
@@ -405,6 +409,8 @@ namespace Editors.AnimationMeta.SuperView
             _combatEditSession = combatEditSession;
             _combatGizmo = combatGizmo;
             _markerPicker = markerPicker;
+            _vfxDocuments = vfxDocuments;
+            if (_vfxDocuments != null) _vfxDocuments.Changed += OnLiveVfxChanged;
             MetaDataTimeline = new MetaDataTimelineViewModel(
                 SelectMetaDataInspectionItem);
             MetaDataProblems = new MetaDataProblemListViewModel(
@@ -580,6 +586,8 @@ namespace Editors.AnimationMeta.SuperView
                 _asset.Data.Player,
                 _asset.FragAndSlotSelection.FragmentList.SelectedItem);
             _asset.Data.MetaDataItems = buildResult.Instances.ToList();
+            foreach (var effect in buildResult.Instances.OfType<EffectMetaInstance>())
+                effect.DiagnosticsChanged += OnVfxDiagnosticsChanged;
             _asset.Data.Player.AnimationRules.AddRange(
                 buildResult.AnimationRules);
             _metaDataDiagnostics = buildResult.Diagnostics.ToList();
@@ -651,6 +659,7 @@ namespace Editors.AnimationMeta.SuperView
 
             if (replacement != null)
             {
+                if (replacement is EffectMetaInstance effect) effect.DiagnosticsChanged += OnVfxDiagnosticsChanged;
                 if (currentIndex < 0)
                     _asset.Data.MetaDataItems.Add(replacement);
                 else
@@ -669,6 +678,25 @@ namespace Editors.AnimationMeta.SuperView
             OnPropertyChanged(nameof(CanFocusSelectedMetaData));
             OnPropertyChanged(nameof(CanConfigureSelectedMetaDataDisplayTime));
             return true;
+        }
+
+        private void OnLiveVfxChanged(object file)
+        {
+            if (_asset?.Data == null) return;
+            var affected = _asset.Data.MetaDataItems.OfType<EffectMetaInstance>()
+                .Where(effect => effect.DependsOn(file)).Select(effect => effect.Source).ToArray();
+            foreach (var source in affected) RefreshMetaDataPreview(source);
+        }
+
+        private void OnVfxDiagnosticsChanged(EffectMetaInstance effect)
+        {
+            if (!TryGetDocumentOwner(effect.Source, out var owner)) return;
+            _metaDataDiagnostics.RemoveAll(diagnostic => ReferenceEquals(diagnostic.Source, effect.Source)
+                && diagnostic.ReasonKey.StartsWith("Vfx.Preview.", StringComparison.Ordinal));
+            foreach (var diagnostic in effect.Diagnostics.DistinctBy(x => x.ReasonKey))
+                _metaDataDiagnostics.Add(MetaDataDiagnosticFactory.Create(effect.Source, owner, diagnostic.ReasonKey, diagnostic.Source));
+            OnPropertyChanged(nameof(MetaDataDiagnostics));
+            RebuildMetaDataInspectionIndex();
         }
 
         private void RebuildMetaDataInspectionIndex()
@@ -1261,6 +1289,7 @@ namespace Editors.AnimationMeta.SuperView
 
         public override void Close()
         {
+            if (_vfxDocuments != null) _vfxDocuments.Changed -= OnLiveVfxChanged;
             _markerPicker.Disconnect();
             _asset.FragAndSlotSelection.PropertyChanged -=
                 OnFragmentSelectionPropertyChanged;

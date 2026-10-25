@@ -1,0 +1,473 @@
+{
+  "Version": 1,
+  "Source": "Terry native controlled environments; camera0/6/-10 target0/6/0 FOV60 depth10, fixed up direction with zero motion",
+  "PixelTolerance": 3,
+  "Supported": "Default render pass, simple lighting true, ordinary sprite, no distortion, additive_blend_mul0, scalar emissive1..8; no claim of game tone mapping or full material fidelity",
+  "DefaultPassCases": [
+    {
+      "Group": "default-opaque-1.2",
+      "Emissive": 1.2,
+      "Brightness": 0.04,
+      "Texel": 255,
+      "TextureAlpha": 255,
+      "Premultiplied": false,
+      "SourceRgb": [
+        47.0,
+        47.0,
+        47.0
+      ],
+      "ReferenceRgb": [
+        47.0,
+        47.0,
+        47.0
+      ],
+      "MaximumChannelError": 0.0,
+      "Indices": [
+        8,
+        9
+      ]
+    },
+    {
+      "Group": "default-opaque-2.2",
+      "Emissive": 2.2,
+      "Brightness": 0.04,
+      "Texel": 255,
+      "TextureAlpha": 255,
+      "Premultiplied": false,
+      "SourceRgb": [
+        63.0,
+        63.0,
+        63.0
+      ],
+      "ReferenceRgb": [
+        62.0,
+        62.0,
+        62.0
+      ],
+      "MaximumChannelError": 1.0,
+      "Indices": [
+        10,
+        11
+      ]
+    },
+    {
+      "Group": "default-opaque-5",
+      "Emissive": 5,
+      "Brightness": 0.04,
+      "Texel": 255,
+      "TextureAlpha": 255,
+      "Premultiplied": false,
+      "SourceRgb": [
+        92.0,
+        92.0,
+        92.0
+      ],
+      "ReferenceRgb": [
+        92.0,
+        92.0,
+        92.0
+      ],
+      "MaximumChannelError": 0.0,
+      "Indices": [
+        12,
+        13
+      ]
+    },
+    {
+      "Group": "default-opaque-8",
+      "Emissive": 8,
+      "Brightness": 0.04,
+      "Texel": 255,
+      "TextureAlpha": 255,
+      "Premultiplied": false,
+      "SourceRgb": [
+        111.0,
+        111.0,
+        111.0
+      ],
+      "ReferenceRgb": [
+        111.0,
+        111.0,
+        111.0
+      ],
+      "MaximumChannelError": 0.0,
+      "Indices": [
+        14,
+        15
+      ]
+    },
+    {
+      "Group": "default-covered-128-2.2",
+      "Emissive": 2.2,
+      "Brightness": 0.1,
+      "Texel": 128,
+      "TextureAlpha": 128,
+      "Premultiplied": true,
+      "SourceRgb": [
+        58.0,
+        58.0,
+        58.0
+      ],
+      "ReferenceRgb": [
+        58.0,
+        58.0,
+        58.0
+      ],
+      "MaximumChannelError": 0.0,
+      "Indices": [
+        32,
+        33
+      ]
+    },
+    {
+      "Group": "default-covered-128-5",
+      "Emissive": 5,
+      "Brightness": 0.1,
+      "Texel": 128,
+      "TextureAlpha": 128,
+      "Premultiplied": true,
+      "SourceRgb": [
+        86.0,
+        86.0,
+        86.0
+      ],
+      "ReferenceRgb": [
+        86.0,
+        86.0,
+        86.0
+      ],
+      "MaximumChannelError": 0.0,
+      "Indices": [
+        34,
+        35
+      ]
+    },
+    {
+      "Group": "default-covered-192-2.2",
+      "Emissive": 2.2,
+      "Brightness": 0.1,
+      "Texel": 192,
+      "TextureAlpha": 128,
+      "Premultiplied": true,
+      "SourceRgb": [
+        58.0,
+        58.0,
+        58.0
+      ],
+      "ReferenceRgb": [
+        58.0,
+        58.0,
+        58.0
+      ],
+      "MaximumChannelError": 0.0,
+      "Indices": [
+        36,
+        37
+      ]
+    },
+    {
+      "Group": "default-covered-192-5",
+      "Emissive": 5,
+      "Brightness": 0.1,
+      "Texel": 192,
+      "TextureAlpha": 128,
+      "Premultiplied": true,
+      "SourceRgb": [
+        86.0,
+        86.0,
+        86.0
+      ],
+      "ReferenceRgb": [
+        86.0,
+        86.0,
+        86.0
+      ],
+      "MaximumChannelError": 0.0,
+      "Indices": [
+        38,
+        39
+      ]
+    }
+  ],
+  "Evidence": {
+    "env-zero-native": {
+      "Images": [
+        {
+          "File": "frame-0.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-1.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-2.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-3.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-4.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-5.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-6.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-7.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-8.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-9.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-10.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        },
+        {
+          "File": "frame-11.png",
+          "Sha256": "09518ce93e9f49c126eebb09eefbe486890659db9f772b617a9ec83648d335c4"
+        }
+      ],
+      "RawSha256": "5b816001cceca5703c3186877018e538d9b985ac75e543966865a94cf7e56d1f",
+      "EnvironmentSha256": "f6528e251c750188278bf9cd980480e2dcb1471a6887e2c6a02e061b261e5f08"
+    },
+    "env-ambient-native": {
+      "Images": [
+        {
+          "File": "frame-0.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-1.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-2.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-3.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-4.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-5.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-6.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-7.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-8.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-9.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-10.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        },
+        {
+          "File": "frame-11.png",
+          "Sha256": "60c9d11cf7a13a1019244080544d04142cf0b7d1182b9b05d5f8327a6f3baf1e"
+        }
+      ],
+      "RawSha256": "eb3e2734d2ad5c417000b5b44bb3b0e0847bea692c1aa11cc638e66c872711ed",
+      "EnvironmentSha256": "808be3ae139968367b3fe0da2bbed58f70a46629d4ad91d2745570544d828890"
+    },
+    "env-sun-native": {
+      "Images": [
+        {
+          "File": "frame-0.png",
+          "Sha256": "8a908f959c8c011440a85f6132f3fe27b709709c0c17ef3fa3aa463f54c561ac"
+        },
+        {
+          "File": "frame-1.png",
+          "Sha256": "4b8a7a778eb158386d54690425573e3ac367af9732de470f53d71b865b1a5425"
+        },
+        {
+          "File": "frame-2.png",
+          "Sha256": "f22fc0931e065e674ed7c27ea958ade8b5d88b7f14522ecd758113c8644bd53f"
+        },
+        {
+          "File": "frame-3.png",
+          "Sha256": "29f99bc26265e706be1e22693381b2e8a4236d9f3b440b211b3cf4d46580e43e"
+        },
+        {
+          "File": "frame-4.png",
+          "Sha256": "9cde825422e01dde6da7750b8cc232b7098ed4a1afacb7004d27a4b54f5b13dd"
+        },
+        {
+          "File": "frame-5.png",
+          "Sha256": "1c277ace461281fb72ec6a942c3f44cb199d37781a95d4de0a2f7a28efb1e0a5"
+        },
+        {
+          "File": "frame-6.png",
+          "Sha256": "09df0a24e1d50a6a5f645836a8ba1b190e144bbbbd3e830c75c491adbfe06d39"
+        },
+        {
+          "File": "frame-7.png",
+          "Sha256": "b482733e8b7abb534d731c5c193011b697e0ce869bdb114a6a5196b232046de4"
+        },
+        {
+          "File": "frame-8.png",
+          "Sha256": "aab8537981cb6d30a4ad64a881d88f119e6e638e2914c625c2ead52a60237fd1"
+        },
+        {
+          "File": "frame-9.png",
+          "Sha256": "48703488360e6979353bc29d088997eb9d570375a68da86f32bee4cafc947cfd"
+        },
+        {
+          "File": "frame-10.png",
+          "Sha256": "6098de1611b1a7bd77eda15db1b50f7b94f06c629fe28d06ba02aefa3e937c94"
+        },
+        {
+          "File": "frame-11.png",
+          "Sha256": "757bca0e656daac4f6abd3b30cd136906f42eb34222ddae295d2e95721de1f62"
+        }
+      ],
+      "RawSha256": "d4b333ef2570f99ed66dcca746e6a242b816b3970cc419185168c1b1d2c2fdde",
+      "EnvironmentSha256": "abd4a850a6840a68da35c57fca6b7a6e550c57570c5c08f56148d4202ff7084b"
+    },
+    "precision-native": {
+      "Images": [
+        {
+          "File": "frame-0.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-1.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-2.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-3.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-4.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-5.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-6.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-7.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-8.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-9.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-10.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        },
+        {
+          "File": "frame-11.png",
+          "Sha256": "3a56278674f6c0ab724bbbe6e3a31d7d1bbf08fec975c928bafb131a00072b03"
+        }
+      ],
+      "RawSha256": "36c706ac1a0e27668c4f2d5c28c9e689613d809de6609c9a5dc24c624fb6e657",
+      "EnvironmentSha256": "808be3ae139968367b3fe0da2bbed58f70a46629d4ad91d2745570544d828890"
+    },
+    "pass-native": {
+      "Images": [
+        {
+          "File": "frame-0.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-1.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-2.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-3.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-4.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-5.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-6.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-7.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-8.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-9.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-10.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        },
+        {
+          "File": "frame-11.png",
+          "Sha256": "59a43a3948633488f4701cd5210cfb87efd1418cce778980fbd3b9e92152c09e"
+        }
+      ],
+      "RawSha256": "a9231d6d4c67d46eff4fc1d4c79663db69e19cd917e7a8375b927da6ee2db877",
+      "EnvironmentSha256": "808be3ae139968367b3fe0da2bbed58f70a46629d4ad91d2745570544d828890"
+    }
+  },
+  "Excluded": [
+    "Full lighting keeps ambient response at emissive1 and above; cannot multiply the whole material by emissive",
+    "One explicit full-resolution opaque emissive5 pair differs by6 display levels; explicit render passes are not enabled by this change",
+    "Low-emissive full-lighting square/gamma hypotheses are rejected by up to9/6 levels",
+    "Premultiplied covered-versus-opaque references differ by20/23 levels; full native transparency is not calibrated",
+    "High-contrast texture-emission additive-half metamer differs by10 levels; additive blending is not extended"
+  ],
+  "ProductEditedBeforeNativeCapture": false,
+  "GlobalStepChanged": false
+}

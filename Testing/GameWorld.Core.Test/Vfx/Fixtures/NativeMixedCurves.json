@@ -1,0 +1,537 @@
+{
+  "SourceSha256": "d5facdcc64b5af807b3c152a1213b1dba056c959ac7dc8b03026944225e51b6d",
+  "IndependentValidation": true,
+  "PhaseFromSimultaneousLinearSize": true,
+  "FirstCohortExcluded": true,
+  "Scope": "Four mixed bezier_c/analytic combinations with descending endpoints and asymmetric handles, later native cohorts; two pixel size uncertainty plus 0.02 phase interval. Does not accept general VFX fidelity or other Bezier/step names.",
+  "Cases": [
+    {
+      "Name": "bezier_c_sine",
+      "Curve": "x_min,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,sine,linear,-0.32,0,0.32,0,1|x_max,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,sine,linear,-0.32,0,0.32,0,1|y_min,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,sine,linear,-0.32,0,0.32,0,1|y_max,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,sine,linear,-0.32,0,0.32,0,1|z_min,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,sine,linear,-0.32,0,0.32,0,1|z_max,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,sine,linear,-0.32,0,0.32,0,1:x,1;0,1|y,1;2,3|z,1;4,5",
+      "Samples": [
+        {
+          "Phase": 0.12396694214876033,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.4338842975206614,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 30,
+          "Cycle": 1,
+          "FrameSha256": "d20a3c54e13c58c12efb7c79255b9af1b9be27d0f1aab037471cba0b1f61a700"
+        },
+        {
+          "Phase": 0.18181818181818182,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.285123966942149,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 32,
+          "Cycle": 1,
+          "FrameSha256": "3ebba7bba9b0311942bd9ab9ffd5b05dd7bd8ad57a682d8057303a860bca970f"
+        },
+        {
+          "Phase": 0.35537190082644626,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.7396694214876034,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 37,
+          "Cycle": 1,
+          "FrameSha256": "ee0346e2a854c2f0ddb2b642d5f00403bb5edea074bc4a4f7853fd5b2a57b072"
+        },
+        {
+          "Phase": 0.5041322314049587,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.2933884297520661,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 41,
+          "Cycle": 1,
+          "FrameSha256": "e43c5ab4276f56949ff1a49b7d04a7493919e125d244c09c0a9f66fa56523fbf"
+        },
+        {
+          "Phase": 0.6528925619834711,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.8966942148760331,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 45,
+          "Cycle": 1,
+          "FrameSha256": "5499d55cc98d126f2fda648593100a0e9a93b8106fb3fc142619162e79f819bb"
+        },
+        {
+          "Phase": 0.7851239669421488,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.6487603305785123,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 49,
+          "Cycle": 1,
+          "FrameSha256": "06eb603e19a8df97ced01bdfc0c5a4a41df91db4285468a05ac2aa80ab2eb35d"
+        },
+        {
+          "Phase": 0.9173553719008265,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.5495867768595042,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 52,
+          "Cycle": 1,
+          "FrameSha256": "3bf52e6ee32cab63e83cf5a9ae1a9e7291e99fe70cd6d11ad45d7ac70f0bf505"
+        },
+        {
+          "Phase": 0.10743801652892562,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.4834710743801653,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 86,
+          "Cycle": 3,
+          "FrameSha256": "92a2329eb28665f1063c49e6636ac3cd51d8453feb93fed17d237b29eb49cb60"
+        },
+        {
+          "Phase": 0.2066115702479339,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.2355371900826446,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 89,
+          "Cycle": 3,
+          "FrameSha256": "c4dfd8cf01f70f82b6eb68055800da430c87f3d40a935612c5d905ea103ad097"
+        },
+        {
+          "Phase": 0.35537190082644626,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.7892561983471074,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 93,
+          "Cycle": 3,
+          "FrameSha256": "654b4618145e67baab9e705e5b4251d5def32b920408e5996860a201c2948c6d"
+        },
+        {
+          "Phase": 0.4793388429752066,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.359504132231405,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 97,
+          "Cycle": 3,
+          "FrameSha256": "5777b849850e3bfbcd172ef980858e2789d09a744d565dcfbabed171b60fbb1f"
+        },
+        {
+          "Phase": 0.6528925619834711,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.8966942148760331,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 101,
+          "Cycle": 3,
+          "FrameSha256": "22a7b98aa1ef5e81ff22c1ab916bbe209b5043c53947caf169084e202187400e"
+        },
+        {
+          "Phase": 0.7851239669421488,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.6487603305785123,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 105,
+          "Cycle": 3,
+          "FrameSha256": "576efca5c92e0ae2da2f7065132b2fc9ad7f56f52d1c30f83bac148c3eda43fb"
+        },
+        {
+          "Phase": 0.9008264462809917,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.5495867768595042,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 108,
+          "Cycle": 3,
+          "FrameSha256": "afd581f503193da40b1e559c1b5a4177e4a9981b842fb7db8e38d9c3a6c6630c"
+        }
+      ]
+    },
+    {
+      "Name": "log3_bezier_c",
+      "Curve": "x_min,8405056,0;0,2.5,linear,log3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|x_max,8405056,0;0,2.5,linear,log3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|y_min,8405056,0;0,2.5,linear,log3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|y_max,8405056,0;0,2.5,linear,log3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|z_min,8405056,0;0,2.5,linear,log3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|z_max,8405056,0;0,2.5,linear,log3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1:x,1;0,1|y,1;2,3|z,1;4,5",
+      "Samples": [
+        {
+          "Phase": 0.12396694214876033,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.93801652892562,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 30,
+          "Cycle": 1,
+          "FrameSha256": "d20a3c54e13c58c12efb7c79255b9af1b9be27d0f1aab037471cba0b1f61a700"
+        },
+        {
+          "Phase": 0.18181818181818182,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.7396694214876034,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 32,
+          "Cycle": 1,
+          "FrameSha256": "3ebba7bba9b0311942bd9ab9ffd5b05dd7bd8ad57a682d8057303a860bca970f"
+        },
+        {
+          "Phase": 0.35537190082644626,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.34297520661157,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 37,
+          "Cycle": 1,
+          "FrameSha256": "ee0346e2a854c2f0ddb2b642d5f00403bb5edea074bc4a4f7853fd5b2a57b072"
+        },
+        {
+          "Phase": 0.5041322314049587,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.1446280991735538,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 41,
+          "Cycle": 1,
+          "FrameSha256": "e43c5ab4276f56949ff1a49b7d04a7493919e125d244c09c0a9f66fa56523fbf"
+        },
+        {
+          "Phase": 0.6528925619834711,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.8966942148760331,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 45,
+          "Cycle": 1,
+          "FrameSha256": "5499d55cc98d126f2fda648593100a0e9a93b8106fb3fc142619162e79f819bb"
+        },
+        {
+          "Phase": 0.7851239669421488,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.6983471074380165,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 49,
+          "Cycle": 1,
+          "FrameSha256": "06eb603e19a8df97ced01bdfc0c5a4a41df91db4285468a05ac2aa80ab2eb35d"
+        },
+        {
+          "Phase": 0.9173553719008265,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.5495867768595042,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 52,
+          "Cycle": 1,
+          "FrameSha256": "3bf52e6ee32cab63e83cf5a9ae1a9e7291e99fe70cd6d11ad45d7ac70f0bf505"
+        },
+        {
+          "Phase": 0.10743801652892562,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.987603305785124,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 86,
+          "Cycle": 3,
+          "FrameSha256": "92a2329eb28665f1063c49e6636ac3cd51d8453feb93fed17d237b29eb49cb60"
+        },
+        {
+          "Phase": 0.2066115702479339,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.6570247933884297,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 89,
+          "Cycle": 3,
+          "FrameSha256": "c4dfd8cf01f70f82b6eb68055800da430c87f3d40a935612c5d905ea103ad097"
+        },
+        {
+          "Phase": 0.35537190082644626,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.359504132231405,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 93,
+          "Cycle": 3,
+          "FrameSha256": "654b4618145e67baab9e705e5b4251d5def32b920408e5996860a201c2948c6d"
+        },
+        {
+          "Phase": 0.4793388429752066,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.1446280991735538,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 97,
+          "Cycle": 3,
+          "FrameSha256": "5777b849850e3bfbcd172ef980858e2789d09a744d565dcfbabed171b60fbb1f"
+        },
+        {
+          "Phase": 0.6528925619834711,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.8966942148760331,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 101,
+          "Cycle": 3,
+          "FrameSha256": "22a7b98aa1ef5e81ff22c1ab916bbe209b5043c53947caf169084e202187400e"
+        },
+        {
+          "Phase": 0.7851239669421488,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.6983471074380165,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 105,
+          "Cycle": 3,
+          "FrameSha256": "576efca5c92e0ae2da2f7065132b2fc9ad7f56f52d1c30f83bac148c3eda43fb"
+        },
+        {
+          "Phase": 0.9008264462809917,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.5495867768595042,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 108,
+          "Cycle": 3,
+          "FrameSha256": "afd581f503193da40b1e559c1b5a4177e4a9981b842fb7db8e38d9c3a6c6630c"
+        }
+      ]
+    },
+    {
+      "Name": "bezier_c_log3",
+      "Curve": "x_min,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,log3,linear,-0.32,0,0.32,0,1|x_max,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,log3,linear,-0.32,0,0.32,0,1|y_min,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,log3,linear,-0.32,0,0.32,0,1|y_max,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,log3,linear,-0.32,0,0.32,0,1|z_min,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,log3,linear,-0.32,0,0.32,0,1|z_max,8405056,0;0,2.5,linear,bezier_c,-0.18,0,0.18,0.4,1;1,0.5,log3,linear,-0.32,0,0.32,0,1:x,1;0,1|y,1;2,3|z,1;4,5",
+      "Samples": [
+        {
+          "Phase": 0.12396694214876033,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.4173553719008263,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 30,
+          "Cycle": 1,
+          "FrameSha256": "d20a3c54e13c58c12efb7c79255b9af1b9be27d0f1aab037471cba0b1f61a700"
+        },
+        {
+          "Phase": 0.18181818181818182,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.2355371900826446,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 32,
+          "Cycle": 1,
+          "FrameSha256": "3ebba7bba9b0311942bd9ab9ffd5b05dd7bd8ad57a682d8057303a860bca970f"
+        },
+        {
+          "Phase": 0.35537190082644626,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.5909090909090908,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 37,
+          "Cycle": 1,
+          "FrameSha256": "ee0346e2a854c2f0ddb2b642d5f00403bb5edea074bc4a4f7853fd5b2a57b072"
+        },
+        {
+          "Phase": 0.5041322314049587,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.1280991735537191,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 41,
+          "Cycle": 1,
+          "FrameSha256": "e43c5ab4276f56949ff1a49b7d04a7493919e125d244c09c0a9f66fa56523fbf"
+        },
+        {
+          "Phase": 0.6528925619834711,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.7644628099173554,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 45,
+          "Cycle": 1,
+          "FrameSha256": "5499d55cc98d126f2fda648593100a0e9a93b8106fb3fc142619162e79f819bb"
+        },
+        {
+          "Phase": 0.7851239669421488,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.5661157024793388,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 49,
+          "Cycle": 1,
+          "FrameSha256": "06eb603e19a8df97ced01bdfc0c5a4a41df91db4285468a05ac2aa80ab2eb35d"
+        },
+        {
+          "Phase": 0.9173553719008265,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.5330578512396694,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 52,
+          "Cycle": 1,
+          "FrameSha256": "3bf52e6ee32cab63e83cf5a9ae1a9e7291e99fe70cd6d11ad45d7ac70f0bf505"
+        },
+        {
+          "Phase": 0.10743801652892562,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.4338842975206614,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 86,
+          "Cycle": 3,
+          "FrameSha256": "92a2329eb28665f1063c49e6636ac3cd51d8453feb93fed17d237b29eb49cb60"
+        },
+        {
+          "Phase": 0.2066115702479339,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.1363636363636367,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 89,
+          "Cycle": 3,
+          "FrameSha256": "c4dfd8cf01f70f82b6eb68055800da430c87f3d40a935612c5d905ea103ad097"
+        },
+        {
+          "Phase": 0.35537190082644626,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.640495867768595,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 93,
+          "Cycle": 3,
+          "FrameSha256": "654b4618145e67baab9e705e5b4251d5def32b920408e5996860a201c2948c6d"
+        },
+        {
+          "Phase": 0.4793388429752066,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.1942148760330578,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 97,
+          "Cycle": 3,
+          "FrameSha256": "5777b849850e3bfbcd172ef980858e2789d09a744d565dcfbabed171b60fbb1f"
+        },
+        {
+          "Phase": 0.6528925619834711,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.7644628099173554,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 101,
+          "Cycle": 3,
+          "FrameSha256": "22a7b98aa1ef5e81ff22c1ab916bbe209b5043c53947caf169084e202187400e"
+        },
+        {
+          "Phase": 0.7851239669421488,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.5661157024793388,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 105,
+          "Cycle": 3,
+          "FrameSha256": "576efca5c92e0ae2da2f7065132b2fc9ad7f56f52d1c30f83bac148c3eda43fb"
+        },
+        {
+          "Phase": 0.9008264462809917,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.5330578512396694,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 108,
+          "Cycle": 3,
+          "FrameSha256": "afd581f503193da40b1e559c1b5a4177e4a9981b842fb7db8e38d9c3a6c6630c"
+        }
+      ]
+    },
+    {
+      "Name": "exp3_bezier_c",
+      "Curve": "x_min,8405056,0;0,2.5,linear,exp3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|x_max,8405056,0;0,2.5,linear,exp3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|y_min,8405056,0;0,2.5,linear,exp3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|y_max,8405056,0;0,2.5,linear,exp3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|z_min,8405056,0;0,2.5,linear,exp3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1|z_max,8405056,0;0,2.5,linear,exp3,-0.18,0,0.18,0.4,1;1,0.5,bezier_c,linear,-0.32,0,0.32,0,1:x,1;0,1|y,1;2,3|z,1;4,5",
+      "Samples": [
+        {
+          "Phase": 0.12396694214876033,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.5165289256198347,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 30,
+          "Cycle": 1,
+          "FrameSha256": "d20a3c54e13c58c12efb7c79255b9af1b9be27d0f1aab037471cba0b1f61a700"
+        },
+        {
+          "Phase": 0.18181818181818182,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.5,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 32,
+          "Cycle": 1,
+          "FrameSha256": "3ebba7bba9b0311942bd9ab9ffd5b05dd7bd8ad57a682d8057303a860bca970f"
+        },
+        {
+          "Phase": 0.36363636363636365,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.2355371900826446,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 37,
+          "Cycle": 1,
+          "FrameSha256": "ee0346e2a854c2f0ddb2b642d5f00403bb5edea074bc4a4f7853fd5b2a57b072"
+        },
+        {
+          "Phase": 0.512396694214876,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.9049586776859504,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 41,
+          "Cycle": 1,
+          "FrameSha256": "e43c5ab4276f56949ff1a49b7d04a7493919e125d244c09c0a9f66fa56523fbf"
+        },
+        {
+          "Phase": 0.6611570247933884,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.4090909090909092,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 45,
+          "Cycle": 1,
+          "FrameSha256": "5499d55cc98d126f2fda648593100a0e9a93b8106fb3fc142619162e79f819bb"
+        },
+        {
+          "Phase": 0.7933884297520661,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.9132231404958677,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 49,
+          "Cycle": 1,
+          "FrameSha256": "06eb603e19a8df97ced01bdfc0c5a4a41df91db4285468a05ac2aa80ab2eb35d"
+        },
+        {
+          "Phase": 0.9173553719008265,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.615702479338843,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 52,
+          "Cycle": 1,
+          "FrameSha256": "3bf52e6ee32cab63e83cf5a9ae1a9e7291e99fe70cd6d11ad45d7ac70f0bf505"
+        },
+        {
+          "Phase": 0.11570247933884298,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.5165289256198347,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 86,
+          "Cycle": 3,
+          "FrameSha256": "92a2329eb28665f1063c49e6636ac3cd51d8453feb93fed17d237b29eb49cb60"
+        },
+        {
+          "Phase": 0.21487603305785125,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.4669421487603307,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 89,
+          "Cycle": 3,
+          "FrameSha256": "c4dfd8cf01f70f82b6eb68055800da430c87f3d40a935612c5d905ea103ad097"
+        },
+        {
+          "Phase": 0.36363636363636365,
+          "PhaseUncertainty": 0.02,
+          "Scale": 2.2355371900826446,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 93,
+          "Cycle": 3,
+          "FrameSha256": "654b4618145e67baab9e705e5b4251d5def32b920408e5996860a201c2948c6d"
+        },
+        {
+          "Phase": 0.4793388429752066,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.93801652892562,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 97,
+          "Cycle": 3,
+          "FrameSha256": "5777b849850e3bfbcd172ef980858e2789d09a744d565dcfbabed171b60fbb1f"
+        },
+        {
+          "Phase": 0.6611570247933884,
+          "PhaseUncertainty": 0.02,
+          "Scale": 1.4090909090909092,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 101,
+          "Cycle": 3,
+          "FrameSha256": "22a7b98aa1ef5e81ff22c1ab916bbe209b5043c53947caf169084e202187400e"
+        },
+        {
+          "Phase": 0.7933884297520661,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.9132231404958677,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 105,
+          "Cycle": 3,
+          "FrameSha256": "576efca5c92e0ae2da2f7065132b2fc9ad7f56f52d1c30f83bac148c3eda43fb"
+        },
+        {
+          "Phase": 0.9090909090909091,
+          "PhaseUncertainty": 0.02,
+          "Scale": 0.6322314049586777,
+          "PixelScaleUncertainty": 0.03305785123966942,
+          "Frame": 108,
+          "Cycle": 3,
+          "FrameSha256": "afd581f503193da40b1e559c1b5a4177e4a9981b842fb7db8e38d9c3a6c6630c"
+        }
+      ]
+    }
+  ]
+}
