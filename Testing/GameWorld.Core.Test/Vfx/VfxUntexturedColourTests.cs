@@ -56,11 +56,26 @@ public class VfxUntexturedColourTests
             var device = graphics.GraphicsDevice; using var preview = new EffekseerVfxPreview(device);
             preview.Reload(new(doc.Write(), "vfx/solid.xml", _ => throw new InvalidOperationException("No resource was authored.")));
             Assert.That(preview.EmitterCount, Is.EqualTo(1)); preview.Seek(.5f, Matrix.Identity);
+            var parameters = new CommonShaderParameters(Matrix.CreateLookAt(new(0, 0, 10), Vector3.Zero, Vector3.Up),
+                Matrix.CreateOrthographic(10, 10, .1f, 50), new(0, 0, 10), Vector3.Zero, 0, 0, 0, 1, Vector3.One, []);
+            using var linearTarget = new RenderTarget2D(device, 64, 64, false, SurfaceFormat.Vector4, DepthFormat.Depth24);
+            device.SetRenderTarget(linearTarget); device.Clear(Color.Black); preview.Draw(parameters);
+            device.SetRenderTarget(null); var linearPixels = new Vector4[64 * 64]; linearTarget.GetData(linearPixels);
+            Assert.That(linearPixels.Count(pixel => pixel.X >= 250f / 255 && pixel.Z >= 250f / 255
+                && pixel.Y >= 0 && pixel.Y <= 2f / 255), Is.GreaterThan(500),
+                "The original near-unit magenta requirement applies to linear particle colour before display conversion.");
             using var target = new RenderTarget2D(device, 64, 64, false, SurfaceFormat.Color, DepthFormat.Depth24);
             device.SetRenderTarget(target); device.Clear(Color.Black);
-            preview.Draw(new CommonShaderParameters(Matrix.CreateLookAt(new(0, 0, 10), Vector3.Zero, Vector3.Up), Matrix.CreateOrthographic(10, 10, .1f, 50), new(0, 0, 10), Vector3.Zero, 0, 0, 0, 1, Vector3.One, []));
+            preview.Draw(parameters);
             device.SetRenderTarget(null); var pixels = new Color[64 * 64]; target.GetData(pixels);
-            Assert.That(pixels.Count(p => p.R >= 250 && p.B >= 250 && p.G <= 2), Is.GreaterThan(500));
+            var displayed = pixels.Where(pixel => pixel.R != 0 || pixel.G != 0 || pixel.B != 0).ToArray();
+            // Native exposure 1, Burn .05, gamma and default LUT map linear magenta to 232.9885, rounded to 233.
+            Assert.Multiple(() =>
+            {
+                Assert.That(displayed, Has.Length.GreaterThan(500));
+                Assert.That(displayed.All(pixel => pixel.R == pixel.B && pixel.G <= 2 && Math.Abs(pixel.R - 233) <= 1), Is.True,
+                    "The 8-bit target must apply the independent native display transfer while retaining equal red/blue and no green.");
+            });
         }
         finally { graphics.Release(); }
     }

@@ -26,6 +26,7 @@ public sealed class VfxPreviewComponent(IVfxPreviewFactory factory, IDeviceResol
     private (float Time, float Duration, bool Loaded, bool Playing, bool Scrubbing, bool Loop)? _playbackState;
     public Func<Matrix> Attachment { get; set; } = () => Matrix.Identity;
     public Func<float, Matrix>? AttachmentAtTime { get; set; }
+    public Func<float, float?>? NextAttachmentSample { get; set; }
     public float CurrentTime => _time;
     public bool EnableContinuousTrailPreview { get; set; }
     public bool IsContinuousTrailPreview => EnableContinuousTrailPreview && Loop && _attachmentMoved
@@ -75,6 +76,7 @@ public sealed class VfxPreviewComponent(IVfxPreviewFactory factory, IDeviceResol
             {
                 var snapshot = _pending; _pending = null;
                 _preview ??= factory.Create(devices.Device);
+                _preview.EnableInteractivePrewarm();
                 _preview.Reload(snapshot);
                 Diagnostics = _preview.Diagnostics;
                 _time = 0;
@@ -85,6 +87,16 @@ public sealed class VfxPreviewComponent(IVfxPreviewFactory factory, IDeviceResol
                 Reloaded?.Invoke();
             }
             if (_preview == null) { PublishPlaybackChanged(); return; }
+            var wasPreparing = _preview.IsPreparing;
+            var previousBounds = _preview.PreviewBounds;
+            if (wasPreparing && !_hasPreviousAttachment) PreparingFrame?.Invoke(_time, false);
+            _preview.PrepareInteractiveFrame(Attachment(), AttachmentAtTime);
+            if (_preview.IsPreparing) { PublishPlaybackChanged(); return; }
+            if (wasPreparing || previousBounds != _preview.PreviewBounds)
+            {
+                Diagnostics = _preview.Diagnostics;
+                Reloaded?.Invoke();
+            }
             var duration = _preview.CycleDuration;
             var requested = _pendingSeek; _pendingSeek = null;
             var attachment = Attachment();
@@ -92,7 +104,7 @@ public sealed class VfxPreviewComponent(IVfxPreviewFactory factory, IDeviceResol
             var continuous = IsContinuousTrailPreview;
             var clampedToAuthoredEnd = !continuous && _time > duration;
             if (clampedToAuthoredEnd) _time = Math.Max(0, duration);
-            var seconds = Math.Max((float)gameTime.ElapsedGameTime.TotalSeconds, 0);
+            var seconds = wasPreparing ? 0 : Math.Max((float)gameTime.ElapsedGameTime.TotalSeconds, 0);
             var advancing = requested == null && IsPlaying && !IsScrubbing && seconds > 0;
             var elapsed = advancing ? continuous ? seconds : Math.Min(seconds, Math.Max(0, duration - _time)) : 0;
             _time = requested is { } target ? Math.Clamp(target, 0, Math.Max(0, Duration)) : _time + elapsed;
@@ -130,7 +142,11 @@ public sealed class VfxPreviewComponent(IVfxPreviewFactory factory, IDeviceResol
     {
         PreparingFrame?.Invoke(_time, explicitSeek);
         var attachment = Attachment();
-        if (IsContinuousTrailPreview) _preview?.SeekContinuousTrail(_time, attachment, AttachmentAtTime);
+        if (IsContinuousTrailPreview)
+        {
+            if (NextAttachmentSample is { } nextSample) _preview?.SeekContinuousTrail(_time, attachment, AttachmentAtTime, nextSample);
+            else _preview?.SeekContinuousTrail(_time, attachment, AttachmentAtTime);
+        }
         else if (AttachmentAtTime is { } sample) _preview?.Seek(_time, attachment, sample, useCurrentAttachmentForFrame: true);
         else _preview?.Seek(_time, attachment);
     }

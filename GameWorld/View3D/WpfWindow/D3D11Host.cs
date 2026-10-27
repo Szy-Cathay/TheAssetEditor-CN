@@ -1,4 +1,4 @@
-﻿using GameWorld.Core.WpfWindow.Internals;
+using GameWorld.Core.WpfWindow.Internals;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using SharpDX.Direct3D11;
@@ -33,6 +33,8 @@ namespace GameWorld.Core.WpfWindow
         private D3D11Image _d3D11Image;
         private bool _disposed;
         private TimeSpan _lastRenderingTime;
+        private bool _suspendWhenHidden, _renderingSuspended;
+        private D3D11HostFrameDiagnostics? _frameDiagnostics;
         private bool _loaded, GraphicsDeviceInitialized;
 
         /// <summary>
@@ -63,6 +65,7 @@ namespace GameWorld.Core.WpfWindow
             Stretch = Stretch.Fill;
 
             Loaded += OnLoaded;
+            IsVisibleChanged += OnIsVisibleChanged;
         }
 
         /// <summary>
@@ -106,6 +109,27 @@ namespace GameWorld.Core.WpfWindow
         /// WPF CompositionTarget.Rendering will drive rendering at the display's refresh rate.
         /// </summary>
         public TimeSpan TargetElapsedTime { get; set; } = TimeSpan.FromTicks(1); // Sync with screen refresh rate
+
+        // Opt in only for scenes whose hidden playback must remain paused.
+        public bool SuspendWhenHidden
+        {
+            get => _suspendWhenHidden;
+            set
+            {
+                if (_suspendWhenHidden == value) return;
+                _suspendWhenHidden = value;
+                _renderingSuspended = value && !IsVisible;
+#if DEBUG
+                if (value)
+                    _frameDiagnostics ??= D3D11HostFrameDiagnostics.TryCreate(_suspendWhenHidden, this);
+                else
+                {
+                    _frameDiagnostics?.Dispose();
+                    _frameDiagnostics = null;
+                }
+#endif
+            }
+        }
 
         /// <summary>
         /// Gets a value indicating whether the controls runs in the context of a designer (e.g.
@@ -199,6 +223,8 @@ namespace GameWorld.Core.WpfWindow
 
         public void Dispose()
         {
+            _frameDiagnostics?.Dispose();
+            _frameDiagnostics = null;
             // each of those has its own check for disposed
             StopRendering();
             UnitializeImageSource();
@@ -408,8 +434,14 @@ namespace GameWorld.Core.WpfWindow
             }
             else
             {
+                if (SuspendWhenHidden) _renderingSuspended = true;
                 StopRendering();
             }
+        }
+
+        private void OnIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs eventArgs)
+        {
+            if (SuspendWhenHidden && !(bool)eventArgs.NewValue) _renderingSuspended = true;
         }
 
         public void ForceEnsureCreated()
@@ -535,72 +567,130 @@ namespace GameWorld.Core.WpfWindow
 
         private void OnRendering(object sender, EventArgs eventArgs)
         {
-            if (!_isRendering)
-                return;
-
-            if (_toBeDisposedNextFrame.Count > 0)
+            var diagnostics = _frameDiagnostics;
+            if (diagnostics != null && !diagnostics.IsCollecting)
             {
-                DisposeRenderTargetsFromPreviousFrames();
+                _frameDiagnostics = null;
+                diagnostics = null;
             }
-
-            // Recreate back buffer if necessary.
-            if (_resetBackBuffer || _dpiChanged)
+            var sample = default(D3D11FrameTiming);
+            diagnostics?.BeginCallback(ref sample);
+            if (diagnostics != null)
             {
-                CreateBackBuffer();
-                _dpiChanged = false;
+                sample.CompositionTicks = (eventArgs as RenderingEventArgs)?.RenderingTime.Ticks ?? 0;
+                sample.PreviousCompositionTicks = _lastRenderingTime.Ticks;
+                sample.IsRendering = _isRendering; sample.IsVisible = IsVisible; sample.WasSuspended = _renderingSuspended;
+                sample.PendingResize = _resetBackBuffer; sample.PendingDpi = _dpiChanged;
+                sample.ActualWidth = ActualWidth; sample.ActualHeight = ActualHeight; sample.DpiScale = DpiScalingFactor;
+                sample.WidthBefore = _cachedRenderTarget?.Width ?? 0; sample.HeightBefore = _cachedRenderTarget?.Height ?? 0;
             }
-
-            // CompositionTarget.Rendering event may be raised multiple times per frame
-            // (e.g. during window resizing).
-            // this will be apparent when the last rendering time equals the new argument
-            var renderingEventArgs = (RenderingEventArgs)eventArgs;
-            if (_lastRenderingTime != renderingEventArgs.RenderingTime)
-            {
-                // get time since last actual rendering
-
-                var deltaTicks = renderingEventArgs.RenderingTime.Ticks - _lastRenderingTime.Ticks;
-                // accumulate until time is greater than target time between frames
-                if (deltaTicks >= TargetElapsedTime.Ticks)
-                {
-                    // enough time has passed to draw a single frame
-                    // draw into cache
-                    GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
-                    Render(new GameTime(renderingEventArgs.RenderingTime, TimeSpan.FromTicks(deltaTicks)));
-
-                    _lastRenderingTime = renderingEventArgs.RenderingTime;
-                }
-            }
-            else if (_resetBackBuffer)
-            {
-                // always force render when backbuffer is reset (happens during resize due to size change)
-                // if we don't always render it will remain black until next frame is drawn
-                // draw into cache
-                GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
-                Render(new GameTime(renderingEventArgs.RenderingTime, TimeSpan.Zero));
-            }
-
-            _d3D11Image.Lock();
             try
             {
-                // poor man's swap chain implementation
-                // now draw from cache to backbuffer
-                GraphicsDevice.SetRenderTarget(_sharedRenderTarget);
-                _spriteBatch.Begin();
-                _spriteBatch.Draw(_cachedRenderTarget, GraphicsDevice.Viewport.Bounds, Color.White);
-                _spriteBatch.End();
-                GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
-                // Wait for the blit without copying a GPU texture back to the CPU.
-                _presentationContext.End(_presentationQuery);
-                GraphicsDevice.Flush();
-                while (!_presentationContext.IsDataAvailable(_presentationQuery, AsynchronousFlags.DoNotFlush))
-                    Thread.Yield();
-                _d3D11Image.MarkDirty();
+                if (!_isRendering)
+                    return;
+
+                var renderingEventArgs = (RenderingEventArgs)eventArgs;
+                if (!PrepareRenderingTime(renderingEventArgs.RenderingTime, IsVisible, out var frameTime))
+                {
+                    sample.HiddenSkipped = true;
+                    return;
+                }
+
+                if (_toBeDisposedNextFrame.Count > 0)
+                {
+                    diagnostics?.StartPhase(ref sample, D3D11FramePhase.DisposeTargets);
+                    DisposeRenderTargetsFromPreviousFrames();
+                    diagnostics?.EndPhase(ref sample, D3D11FramePhase.DisposeTargets);
+                }
+
+                // Recreate back buffer if necessary.
+                if (_resetBackBuffer || _dpiChanged)
+                {
+                    diagnostics?.StartPhase(ref sample, D3D11FramePhase.Rebuild);
+                    CreateBackBuffer();
+                    _dpiChanged = false;
+                    diagnostics?.EndPhase(ref sample, D3D11FramePhase.Rebuild);
+                }
+
+                if (frameTime != null)
+                {
+                    diagnostics?.StartPhase(ref sample, D3D11FramePhase.Render);
+                    GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
+                    Render(frameTime);
+                    diagnostics?.EndPhase(ref sample, D3D11FramePhase.Render);
+                    sample.ElapsedGameTimeTicks = frameTime.ElapsedGameTime.Ticks;
+                    _lastRenderingTime = renderingEventArgs.RenderingTime;
+                    _renderingSuspended = false;
+                }
+
+                sample.PresentAttempts++;
+                diagnostics?.StartPhase(ref sample, D3D11FramePhase.Lock);
+                _d3D11Image.Lock();
+                diagnostics?.EndPhase(ref sample, D3D11FramePhase.Lock);
+                try
+                {
+                    diagnostics?.StartPhase(ref sample, D3D11FramePhase.Blit);
+                    // poor man's swap chain implementation
+                    // now draw from cache to backbuffer
+                    GraphicsDevice.SetRenderTarget(_sharedRenderTarget);
+                    _spriteBatch.Begin();
+                    _spriteBatch.Draw(_cachedRenderTarget, GraphicsDevice.Viewport.Bounds, Color.White);
+                    _spriteBatch.End();
+                    GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
+                    // Wait for the blit without copying a GPU texture back to the CPU.
+                    _presentationContext.End(_presentationQuery);
+                    diagnostics?.EndPhase(ref sample, D3D11FramePhase.Blit);
+                    diagnostics?.StartPhase(ref sample, D3D11FramePhase.Flush);
+                    GraphicsDevice.Flush();
+                    diagnostics?.EndPhase(ref sample, D3D11FramePhase.Flush);
+                    diagnostics?.StartPhase(ref sample, D3D11FramePhase.QueryWait);
+                    while (!_presentationContext.IsDataAvailable(_presentationQuery, AsynchronousFlags.DoNotFlush))
+                    {
+                        if (diagnostics != null) sample.QueryPolls++;
+                        Thread.Yield();
+                    }
+                    diagnostics?.EndPhase(ref sample, D3D11FramePhase.QueryWait);
+                    _d3D11Image.MarkDirty();
+                    sample.PresentCalls++;
+                }
+                finally
+                {
+                    diagnostics?.StartPhase(ref sample, D3D11FramePhase.Unlock);
+                    _d3D11Image.Unlock();
+                    diagnostics?.EndPhase(ref sample, D3D11FramePhase.Unlock);
+                }
+                _resetBackBuffer = false;
             }
+            catch { sample.Faulted = true; throw; }
             finally
             {
-                _d3D11Image.Unlock();
+                if (diagnostics != null)
+                {
+                    sample.Width = _cachedRenderTarget?.Width ?? 0; sample.Height = _cachedRenderTarget?.Height ?? 0;
+                    diagnostics.EndCallback(ref sample);
+                }
             }
-            _resetBackBuffer = false;
+        }
+
+        private bool PrepareRenderingTime(TimeSpan now, bool isVisible, out GameTime? frameTime)
+        {
+            frameTime = null;
+            if (SuspendWhenHidden && !isVisible)
+            {
+                _lastRenderingTime = now;
+                _renderingSuspended = true;
+                return false;
+            }
+            if (_renderingSuspended)
+                frameTime = new GameTime(now, TimeSpan.Zero);
+            else if (_lastRenderingTime != now)
+            {
+                var delta = now - _lastRenderingTime;
+                if (delta >= TargetElapsedTime) frameTime = new GameTime(now, delta);
+            }
+            else if (_resetBackBuffer)
+                frameTime = new GameTime(now, TimeSpan.Zero);
+            return true;
         }
 
         private void DisposeRenderTargetsFromPreviousFrames()

@@ -70,6 +70,7 @@ Asset Editor 国区版是一款运行在 Windows 上的《全面战争》系列�
 | Kitbash 与 3D 视图强化 | 增加 Blender 风格视图操作、导航 Gizmo、选择和变换体验，并强化顶点、边、面、对象模式及选择覆盖层 |
 | 三维渲染强化 | 增加材质预览、实体和线框模式，统一灯光、背景、网格、背面显示和阵营着色设置 |
 | 超级视图强化 | 同时处理持久 META 和动画 META，显示战斗标记、Prop 和时间范围，并支持部分 META 的三维移动、旋转、撤销与重做 |
+| VFX 编辑与场内预览 | 编辑原始特效 XML 与引用组合，直接进入三维场景，支持单独或组合查看、公共播放器、挂点拖动和连续 trail 预览；超级视图可同时预览多条 Effect。游戏材质、空间与合成仍有受限适配，详见 [VFX 文档](docs/vfx-editor.md) |
 | 音频工作流强化 | 改进音频浏览、波形时间线、筛选、试听、编译、转换、合并、导出和错误反馈 |
 | 生成与更新安全 | 文件夹工程生成 Pack 时仅为《全面战争：战锤 3》的 PFH5 输出启用 ZSTD；更新流程保留校验、事务安装、备份与失败回滚 |
 | 外部工具联动 | 通过当前 Windows 用户专用的命名管道，让外部工具请求打开指定 Pack 资源或复用已有 Kitbash 页面 |
@@ -88,6 +89,7 @@ Asset Editor 国区版是一款运行在 Windows 上的《全面战争》系列�
 | [`docs/architecture.md`](docs/architecture.md) | 总体架构、模块职责、依赖注入和验证入口 |
 | [`docs/kitbash-editor.md`](docs/kitbash-editor.md) | Kitbash 模型编辑、选择、变换、渲染和保存架构 |
 | [`docs/superview.md`](docs/superview.md) | 超级视图、双 META 文档、预览和三维编辑架构 |
+| [`docs/vfx-editor.md`](docs/vfx-editor.md) | VFX 编辑、引用范围、连续 trail、共享渲染语义、已知限制及验证门禁 |
 | [`docs/ui-design-system.md`](docs/ui-design-system.md) | 国区版 WPF 界面设计系统与公共组件规则 |
 | [`docs/folder-project-version-control.md`](docs/folder-project-version-control.md) | 文件夹工程、本地 Git、路径安全和大型工程约束 |
 | [`docs/asseteditor-ipc.md`](docs/asseteditor-ipc.md) | 外部工具打开资源时使用的 IPC 协议 |

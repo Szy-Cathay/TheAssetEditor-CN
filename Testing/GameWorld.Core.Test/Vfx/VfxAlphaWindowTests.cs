@@ -45,13 +45,15 @@ public class VfxAlphaWindowTests
         Assert.That(result.Emitters, Has.Count.EqualTo(1));
         var simulation = new TotalWarVfxSimulation(result); simulation.Seek(phase * 2, Matrix.Identity);
         var camera = new CommonShaderParameters(Matrix.Identity, Matrix.Identity, new(0, 0, 10), Vector3.Zero, 0, 0, 0, 1, Vector3.One, []);
-        var particle = simulation.ProjectedFrame(camera).Single().Render;
+        // Inspect the authored curve before the separately asserted native render gate.
+        var particle = simulation.ProjectedFrame(camera with { VfxLowOpacityCulling = -1 }).Single().Render;
         Assert.Multiple(() =>
         {
             Assert.That(particle.Colour.W, Is.EqualTo(expected).Within(.00001f));
             Assert.That(particle.AppearancePhase, Is.EqualTo(phase).Within(.00001f));
             Assert.That(result.Diagnostics.Any(d => d.Field is "alpha_START_offset" or "alpha_END_offset"), Is.False);
             Assert.That(VfxDocument.Read(bytes).Write(), Is.EqualTo(bytes));
+            if (expected == 0) Assert.That(simulation.ProjectedFrame(camera), Is.Empty);
         });
     }
 }

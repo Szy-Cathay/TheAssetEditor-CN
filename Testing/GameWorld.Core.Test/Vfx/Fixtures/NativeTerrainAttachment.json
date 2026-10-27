@@ -1,0 +1,128 @@
+{
+  "Source": "Actual unchanged official ordinary spawn orientation6be290 and scale6bdf80 execution; fixed-angle diagnostic derived from official frost trail, not complete original visual acceptance.",
+  "WarscapeSha256": "c75d40a30ce938958f445ae59eb256e4c23f51201984d1f3ea5cb25319f763b8",
+  "Contract": "Terrain-normal orientation ignores root yaw/tilt and uses flat up; scale multiplier remains nodeScale*controllerScale. Position projection is separately instruction-proved, not executed by this fixture.",
+  "Cases": [
+    {
+      "Name": "identity",
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "RootScale": 1,
+      "ParticleAngles": [
+        90,
+        37,
+        0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ],
+      "NativeScaleFactorFloatBits": 1065353216
+    },
+    {
+      "Name": "tilt-x60",
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "RootScale": 1,
+      "ParticleAngles": [
+        90,
+        37,
+        0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ],
+      "NativeScaleFactorFloatBits": 1065353216
+    },
+    {
+      "Name": "yaw90",
+      "RootQuaternion": [
+        0.0,
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "RootScale": 1,
+      "ParticleAngles": [
+        90,
+        37,
+        0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ],
+      "NativeScaleFactorFloatBits": 1065353216
+    },
+    {
+      "Name": "scale2p5",
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "RootScale": 2.5,
+      "ParticleAngles": [
+        90,
+        37,
+        0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ],
+      "NativeScaleFactorFloatBits": 1075838976
+    },
+    {
+      "Name": "tilt-yaw-scale2p5",
+      "RootQuaternion": [
+        0.3535533845424652,
+        0.6123724579811096,
+        0.3535533845424652,
+        0.6123724579811096
+      ],
+      "RootScale": 2.5,
+      "ParticleAngles": [
+        90,
+        37,
+        0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ],
+      "NativeScaleFactorFloatBits": 1075838976
+    }
+  ],
+  "ScaleHelperDisassembly": [
+    "00000001806bdf80 488b4118                 mov      rax, qword ptr [rcx + 0x18]",
+    "00000001806bdf84 f30f104034               movss    xmm0, dword ptr [rax + 0x34]",
+    "00000001806bdf89 f30f598184000000         mulss    xmm0, dword ptr [rcx + 0x84]",
+    "00000001806bdf91 c3                       ret      "
+  ],
+  "ScaleUploadDisassembly": [
+    "00000001806bf6db f30f114330               movss    dword ptr [rbx + 0x30], xmm0",
+    "00000001806bf6e0 e89be8ffff               call     0x1806bdf80",
+    "00000001806bf6e5 f30f114334               movss    dword ptr [rbx + 0x34], xmm0"
+  ]
+}

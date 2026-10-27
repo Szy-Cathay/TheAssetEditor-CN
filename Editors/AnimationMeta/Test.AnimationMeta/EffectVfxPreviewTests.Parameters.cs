@@ -214,7 +214,10 @@ public partial class EffectVfxPreviewTests
             instance.IsEnabled = true; instance.Update(1.5f);
             Assert.That(marker.IsVisible, Is.True);
             instance.Update(9.5f);
-            Assert.That(marker.IsVisible, Is.False, "The default eight-second runtime tail has already ended.");
+            Assert.That(marker.IsVisible, Is.True, "The runtime still reports live content beyond the eight-second display estimate.");
+            factory.Created.Single().Drained = true;
+            instance.Update(9.5f);
+            Assert.That(marker.IsVisible, Is.False, "Actual runtime drain ends the tail.");
             instance.ShowForEntireAnimation = true; instance.Update(9.5f);
             Assert.That(marker.IsVisible, Is.True); Assert.That(instance.ShowForEntireAnimation, Is.True);
             instance.ShowForEntireAnimation = false; instance.Update(9.5f);

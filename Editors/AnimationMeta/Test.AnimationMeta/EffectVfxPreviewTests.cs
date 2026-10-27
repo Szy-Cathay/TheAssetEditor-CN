@@ -434,6 +434,8 @@ public partial class EffectVfxPreviewTests
         public int EmitterCount => 1;
         public int TotalEmitterCount => 1;
         public int ParticleCount => 1;
+        public bool IsDrained => Drained;
+        public bool Drained;
         public int Reloads;
         public int Draws;
         public VfxPreviewSnapshot? Snapshot;

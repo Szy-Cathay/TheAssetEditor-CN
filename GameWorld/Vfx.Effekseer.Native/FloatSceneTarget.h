@@ -1,4 +1,5 @@
 #pragma once
+#include "CompiledFloatSceneShaders.h"
 
 // UNORM targets clamp shader RGB before SRC_ALPHA blending. Keep thin HDR particle colour until composition finishes.
 class FloatSceneTarget
@@ -37,117 +38,14 @@ class FloatSceneTarget
     {
         if (!vertex_)
         {
-            const char* vs = "float4 main(uint i:SV_VertexID):SV_Position { float2 p=float2((i<<1)&2,i&2); return float4(p*float2(2,-2)+float2(-1,1),0,1); }";
-            // Shipped hdr_to_screen transfer and separable default LUT, applied after particle blending.
-            const std::string transfer = R"(
-                cbuffer Display : register(b0) { float4 display; float4 mode; float4 bloom; }
-                Texture2D<float4> halo : register(t2);
-                SamplerState linearClamp : register(s0);
-                static const float lut[32] = { 0,8,16,24,33,41,49,57,65,73,82,91,99,107,115,123,
-                    132,140,148,156,164,173,182,190,198,206,214,222,231,239,247,255 };
-                float3 ToSrgb(float3 c) { return lerp(12.92*c, 1.055*pow(max(c,0),1/2.4)-.055, step(.0031308,c)); }
-                float3 FromSrgb(float3 c) { return lerp(c/12.92, pow((c+.055)/1.055,2.4), step(.04045,c)); }
-                float WhiteReciprocal() { return display.z == 0 ? 0 : 1 / (1 / display.z - .999); }
-                float Lookup(float c)
-                {
-                    float p = clamp(c*32-.5,0,31); uint i = (uint)p;
-                    return lerp(lut[i], lut[min(i+1,31)], p-i) / 255;
-                }
-                float InverseLookup(float c)
-                {
-                    if (c <= 0 || c >= 1) return saturate(c);
-                    float value = c*255;
-                    [unroll] for (uint i=0;i<31;i++)
-                        if (value <= lut[i+1]) return (i+.5+(value-lut[i])/(lut[i+1]-lut[i]))/32;
-                    return 1;
-                }
-                float3 Encode(float3 rgb)
-                {
-                    rgb = max(rgb,0);
-                    float exposure = display.y*display.y;
-                    float x = dot(rgb,float3(.2126,.7152,.0722))*exposure;
-                    float3 encoded = pow(saturate(rgb*exposure*(1+x*WhiteReciprocal())/(1+x)),1/2.2);
-                    if (display.w != 0) encoded = (1 + display.w) * (encoded - .5) + .5;
-                    return float3(Lookup(encoded.r),Lookup(encoded.g),Lookup(encoded.b));
-                }
-                float3 Decode(float3 encoded)
-                {
-                    float3 corrected = float3(InverseLookup(encoded.r),InverseLookup(encoded.g),InverseLookup(encoded.b));
-                    if (display.w != 0) corrected = max((corrected - .5) / (1 + display.w) + .5, 0);
-                    float3 c = pow(corrected,2.2);
-                    float y = dot(c,float3(.2126,.7152,.0722)), w = WhiteReciprocal();
-                    float x = w > 0 ? 2*y/max(sqrt((1-y)*(1-y)+4*w*y)+1-y,1e-8) : y/max(1-y,1e-6);
-                    return c*(x/max(y,1e-8))/(display.y*display.y);
-                }
-                float3 BackgroundRadiance(float4 background)
-                {
-                    return Decode(mode.y > .5 ? ToSrgb(background.rgb) : background.rgb);
-                }
-                float3 Bright(float3 colour)
-                {
-                    colour = max(colour,0);
-                    return colour * saturate(dot(colour,float3(.2126,.7152,.0722))-max(bloom.x,0)) * bloom.y;
-                }
-                float4 Extract(float4 value, float4 background)
-                {
-                    // Only the VFX increment blooms; the existing model/grid display is not a new light source.
-                    float3 before = f16tof32(f32tof16(BackgroundRadiance(background)));
-                    return float4(max(Bright(value.rgb)-Bright(before),0),0);
-                }
-                float4 Transfer(float4 value, float4 background, float2 uv)
-                {
-                    if (display.x < .5) return value;
-                    float3 linearBackground = BackgroundRadiance(background);
-                    if (mode.x < .5) return float4(linearBackground,background.a);
-                    float3 glow = bloom.y > 0 ? halo.SampleLevel(linearClamp,uv,0).rgb : 0;
-                    // Preserve untouched display pixels exactly, including prior PBR tonemapping and alpha.
-                    if (all(glow == 0) && all(value.rgb == f16tof32(f32tof16(linearBackground))) && value.a == f16tof32(f32tof16(background.a)))
-                        return background;
-                    float3 encoded = Encode(value.rgb + glow);
-                    return float4(mode.y > .5 ? FromSrgb(encoded) : encoded,value.a);
-                }
-            )";
-            const auto ps = transfer + "Texture2D<float4> source:register(t0), background:register(t1); float4 main(float4 p:SV_Position):SV_Target { int3 q=int3(int2(p.xy),0); return Transfer(source.Load(q),background.Load(q),p.xy*bloom.zw); }";
-            const auto ms = transfer + "Texture2DMS<float4> source:register(t0), background:register(t1); float4 main(float4 p:SV_Position,uint sample:SV_SampleIndex):SV_Target { int2 q=int2(p.xy); return Transfer(source.Load(q,sample),background.Load(q,sample),p.xy*bloom.zw); }";
-            const auto extract = transfer + "Texture2D<float4> source:register(t0), background:register(t1); float4 main(float4 p:SV_Position):SV_Target { int3 q=int3(int2(p.xy),0); return Extract(source.Load(q),background.Load(q)); }";
-            const auto extractMS = transfer + R"(
-                Texture2DMS<float4> source:register(t0), background:register(t1);
-                float4 main(float4 p:SV_Position):SV_Target {
-                    uint width,height,samples; source.GetDimensions(width,height,samples);
-                    float4 result=0;
-                    for(uint i=0;i<samples;i++) result += Extract(source.Load(int2(p.xy),i),background.Load(int2(p.xy),i));
-                    return result/samples;
-                })";
-            const std::string filter = R"(
-                cbuffer Display : register(b0) { float4 display; float4 mode; float4 bloom; }
-                Texture2D<float4> inputA:register(t0), inputB:register(t1);
-                SamplerState linearClamp:register(s0);
-            )";
-            const auto downsample = filter + "float4 main(float4 p:SV_Position):SV_Target { return inputA.SampleLevel(linearClamp,p.xy*bloom.zw,0); }";
-            const auto upsample = filter + "float4 main(float4 p:SV_Position):SV_Target { float2 uv=p.xy*bloom.zw; return inputA.SampleLevel(linearClamp,uv,0)+inputB.SampleLevel(linearClamp,uv,0); }";
-            const auto blur = filter + R"(
-                static const float weights[11]={.000003,.000229,.005977,.060598,.241730,.382925,.241730,.060598,.005977,.000229,.000003};
-                float4 main(float4 p:SV_Position):SV_Target {
-                    float4 result=0;
-                    [unroll] for(int i=0;i<11;i++) result += inputA.SampleLevel(linearClamp,p.xy*bloom.zw+(i-5)*mode.zw,0)*weights[i];
-                    return result;
-                })";
-            auto compile = [](const char* sourceCode, const char* profile)
-            {
-                ComPtr<ID3DBlob> code, errors;
-                Check(D3DCompile(sourceCode, std::strlen(sourceCode), "AECN VFX colour transfer", nullptr, nullptr, "main", profile, 0, 0, code.GetAddressOf(), errors.GetAddressOf()));
-                return code;
+            const auto& vertexCode = CompiledFloatSceneShaders[0];
+            Check(device->CreateVertexShader(vertexCode.Data, vertexCode.Size, nullptr, vertex_.GetAddressOf()));
+            auto pixel = [&](size_t index, ComPtr<ID3D11PixelShader>& shader) {
+                const auto& code = CompiledFloatSceneShaders[index];
+                Check(device->CreatePixelShader(code.Data, code.Size, nullptr, shader.GetAddressOf()));
             };
-            static auto vertexCode = compile(vs, "vs_5_0"), singleCode = compile(ps.c_str(), "ps_5_0"), multisampleCode = compile(ms.c_str(), "ps_5_0");
-            Check(device->CreateVertexShader(vertexCode->GetBufferPointer(), vertexCode->GetBufferSize(), nullptr, vertex_.GetAddressOf()));
-            Check(device->CreatePixelShader(singleCode->GetBufferPointer(), singleCode->GetBufferSize(), nullptr, single_.GetAddressOf()));
-            Check(device->CreatePixelShader(multisampleCode->GetBufferPointer(), multisampleCode->GetBufferSize(), nullptr, multisample_.GetAddressOf()));
-            static auto extractCode=compile(extract.c_str(),"ps_5_0"), extractMSCode=compile(extractMS.c_str(),"ps_5_0"),
-                downsampleCode=compile(downsample.c_str(),"ps_5_0"), blurCode=compile(blur.c_str(),"ps_5_0"), upsampleCode=compile(upsample.c_str(),"ps_5_0");
-            auto pixel = [&](const ComPtr<ID3DBlob>& code, ComPtr<ID3D11PixelShader>& shader) {
-                Check(device->CreatePixelShader(code->GetBufferPointer(),code->GetBufferSize(),nullptr,shader.GetAddressOf()));
-            };
-            pixel(extractCode,extract_); pixel(extractMSCode,extractMultisample_); pixel(downsampleCode,downsample_); pixel(blurCode,blur_); pixel(upsampleCode,upsample_);
+            pixel(1, single_); pixel(2, multisample_); pixel(3, extract_); pixel(4, extractMultisample_);
+            pixel(5, downsample_); pixel(6, blur_); pixel(7, upsample_);
             D3D11_SAMPLER_DESC sampler{}; sampler.Filter=D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
             sampler.AddressU=sampler.AddressV=sampler.AddressW=D3D11_TEXTURE_ADDRESS_CLAMP; sampler.MaxLOD=D3D11_FLOAT32_MAX;
             Check(device->CreateSamplerState(&sampler,linearClamp_.GetAddressOf()));
@@ -231,6 +129,48 @@ class FloatSceneTarget
         return source;
     }
 
+    class OutputState
+    {
+        ID3D11DeviceContext* context_;
+        std::array<ComPtr<ID3D11RenderTargetView>, D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT> targets_;
+        std::array<ComPtr<ID3D11UnorderedAccessView>, D3D11_PS_CS_UAV_REGISTER_COUNT> unordered_;
+        ComPtr<ID3D11DepthStencilView> depth_;
+        UINT targetCount_ = 0;
+        bool active_ = true;
+    public:
+        explicit OutputState(ID3D11DeviceContext* context) : context_(context)
+        {
+            ID3D11RenderTargetView* targets[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT]{};
+            context->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, targets, depth_.GetAddressOf());
+            for (UINT index = 0; index < targets_.size(); ++index)
+            {
+                targets_[index].Attach(targets[index]);
+                if (targets[index]) targetCount_ = index + 1;
+            }
+            ID3D11UnorderedAccessView* unordered[D3D11_PS_CS_UAV_REGISTER_COUNT]{};
+            context->OMGetRenderTargetsAndUnorderedAccessViews(0, nullptr, nullptr, 0, D3D11_PS_CS_UAV_REGISTER_COUNT, unordered);
+            for (size_t index = 0; index < unordered_.size(); ++index) unordered_[index].Attach(unordered[index]);
+        }
+        OutputState(const OutputState&) = delete;
+        ~OutputState() { Restore(); }
+        void Restore()
+        {
+            if (!active_) return;
+            ID3D11RenderTargetView* targets[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT]{};
+            for (size_t index = 0; index < targets_.size(); ++index) targets[index] = targets_[index].Get();
+            ID3D11UnorderedAccessView* unordered[D3D11_PS_CS_UAV_REGISTER_COUNT]{};
+            UINT counters[D3D11_PS_CS_UAV_REGISTER_COUNT];
+            std::fill_n(counters, D3D11_PS_CS_UAV_REGISTER_COUNT, static_cast<UINT>(-1));
+            for (size_t index = 0; index < unordered_.size(); ++index) unordered[index] = unordered_[index].Get();
+            if (targetCount_ == D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT)
+                context_->OMSetRenderTargets(targetCount_, targets, depth_.Get());
+            else
+                context_->OMSetRenderTargetsAndUnorderedAccessViews(targetCount_, targets, depth_.Get(), targetCount_,
+                    D3D11_PS_CS_UAV_REGISTER_COUNT - targetCount_, unordered + targetCount_, counters + targetCount_);
+            active_ = false;
+        }
+    };
+
     void Copy(ID3D11DeviceContext* context, ID3D11RenderTargetView* target, ID3D11ShaderResourceView* source, bool finish)
     {
         ComPtr<ID3D11VertexShader> vs; ComPtr<ID3D11PixelShader> ps; ComPtr<ID3D11GeometryShader> gs;
@@ -245,33 +185,42 @@ class FloatSceneTarget
         ComPtr<ID3D11ShaderResourceView> texture, background, halo; context->PSGetShaderResources(0, 1, texture.GetAddressOf()); context->PSGetShaderResources(1, 1, background.GetAddressOf()); context->PSGetShaderResources(2,1,halo.GetAddressOf());
         ComPtr<ID3D11SamplerState> sampler; context->PSGetSamplers(0,1,sampler.GetAddressOf());
         ComPtr<ID3D11Buffer> constants; context->PSGetConstantBuffers(0, 1, constants.GetAddressOf());
-        ID3D11RenderTargetView* targets[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT]{}; ComPtr<ID3D11DepthStencilView> depthTarget;
-        context->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, targets, depthTarget.GetAddressOf());
+        OutputState outputs(context);
         D3D11_VIEWPORT viewports[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE]{}; UINT viewportCount = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
         context->RSGetViewports(&viewportCount, viewports);
-        D3D11_VIEWPORT viewport{0,0,static_cast<float>(description_.Width),static_cast<float>(description_.Height),0,1};
-        context->OMSetRenderTargets(1, &target, nullptr); context->RSSetViewports(1, &viewport);
-        context->OMSetBlendState(replace_.Get(), nullptr, 0xFFFFFFFF); context->OMSetDepthStencilState(noDepth_.Get(), 0); context->RSSetState(raster_.Get());
-        context->IASetInputLayout(nullptr); context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        context->VSSetShader(vertex_.Get(), nullptr, 0); context->GSSetShader(nullptr, nullptr, 0);
-        auto linearSampler=linearClamp_.Get(); context->PSSetSamplers(0,1,&linearSampler);
-        auto glow=finish ? Bloom(context) : nullptr;
-        context->OMSetRenderTargets(1,&target,nullptr); context->RSSetViewports(1,&viewport);
-        context->PSSetShader(description_.SampleDesc.Count > 1 ? multisample_.Get() : single_.Get(), nullptr, 0);
-        Constants(context,description_.Width,description_.Height,finish);
-        ID3D11ShaderResourceView* inputs[]{source,sourceView_.Get(),glow}; context->PSSetShaderResources(0, 3, inputs); context->Draw(3, 0);
-        ID3D11ShaderResourceView* empty[3]{}; context->PSSetShaderResources(0, 3, empty);
-        context->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, targets, depthTarget.Get());
-        for (auto targetView : targets) if (targetView) targetView->Release();
-        ID3D11ShaderResourceView* previousTextures[]{texture.Get(),background.Get(),halo.Get()}; context->PSSetShaderResources(0, 3, previousTextures);
-        auto previousSampler=sampler.Get(); context->PSSetSamplers(0,1,&previousSampler);
-        auto previousConstants = constants.Get(); context->PSSetConstantBuffers(0, 1, &previousConstants);
-        context->VSSetShader(vs.Get(), vsClasses, vsCount); context->PSSetShader(ps.Get(), psClasses, psCount); context->GSSetShader(gs.Get(), gsClasses, gsCount);
-        for (UINT i = 0; i < vsCount; ++i) if (vsClasses[i]) vsClasses[i]->Release();
-        for (UINT i = 0; i < psCount; ++i) if (psClasses[i]) psClasses[i]->Release();
-        for (UINT i = 0; i < gsCount; ++i) if (gsClasses[i]) gsClasses[i]->Release();
-        context->IASetInputLayout(layout.Get()); context->IASetPrimitiveTopology(topology);
-        context->OMSetBlendState(blend.Get(), factors, mask); context->OMSetDepthStencilState(depth.Get(), stencil); context->RSSetState(raster.Get()); context->RSSetViewports(viewportCount, viewports);
+        const auto restore = [&]()
+        {
+            ID3D11ShaderResourceView* empty[3]{}; context->PSSetShaderResources(0, 3, empty);
+            outputs.Restore();
+            ID3D11ShaderResourceView* previousTextures[]{texture.Get(),background.Get(),halo.Get()}; context->PSSetShaderResources(0, 3, previousTextures);
+            auto previousSampler=sampler.Get(); context->PSSetSamplers(0,1,&previousSampler);
+            auto previousConstants = constants.Get(); context->PSSetConstantBuffers(0, 1, &previousConstants);
+            context->VSSetShader(vs.Get(), vsClasses, vsCount); context->PSSetShader(ps.Get(), psClasses, psCount); context->GSSetShader(gs.Get(), gsClasses, gsCount);
+            for (UINT i = 0; i < vsCount; ++i) if (vsClasses[i]) vsClasses[i]->Release();
+            for (UINT i = 0; i < psCount; ++i) if (psClasses[i]) psClasses[i]->Release();
+            for (UINT i = 0; i < gsCount; ++i) if (gsClasses[i]) gsClasses[i]->Release();
+            context->IASetInputLayout(layout.Get()); context->IASetPrimitiveTopology(topology);
+            context->OMSetBlendState(blend.Get(), factors, mask); context->OMSetDepthStencilState(depth.Get(), stencil); context->RSSetState(raster.Get()); context->RSSetViewports(viewportCount, viewports);
+        };
+        try
+        {
+            D3D11_VIEWPORT viewport{0,0,static_cast<float>(description_.Width),static_cast<float>(description_.Height),0,1};
+            ID3D11UnorderedAccessView* unordered[D3D11_PS_CS_UAV_REGISTER_COUNT]{};
+            context->OMSetRenderTargetsAndUnorderedAccessViews(1, &target, nullptr, 1,
+                D3D11_PS_CS_UAV_REGISTER_COUNT - 1, unordered + 1, nullptr);
+            context->RSSetViewports(1, &viewport);
+            context->OMSetBlendState(replace_.Get(), nullptr, 0xFFFFFFFF); context->OMSetDepthStencilState(noDepth_.Get(), 0); context->RSSetState(raster_.Get());
+            context->IASetInputLayout(nullptr); context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+            context->VSSetShader(vertex_.Get(), nullptr, 0); context->GSSetShader(nullptr, nullptr, 0);
+            auto linearSampler=linearClamp_.Get(); context->PSSetSamplers(0,1,&linearSampler);
+            auto glow=finish ? Bloom(context) : nullptr;
+            context->OMSetRenderTargets(1,&target,nullptr); context->RSSetViewports(1,&viewport);
+            context->PSSetShader(description_.SampleDesc.Count > 1 ? multisample_.Get() : single_.Get(), nullptr, 0);
+            Constants(context,description_.Width,description_.Height,finish);
+            ID3D11ShaderResourceView* inputs[]{source,sourceView_.Get(),glow}; context->PSSetShaderResources(0, 3, inputs); context->Draw(3, 0);
+        }
+        catch (...) { restore(); throw; }
+        restore();
     }
 
 public:
@@ -280,14 +229,12 @@ public:
         FloatSceneTarget& owner_;
         ID3D11DeviceContext* context_;
         ComPtr<ID3D11RenderTargetView> target_;
-        std::array<ComPtr<ID3D11RenderTargetView>, D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT - 1> otherTargets_;
+        std::unique_ptr<OutputState> outputs_;
         ComPtr<ID3D11DepthStencilView> depth_;
 
         void Restore()
         {
-            ID3D11RenderTargetView* targets[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT]{target_.Get()};
-            for (size_t index = 0; index < otherTargets_.size(); ++index) targets[index + 1] = otherTargets_[index].Get();
-            context_->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, targets, depth_.Get()); target_.Reset();
+            outputs_->Restore(); outputs_.reset(); target_.Reset();
         }
 
     public:
@@ -305,14 +252,18 @@ public:
             owner_.Prepare(device, description, view.Format);
             for (size_t i = 0; i < owner_.display_.size(); ++i) owner_.display_[i] = display ? display[i] : 0;
             for (size_t i = 0; i < owner_.bloom_.size(); ++i) owner_.bloom_[i] = bloom ? bloom[i] : 0;
-            ID3D11RenderTargetView* targets[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT]{};
-            context->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, targets, nullptr);
-            if (targets[0]) targets[0]->Release();
-            for (size_t index = 0; index < otherTargets_.size(); ++index) otherTargets_[index].Attach(targets[index + 1]);
-            context->CopyResource(owner_.sourceCopy_.Get(), texture.Get());
-            owner_.Copy(context, owner_.colourTarget_.Get(), owner_.sourceView_.Get(), false);
+            outputs_ = std::make_unique<OutputState>(context);
             target_ = target; depth_ = depth;
-            auto temporary = owner_.colourTarget_.Get(); context->OMSetRenderTargets(1, &temporary, depth.Get());
+            try
+            {
+                context->CopyResource(owner_.sourceCopy_.Get(), texture.Get());
+                owner_.Copy(context, owner_.colourTarget_.Get(), owner_.sourceView_.Get(), false);
+                auto temporary = owner_.colourTarget_.Get();
+                ID3D11UnorderedAccessView* unordered[D3D11_PS_CS_UAV_REGISTER_COUNT]{};
+                context->OMSetRenderTargetsAndUnorderedAccessViews(1, &temporary, depth.Get(), 1,
+                    D3D11_PS_CS_UAV_REGISTER_COUNT - 1, unordered + 1, nullptr);
+            }
+            catch (...) { Restore(); throw; }
         }
         Frame(const Frame&) = delete;
         ~Frame() { if (target_) Restore(); }

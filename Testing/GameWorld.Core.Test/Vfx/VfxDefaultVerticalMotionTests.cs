@@ -72,9 +72,14 @@ public class VfxDefaultVerticalMotionTests
             case "surface-normal": emitter.Add(new XElement("property", new XAttribute("name", "UseSurfaceNormal"), new XAttribute("value", "true"))); break;
         }
         var bytes = document.Write(); var actualConversion = TotalWarVfxConverter.Convert(original with { GameBytes = bytes });
-        var unsupported = control is "rotation" or "wind" or "surface-normal";
+        var unsupported = control is "rotation" or "surface-normal";
         Assert.That(actualConversion.Emitters.Single().ParticleForceCurve, Is.EqualTo(!unsupported));
         Assert.That(actualConversion.Diagnostics.Any(item => item.Field == "ForceA" && item.ReasonKey == "Vfx.Preview.ForceUnsupported"), Is.EqualTo(unsupported));
+        if (control == "wind")
+        {
+            Assert.That(actualConversion.Emitters.Single().ConstantForceDamping, Is.Null);
+            Assert.That(actualConversion.Diagnostics.Any(item => item.Field == "WindVarianceFactor" && item.ReasonKey == "Vfx.Preview.Unmapped"), Is.True);
+        }
         Set("ForceA", Vector(Vector3.Zero));
         var expected = new TotalWarVfxSimulation(TotalWarVfxConverter.Convert(original with { GameBytes = document.Write() })); expected.Seek(.25f, Matrix.Identity);
         var actual = new TotalWarVfxSimulation(actualConversion); actual.Seek(.25f, Matrix.Identity);

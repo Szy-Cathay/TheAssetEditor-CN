@@ -8,18 +8,29 @@ internal static class VfxPreviewBounds
     private static readonly CommonShaderParameters Camera = new(Matrix.Identity, Matrix.Identity,
         new(0, 0, 100), Vector3.Zero, 0, 0, 0, 1, Vector3.One, [], VfxGroundHeight: 0);
 
-    public static BoundingBox? Estimate(VfxConversion conversion)
+    public static BoundingBox? Estimate(VfxConversion conversion, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var simulation = new TotalWarVfxSimulation(conversion);
         var end = Math.Min(8, simulation.CycleDuration);
-        var models = conversion.Models.Select(model => model.AnimationVertices == null
-            ? new[] { BoundingBox.CreateFromPoints(model.Vertices.Select(vertex => vertex.Position)) }
-            : Enumerable.Range(0, model.AnimationFrameCount).Select(frame => BoundingBox.CreateFromPoints(model.AnimationVertices
-                .Skip(frame * model.Vertices.Length).Take(model.Vertices.Length).Select(vertex => vertex.Position))).ToArray()).ToArray();
+        var models = conversion.Models.Select(model =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (model.AnimationVertices == null)
+                return new[] { BoundingBox.CreateFromPoints(model.Vertices.Select(vertex => vertex.Position)) };
+            return Enumerable.Range(0, model.AnimationFrameCount).Select(frame =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return BoundingBox.CreateFromPoints(model.AnimationVertices
+                    .Skip(frame * model.Vertices.Length).Take(model.Vertices.Length).Select(vertex => vertex.Position));
+            }).ToArray();
+        }).ToArray();
         BoundingBox? colour = null, ground = null, fallback = null;
         foreach (var time in new[] { 0f, 1f/120, 1f/60, .033f, .05f, .1f, .2f, .35f, .5f, .75f, 1f, 1.5f, 2f, 3f, 4f, 6f, 8f }.Where(t => t <= end))
         {
-            simulation.Seek(time, Matrix.Identity);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (cancellationToken.CanBeCanceled) simulation.SeekForPreparation(time, Matrix.Identity, cancellationToken);
+            else simulation.Seek(time, Matrix.Identity);
             var bounds = Current(conversion, simulation, models);
             Merge(ref colour, bounds.Colour); Merge(ref ground, bounds.Ground); Merge(ref fallback, bounds.All);
         }
@@ -30,7 +41,7 @@ internal static class VfxPreviewBounds
         VfxConversion conversion, TotalWarVfxSimulation simulation, BoundingBox[][] models)
     {
         BoundingBox? colour = null, ground = null, fallback = null;
-        foreach (var projected in simulation.ProjectedFrame(Camera))
+        foreach (var projected in simulation.ProjectedFrame(Camera, applyCameraCulling: false))
         {
             var particle = projected.Render;
             var emitter = conversion.Emitters[particle.Layer];

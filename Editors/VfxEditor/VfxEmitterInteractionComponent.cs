@@ -47,6 +47,7 @@ public sealed class VfxEmitterInteractionComponent : BaseComponent, IDisposable
         DrawOrder = (int)ComponentDrawOrderEnum.Gizmo;
         _preview.Attachment = () => Target.World;
         _preview.AttachmentAtTime = History.Sample;
+        _preview.NextAttachmentSample = History.NextSampleTime;
         _preview.PreparingFrame += PrepareAttachment;
         _preview.SnapshotReloaded += ResetHistory;
         _mouse.CaptureInterrupted += CancelTransform;
@@ -404,6 +405,7 @@ public sealed class VfxEmitterInteractionComponent : BaseComponent, IDisposable
         _preview.SnapshotReloaded -= ResetHistory;
         _preview.Attachment = () => Matrix.Identity;
         _preview.AttachmentAtTime = null;
+        _preview.NextAttachmentSample = null;
         _gizmo?.Dispose();
         _selectionMarker?.Dispose();
         SelectionChanged = null;

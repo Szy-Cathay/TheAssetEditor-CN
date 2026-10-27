@@ -5,6 +5,7 @@ using GameWorld.Core.Components.Selection;
 using GameWorld.Core.Rendering;
 using GameWorld.Core.Services;
 using GameWorld.Core.Utility;
+using GameWorld.Core.Vfx;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Shared.Core.ErrorHandling;
@@ -701,8 +702,9 @@ namespace GameWorld.Core.Components.Rendering
 
                 DrawViewportSurfaces(device, commonShaderParameters, renderingTechnique);
                 foreach (var item in _renderItems[RenderBuckedId.Normal])
-                    if (!item.IsMeshSurface)
+                    if (!item.IsMeshSurface && item is not VfxPreviewSceneNode)
                         item.Draw(device, commonShaderParameters, renderingTechnique);
+                DrawVfxPreviews(device, commonShaderParameters, renderingTechnique);
 
                 // Draw depth-tested helpers after meshes so they cannot punch
                 // holes into the selection mask before selected geometry renders.
@@ -800,6 +802,29 @@ namespace GameWorld.Core.Components.Rendering
             finally
             {
                 device.Viewport = previousViewport;
+            }
+        }
+
+        private void DrawVfxPreviews(GraphicsDevice device, CommonShaderParameters parameters, RenderingTechnique technique)
+        {
+            VfxPreviewSceneNode? owner = null;
+            IDisposable? scene = null;
+            try
+            {
+                if (technique is RenderingTechnique.Normal or RenderingTechnique.Solid)
+                    foreach (var item in _renderItems[RenderBuckedId.Normal])
+                        if (item is VfxPreviewSceneNode node && (scene = node.BeginScene(parameters)) != null)
+                        {
+                            owner = node;
+                            break;
+                        }
+                foreach (var item in _renderItems[RenderBuckedId.Normal])
+                    if (item is VfxPreviewSceneNode node)
+                        node.DrawInScene(device, parameters, technique, scene);
+            }
+            finally
+            {
+                if (scene != null) owner!.EndScene(scene);
             }
         }
 

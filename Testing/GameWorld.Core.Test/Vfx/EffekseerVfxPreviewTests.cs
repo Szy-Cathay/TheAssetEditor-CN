@@ -49,14 +49,15 @@ public class EffekseerVfxPreviewTests
             Assert.That(preview.ParticleCount, Is.EqualTo(1), JsonSerializer.Serialize(preview.Diagnostics));
             var name = $"distortion-compositing-{textureName}-{additive}-{samples}";
             var background = new Color(40, 80, 120);
-            var flat = Render(device, null, width: 20, samples: samples, outputName: name + "-flat-baseline", background: background);
-            var refracted = Render(device, preview, width: 20, samples: samples, outputName: name + "-flat", background: background);
+            // Keep the full quad in view while making the official texture's refraction spatially resolvable.
+            var flat = Render(device, null, width: 10, samples: samples, outputName: name + "-flat-baseline", background: background);
+            var refracted = Render(device, preview, width: 10, samples: samples, outputName: name + "-flat", background: background);
             var maximumError = refracted.Zip(flat).Max(pair => Math.Max(Math.Abs(pair.First.R - pair.Second.R),
                 Math.Max(Math.Abs(pair.First.G - pair.Second.G), Math.Abs(pair.First.B - pair.Second.B))));
             Assert.That(maximumError, Is.LessThanOrEqualTo(1),
                 "Refraction of a uniform background must not expose the rectangular sprite by adding the captured background to itself.");
-            var pattern = Render(device, null, width: 20, samples: samples, outputName: name + "-pattern-baseline");
-            var warped = Render(device, preview, width: 20, samples: samples, outputName: name + "-pattern");
+            var pattern = Render(device, null, width: 10, samples: samples, outputName: name + "-pattern-baseline");
+            var warped = Render(device, preview, width: 10, samples: samples, outputName: name + "-pattern");
             Assert.That(warped.Zip(pattern).Count(pair => pair.First != pair.Second), Is.GreaterThan(50),
                 "Keep actual normal-map refraction; hiding the distortion layer must not satisfy the uniform-background regression.");
         }
@@ -378,6 +379,16 @@ public class EffekseerVfxPreviewTests
             var contact = Vector4.Transform(new Vector4(0, 0, -10.1f, 1), parameters.Projection);
             device.SetRenderTarget(target);
             device.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, Color.Black, contact.Z / contact.W, 0);
+            preview.Draw(parameters); device.SetRenderTarget(null); target.GetData(pixels);
+            var outsideFade = (pixels[32 * 64 + 31] + pixels[32 * 64 + 32]) / 2;
+            Assert.That(outsideFade.X, Is.EqualTo(colour.X).Within(.003),
+                "The native depth bias moves soft view distance from 10 to 8, so the original 10.1 receiver must remain unsoftened.");
+            // Authored factor 2, default strength 1 and clamped XY scale 5 give native bias 2.
+            var nativeBias = (float)(Half)2;
+            var receiverDistance = 10 - nativeBias + .05f * (nativeBias + .001f);
+            var biasedContact = Vector4.Transform(new Vector4(0, 0, -receiverDistance, 1), parameters.Projection);
+            device.SetRenderTarget(target);
+            device.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, Color.Black, biasedContact.Z / biasedContact.W, 0);
             preview.Draw(parameters); device.SetRenderTarget(null); target.GetData(pixels);
             var softened = (pixels[32 * 64 + 31] + pixels[32 * 64 + 32]) / 2;
             Assert.That(softened.X, Is.EqualTo(covered.X * .05f + emitted.X * .05f * .05f).Within(.003),

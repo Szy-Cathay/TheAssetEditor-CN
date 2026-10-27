@@ -26,9 +26,6 @@ public class VfxTerrainDecalTests
     }
 
     [TestCase(false, 0, 1, 0)]
-    [TestCase(true, 30, 1, 0)]
-    [TestCase(true, 0, 2, 0)]
-    [TestCase(true, 0, 1, 2)]
     public void UncalibratedReceiverOrRoot_DoesNotInventATerrainBasis(bool ground, float yaw, float scale, float height)
     {
         var conversion = Convert(Source(true)); Assert.That(conversion.Emitters, Has.Count.EqualTo(1));
@@ -37,6 +34,31 @@ public class VfxTerrainDecalTests
         Assert.That(simulation.Frame(Camera(ground ? 0 : null)), Is.Empty);
         simulation.Seek(0, Matrix.Identity);
         Assert.That(simulation.Frame(Camera(0)), Has.Length.EqualTo(1), "A corrected root must recover without rewriting the document.");
+    }
+
+    [TestCase(30, 1, 0)]
+    [TestCase(0, 2, 0)]
+    [TestCase(0, 1, 2)]
+    public void TerrainBirth_UsesNativeGroundProjectionAndRootScaleWithoutBoneRotation(float yaw, float scale, float height)
+    {
+        var bytes = Source(true);
+        var simulation = new TotalWarVfxSimulation(Convert(bytes));
+        simulation.Seek(.2f, Matrix.Identity);
+        var baseline = simulation.Frame(Camera(0)).Single().Transform;
+        simulation.Seek(0, Matrix.CreateScale(scale) * Matrix.CreateRotationY(MathHelper.ToRadians(yaw))
+            * Matrix.CreateTranslation(0, height, 0));
+        simulation.Seek(.2f, Matrix.CreateScale(scale) * Matrix.CreateRotationY(MathHelper.ToRadians(yaw))
+            * Matrix.CreateTranslation(0, height, 0));
+        var actual = simulation.Frame(Camera(0)).Single().Transform;
+        Assert.Multiple(() =>
+        {
+            Assert.That(Vector3.Distance(actual.Right, baseline.Right * scale), Is.LessThan(.00001f));
+            Assert.That(Vector3.Distance(actual.Up, baseline.Up * scale), Is.LessThan(.00001f));
+            Assert.That(Vector3.Distance(actual.Backward, baseline.Backward * scale), Is.LessThan(.00001f));
+            Assert.That(actual.Translation, Is.EqualTo(Vector3.Zero));
+            Assert.That(simulation.TerrainBasisUnsupported, Is.False);
+            Assert.That(VfxDocument.Read(bytes).Write(), Is.EqualTo(bytes));
+        });
     }
 
     [TestCase("DEFERRED_DECAL_EMISSIVE", 1)]

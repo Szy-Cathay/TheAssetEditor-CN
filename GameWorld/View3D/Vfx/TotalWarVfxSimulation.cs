@@ -1,4 +1,4 @@
-﻿using GameWorld.Core.Rendering;
+using GameWorld.Core.Rendering;
 using Microsoft.Xna.Framework;
 
 namespace GameWorld.Core.Vfx;
@@ -11,18 +11,44 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
     private readonly List<Particle> _particles = [];
     private readonly List<EmitterState> _emitters = [];
     private readonly Dictionary<VfxPreviewEmitter, int> _definitionIndexes = [];
+    private readonly Dictionary<object, ReferenceRandoms> _referenceRandoms = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<EmitterState, float?> _spriteCullScales = [];
+    private readonly HashSet<int> _spriteFrameUnsupported = [];
+    private ProjectedOrder[] _projectedOrder = [];
     private float? _groundHeight;
     private float _cycleDuration;
     private double _requestedTime;
     private double _simulatedTime;
     private Matrix _attachment = Matrix.Identity;
     private Func<float, Matrix>? _attachmentAtTime;
+    private Func<float, float?>? _nextAttachmentSample;
     private bool _useCurrentAttachmentForFrame;
     private bool _continueMotionTrails;
     private bool _initialized;
+    private float? _emissionEndTimeSeconds;
     public int ParticleCount => _particles.Count;
     public bool HasMotionTrailEmitters => conversion.Emitters.Any(emitter => emitter.IsMotionTrail);
     public float Time => (float)_requestedTime;
+    public float? EmissionEndTimeSeconds
+    {
+        get => _emissionEndTimeSeconds;
+        set
+        {
+            if (value is { } end && !float.IsFinite(end)) throw new ArgumentOutOfRangeException(nameof(value));
+            if (_emissionEndTimeSeconds == value) return;
+            var previousEnd = _emissionEndTimeSeconds;
+            _emissionEndTimeSeconds = value;
+            if (previousEnd < _simulatedTime || value < _simulatedTime) _initialized = false;
+        }
+    }
+    public bool IsDrained
+    {
+        get
+        {
+            if (!_initialized) Reset();
+            return _particles.Count == 0 && !_emitters.Any(CanEmitAgain);
+        }
+    }
     public float CycleDuration
     {
         get
@@ -34,9 +60,13 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
     public bool CapacityReached { get; private set; }
     public bool RateLimited { get; private set; }
     public bool VelocityScaleUnsupported { get; private set; }
+    public bool SpriteCullScaleUnsupported { get; private set; }
     public bool ForceBasisUnsupported { get; private set; }
     public bool ModelSpinBasisUnsupported { get; private set; }
+    public bool ModelMotionScaleUnsupported { get; private set; }
+    public bool SpriteSpinBasisUnsupported { get; private set; }
     public bool ModelSpinRangeUnsupported { get; private set; }
+    public bool SpriteSpinRangeUnsupported { get; private set; }
     public bool TerrainBasisUnsupported { get; private set; }
 
     public void Advance(float seconds, Matrix attachment) => Seek((float)_requestedTime + seconds, attachment);
@@ -48,26 +78,78 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         => SeekCore(seconds, attachment, attachmentAtTime, true);
 
     public void SeekContinuousTrail(float seconds, Matrix attachment, Func<float, Matrix>? attachmentAtTime = null)
-        => SeekCore(seconds, attachment, attachmentAtTime, true, continueMotionTrails: true);
+        => SeekContinuousTrail(seconds, attachment, attachmentAtTime, null);
+
+    public void SeekContinuousTrail(float seconds, Matrix attachment, Func<float, Matrix>? attachmentAtTime,
+        Func<float, float?>? nextAttachmentSample)
+        => SeekCore(seconds, attachment, attachmentAtTime, true, continueMotionTrails: true,
+            nextAttachmentSample: nextAttachmentSample);
+
+    internal void SeekForPreparation(float seconds, Matrix attachment, CancellationToken cancellationToken,
+        Func<float, Matrix>? attachmentAtTime = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        SeekCore(seconds, attachment, attachmentAtTime, false, cancellationToken: cancellationToken);
+    }
 
     private void SeekCore(float seconds, Matrix attachment, Func<float, Matrix>? attachmentAtTime, bool useCurrentAttachmentForFrame,
-        bool continueMotionTrails = false)
+        bool continueMotionTrails = false, CancellationToken cancellationToken = default,
+        Func<float, float?>? nextAttachmentSample = null)
     {
         if (!float.IsFinite(seconds) || seconds < 0 || !continueMotionTrails && seconds > 600) throw new ArgumentOutOfRangeException(nameof(seconds));
         var sameTime = _initialized && seconds == _requestedTime;
         _attachment = attachment;
         _attachmentAtTime = attachmentAtTime;
+        _nextAttachmentSample = nextAttachmentSample;
         _useCurrentAttachmentForFrame = useCurrentAttachmentForFrame;
         _continueMotionTrails = continueMotionTrails;
         if (!_initialized || seconds + 0.00001 < _requestedTime) Reset();
+        var previousTime = _requestedTime;
         _requestedTime = seconds;
-        while (_simulatedTime + Step <= _requestedTime + 0.000001)
+        if (continueMotionTrails)
         {
+            // Active native distance trails consume one source chord per recorded input update.
+            // The fixed ticks still integrate all particles and other emission routes.
+            while (previousTime < seconds)
+            {
+                var end = (double)seconds;
+                if (nextAttachmentSample?.Invoke((float)previousTime) is { } next && next > previousTime && next < end) end = next;
+                StepTo(end, cancellationToken);
+                EmitFrameTrails(previousTime, end);
+                previousTime = end;
+            }
+        }
+        else StepTo(_requestedTime, cancellationToken);
+        if (sameTime && useCurrentAttachmentForFrame)
+            foreach (var emitter in _emitters) UpdateMotionRoot(emitter, seconds, currentFrame: true, preserveVelocity: true);
+    }
+
+    private void StepTo(double time, CancellationToken cancellationToken)
+    {
+        while (_simulatedTime + Step <= time + 0.000001)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
             _simulatedTime += Step;
             Tick(Step);
         }
-        if (sameTime && useCurrentAttachmentForFrame)
-            foreach (var emitter in _emitters) UpdateMotionRoot(emitter, seconds, currentFrame: true, preserveVelocity: true);
+    }
+
+    private void EmitFrameTrails(double start, double end)
+    {
+        for (var index = 0; index < _emitters.Count; index++)
+        {
+            var emitter = _emitters[index];
+            // Negative-start native preparation has its own catch-up loop; retain that path.
+            if (!UsesFrameTrail(emitter) || !emitter.Definition.IsMotionTrail) continue;
+            var emissionEnd = _emissionEndTimeSeconds is { } stop ? Math.Min(end, stop) : end;
+            var emissionStart = Math.Max(start, emitter.Start);
+            if (emissionEnd <= emissionStart) continue;
+            var current = CurrentRoot(emitter, emissionEnd, currentFrame: emissionEnd == _requestedTime);
+            if (NativeTrailSpacing(emitter, current) is not { } spacing) continue;
+            var phase = Phase(emissionEnd - emitter.Start, emitter.Duration,
+                emitter.Definition.LoopEmission || !emitter.Definition.Infinite);
+            EmitNativeTrail(index, phase, emissionEnd - emissionStart, emissionEnd - emissionStart, current, spacing, emissionEnd);
+        }
     }
 
     private void Reset()
@@ -76,14 +158,19 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         CapacityReached = false;
         RateLimited = false;
         VelocityScaleUnsupported = false;
+        SpriteCullScaleUnsupported = false;
         ForceBasisUnsupported = false;
         ModelSpinBasisUnsupported = false;
+        ModelMotionScaleUnsupported = false;
+        SpriteSpinBasisUnsupported = false;
         ModelSpinRangeUnsupported = false;
-        _emitters.Clear(); _definitionIndexes.Clear();
+        SpriteSpinRangeUnsupported = false;
+        _spriteFrameUnsupported.Clear();
+        _emitters.Clear(); _definitionIndexes.Clear(); _referenceRandoms.Clear();
         for (var index = 0; index < conversion.Emitters.Count; ++index) _definitionIndexes.Add(conversion.Emitters[index], index);
         var rootIndex = 0;
         foreach (var definition in conversion.Emitters.Where(e => !e.IsEventTemplate))
-            _emitters.Add(new(definition, 1940 + rootIndex++ * 7919, _definitionIndexes[definition]));
+            _emitters.Add(new(definition, 1940 + rootIndex++ * 7919, _definitionIndexes[definition], referenceRandoms: _referenceRandoms));
         var end = _emitters.Select(emitter => emitter.Start + (emitter.Definition.Infinite ? 0 : emitter.Duration)
             + EventTail(emitter.Definition, emitter.LifeBias) / emitter.TimeScale).DefaultIfEmpty(0).Max();
         _cycleDuration = Math.Clamp(Math.Max(_emitters.Any(e => e.Definition.Infinite) ? 8 : .5f, end + .25f), .5f, 600);
@@ -112,12 +199,12 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             }
             if (definition.DynamicSpinDamping)
             {
-                (particle.SpinRotation, particle.AngularSpeed) = DynamicSpinAt(particle, _simulatedTime);
+                (particle.SpinRotation, particle.AngularSpeed) = DynamicSpinAt(particle, _simulatedTime, commit: true);
                 particle.SpinTime = _simulatedTime;
             }
             else if (definition.ComplexSpinDamping)
             {
-                (particle.SpinRotation, particle.AngularVelocity) = ComplexSpinAt(particle, _simulatedTime);
+                (particle.SpinRotation, particle.AngularVelocity, particle.SpinRootRotation) = ComplexSpinAt(particle, _simulatedTime, commit: true);
                 particle.SpinTime = _simulatedTime;
             }
             else if (definition.ModelQuaternionSpin)
@@ -125,21 +212,28 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
                 (particle.SpinRotation, particle.AngularVelocity, particle.SpinRootRotation) = ModelSpinAt(particle, _simulatedTime);
                 particle.SpinTime = _simulatedTime;
             }
+            if (particle.NativeFrameTrail)
+            {
+                particle.Position = particle.MotionOrigin + particle.MotionInitialVelocity * (float)(_simulatedTime - particle.Birth);
+                continue;
+            }
             var forceSupported = (definition.CalibratedVerticalAcceleration != 0 || definition.ParticleForceCurve)
                 && ForceBasisSupported(particle, definition);
             if (definition.ConstantForceDamping != null && forceSupported)
             {
                 (particle.Position, particle.Velocity) = ConstantMotion(particle, definition, age);
+                CommitModelMotion(particle, _simulatedTime);
                 continue;
             }
             if (forceSupported)
             {
                 var acceleration = definition.ParticleForceCurve
-                    ? definition.Force.Vector(age / particle.Life, new Vector3(particle.RandomAlpha)) * .01f
+                    ? particle.FixedForce ?? definition.Force.Vector(age / particle.Life, new Vector3(particle.RandomAlpha)) * .01f
                     : new Vector3(0, definition.CalibratedVerticalAcceleration, 0);
                 particle.Velocity += acceleration * (float)delta;
             }
-            var damping = Math.Max(0, definition.Deceleration.Sample("x", age / particle.Life, particle.RandomAlpha));
+            var damping = definition.Deceleration.Sample("x", age / particle.Life, particle.RandomAlpha);
+            if (definition.Kind != 0) damping = Math.Max(0, damping);
             particle.Velocity *= MathF.Exp(-damping * (float)delta);
             particle.Position += particle.Velocity * (float)delta;
             if (definition.ConstantForceDamping != null)
@@ -148,22 +242,34 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
                 particle.MotionOrigin = particle.Position;
                 particle.MotionInitialVelocity = particle.Velocity;
             }
+            CommitModelMotion(particle, _simulatedTime);
         }
         for (var index = 0; index < _emitters.Count; ++index)
         {
             var emitter = _emitters[index];
             UpdateMotionRoot(emitter, _simulatedTime);
             if (emitter.Parent is { Alive: false } && emitter.Event is { TrackLifetime: true, OnDeath: false }) continue;
-            var localTime = _simulatedTime - emitter.Start;
+            var emissionTime = _simulatedTime;
+            var emissionDelta = delta;
+            if (emitter.Parent == null && _emissionEndTimeSeconds is { } emissionEnd)
+            {
+                if (emitter.Start >= emissionEnd || _simulatedTime > emissionEnd && _simulatedTime - delta >= emissionEnd) continue;
+                if (_simulatedTime > emissionEnd)
+                {
+                    emissionTime = emissionEnd;
+                    emissionDelta = Math.Max(0, emissionEnd - (_simulatedTime - delta));
+                }
+            }
+            var localTime = emissionTime - emitter.Start;
             if (localTime < -0.000001) continue;
             // Continue only motion-driven root emission; particle and event lifetimes remain authored.
             var continuousTrail = _continueMotionTrails && emitter.Parent == null && emitter.Definition.IsMotionTrail;
             var emittingContinuously = emitter.Definition.Infinite || continuousTrail;
-            var emissionDelta = delta;
+            var intervalDelta = emissionDelta;
             if (!emittingContinuously)
             {
                 // Integrate only the part of this tick inside the authored finite interval.
-                var intervalStart = Math.Max(0, localTime - delta);
+                var intervalStart = Math.Max(0, localTime - intervalDelta);
                 var intervalEnd = Math.Clamp(localTime, 0, emitter.Duration);
                 if (localTime > emitter.Duration && intervalEnd <= intervalStart) continue;
                 emissionDelta = Math.Max(0, intervalEnd - intervalStart);
@@ -171,7 +277,7 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             if (emitter.Definition.BurstInterval > 0)
             {
                 var intervalEnd = Math.Max(0, emittingContinuously ? localTime : Math.Min(localTime, emitter.Duration));
-                var intervalStart = Math.Max(0, localTime - delta);
+                var intervalStart = Math.Max(0, localTime - intervalDelta);
                 emissionDelta = Math.Max(0, BurstActiveTime(intervalEnd, emitter) - BurstActiveTime(intervalStart, emitter));
             }
             var phase = Phase(localTime, emitter.Duration,
@@ -206,6 +312,21 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
                 || state.Event is { TrackLifetime: true, OnDeath: false } && !state.Parent.Alive));
     }
 
+    private bool CanEmitAgain(EmitterState emitter)
+    {
+        if (emitter.Parent is { Alive: false } && emitter.Event is { TrackLifetime: true, OnDeath: false }) return false;
+        if (emitter.Definition.MaximumParticles <= 0 || emitter.Definition.Life.Maximum + emitter.LifeBias <= 0
+            || emitter.Definition.SpawnSpacing <= 0 && (emitter.Definition.Emission.Maximum <= 0 || emitter.RateScale <= 0)) return false;
+        var continuousTrail = _continueMotionTrails && emitter.Parent == null && emitter.Definition.IsMotionTrail;
+        var end = emitter.Definition.Infinite || continuousTrail ? double.PositiveInfinity : emitter.Start + emitter.Duration;
+        if (emitter.Parent == null && _emissionEndTimeSeconds is { } emissionEnd)
+        {
+            if (emitter.Start >= emissionEnd) return false;
+            end = Math.Min(end, emissionEnd);
+        }
+        return _simulatedTime < end;
+    }
+
     private static double BurstActiveTime(double time, EmitterState emitter)
     {
         // Native BurstInterval is the quiet gap after each active BurstIntervalLength window.
@@ -220,6 +341,12 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
     {
         var emitter = _emitters[emitterIndex];
         var current = CurrentRoot(emitter, _simulatedTime);
+        if (NativeTrailSpacing(emitter, current) is { } nativeSpacing)
+        {
+            if (UsesFrameTrail(emitter)) return;
+            EmitNativeTrail(emitterIndex, phase, delta, activeDelta, current, nativeSpacing);
+            return;
+        }
         var previous = emitter.DistanceRoot ?? current;
         emitter.DistanceRoot = current;
         if (delta <= 0 || activeDelta <= 0) return;
@@ -243,6 +370,80 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         if (spacing - emitter.DistanceRemainder < spacing * .00001) emitter.DistanceRemainder = 0;
     }
 
+    private bool UsesFrameTrail(EmitterState emitter) => _continueMotionTrails && emitter.Start >= 0
+        // Equal zero endpoints can still contain nonzero Bezier force or damping.
+        && !emitter.Definition.Force.HasBezierSegments && !emitter.Definition.Deceleration.HasBezierSegments;
+
+    private float? NativeTrailSpacing(EmitterState emitter, Matrix root)
+    {
+        var definition = emitter.Definition;
+        if (emitter.Parent != null || definition.Kind != 0 || definition.Distortion != 0 || !definition.TrailMode
+            || definition.Alignment != 1 || definition.SimulationSpace != 2 || definition.Render.MeshMaterialIndex >= 0
+            || definition.Events.Count != 0 || definition.RelativeOrientation || definition.RequiresFlatTerrain
+            || definition.MeshLoop != null || definition.BurstInterval != 0 || emitter.TimeScale != 1 || emitter.RateScale != 1
+            || definition.SpawnInheritedSpeed != 0 || !definition.Position.IsZero || !definition.SpawnBox.IsZero
+            || !definition.SpawnRadius.IsZero || !definition.Force.IsZero || !definition.Deceleration.IsZero
+            || !definition.Orientation.IsConstant || definition.OrientationMin != Vector3.Zero || definition.OrientationMax != Vector3.Zero
+            || definition.SpinMin != Vector3.Zero || definition.SpinMax != Vector3.Zero
+            || !definition.Speed.IsConstant || !definition.VelocityStretch.IsConstant) return null;
+        var speed = definition.Speed.Range("x", 0);
+        var stretch = definition.VelocityStretch.Range("x", 0);
+        if (!definition.InitialScale.TryConstantRange("y", out var initialY) || !definition.Scale.TryConstantRange("y", out var sizeY)
+            || speed.Min != speed.Max || stretch.Min != stretch.Max || initialY.Min != initialY.Max || sizeY.Min != sizeY.Max
+            || speed.Min <= 0 || stretch.Min <= 0 || initialY.Min <= 0 || sizeY.Min <= 0) return null;
+        if (!root.Decompose(out var scale, out var rotation, out var translation) || !PositiveUniformScale(scale)
+            || !MatrixClose(root, Matrix.CreateScale(scale) * Matrix.CreateFromQuaternion(rotation) * Matrix.CreateTranslation(translation)))
+        {
+            VelocityScaleUnsupported = true;
+            return null;
+        }
+        // Native 6c1a60 samples the first Y scale entries; positive SpawnSpacing selects this route, not its segment length.
+        var spacing = speed.Min * stretch.Min * initialY.Min * sizeY.Min * scale.X;
+        return float.IsFinite(spacing) && spacing > 0 ? spacing : null;
+    }
+
+    private void EmitNativeTrail(int emitterIndex, double phase, double delta, double activeDelta, Matrix current, float spacing,
+        double? frameEnd = null)
+    {
+        var emitter = _emitters[emitterIndex];
+        var endTime = frameEnd ?? _simulatedTime;
+        var continuous = _continueMotionTrails && emitter.Definition.IsMotionTrail;
+        if (!emitter.Definition.Infinite && !continuous) endTime = Math.Min(endTime, emitter.Start + emitter.Duration);
+        if (_emissionEndTimeSeconds is { } end) endTime = Math.Min(endTime, end);
+        if (frameEnd == null && endTime != _simulatedTime) current = CurrentRoot(emitter, endTime);
+        if (emitter.NativeTrailRoot == null)
+        {
+            emitter.NativeTrailTime = Math.Max(emitter.Start, endTime - activeDelta);
+            emitter.NativeTrailRoot = CurrentRoot(emitter, emitter.NativeTrailTime);
+        }
+        if (delta <= 0 || activeDelta <= 0) return;
+        var previous = emitter.NativeTrailRoot.Value;
+        var displacement = current.Translation - previous.Translation;
+        var distance = displacement.Length();
+        if (!float.IsFinite(distance)) { RateLimited = true; return; }
+        if (distance < spacing) return;
+        var direction = displacement / distance;
+        var travelled = 0f;
+        var emitted = 0;
+        var budget = Math.Max(1, (int)Math.Ceiling(10000 * delta));
+        while (travelled + spacing <= distance)
+        {
+            if (emitted++ >= budget) { RateLimited = true; break; }
+            travelled += spacing;
+            var fraction = travelled / distance;
+            var birthRoot = current;
+            birthRoot.Translation = Vector3.Lerp(previous.Translation, current.Translation, fraction);
+            var birthTime = emitter.NativeTrailTime + (endTime - emitter.NativeTrailTime) * fraction;
+            SpawnCore(emitterIndex, phase, birthRoot, direction, birthTime, nativeFrameTrail: frameEnd != null);
+            if (emitter.ActiveCount >= emitter.Definition.MaximumParticles || _particles.Count >= ParticleLimit) break;
+        }
+        // Preserve the remaining chord and source clock, including a long stationary interval before a teleport.
+        var consumed = travelled / distance;
+        previous.Translation = Vector3.Lerp(previous.Translation, current.Translation, consumed);
+        emitter.NativeTrailRoot = previous;
+        emitter.NativeTrailTime += (endTime - emitter.NativeTrailTime) * consumed;
+    }
+
     private static float EventTail(VfxPreviewEmitter definition, float lifeBias = 0)
     {
         var life = Math.Max(0, definition.Life.Maximum + lifeBias);
@@ -257,26 +458,38 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         return end;
     }
 
-    private void TriggerEvents(Particle particle, bool death)
+    private void TriggerEvents(Particle particle, bool death, double? triggerTime = null)
     {
+        var eventTime = triggerTime ?? _simulatedTime;
         foreach (var particleEvent in particle.Emitter.Definition.Events.Where(e => e.OnDeath == death))
+        {
+            var referenceRandoms = new Dictionary<object, ReferenceRandoms>(ReferenceEqualityComparer.Instance);
             foreach (var child in particleEvent.Children)
             {
                 if (!_definitionIndexes.TryGetValue(child, out var definitionIndex)) continue;
                 if (_emitters.Count >= 4096) { CapacityReached = true; return; }
                 var state = new EmitterState(child, particle.Emitter.Random.Next(), definitionIndex, particle, particleEvent,
-                    _simulatedTime + particleEvent.Delay);
-                state.SpawnAnchor = EventAnchor(state, _simulatedTime, out _);
+                    eventTime + particleEvent.Delay, referenceRandoms);
+                state.SpawnAnchor = EventAnchor(state, eventTime, out _);
                 if (!particle.Alive) FreezeEvent(state);
                 (particle.EventInstances ??= []).Add(state);
                 _emitters.Add(state);
             }
+        }
     }
 
-    private void Spawn(int emitterIndex, double phase, Matrix? distanceRoot = null)
+    private void Spawn(int emitterIndex, double phase, Matrix? distanceRoot = null, Vector3? trailDirection = null, double? distanceBirthTime = null)
+        => SpawnCore(emitterIndex, phase, distanceRoot, trailDirection, distanceBirthTime, nativeFrameTrail: false);
+
+    private void SpawnCore(int emitterIndex, double phase, Matrix? distanceRoot, Vector3? trailDirection, double? distanceBirthTime,
+        bool nativeFrameTrail)
     {
         var state = _emitters[emitterIndex];
         var definition = state.Definition;
+        var birthTime = distanceBirthTime ?? _simulatedTime;
+        if (state.Parent == null && _emissionEndTimeSeconds is { } emissionEnd) birthTime = Math.Min(birthTime, emissionEnd);
+        // Native GPU birth parameters use their own clock, independently of CPU emission sampling.
+        var initialPhase = definition.Kind == 0 ? InitialParameterPhase(state, birthTime) : phase;
         if (state.ActiveCount >= definition.MaximumParticles) return;
         if (_particles.Count >= ParticleLimit) { CapacityReached = true; return; }
         var random = state.Random;
@@ -285,6 +498,7 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         var orientation = definition.Orientation.Vector(phase, RandomVector(random));
         var rotation = Rotation(orientation);
         var position = definition.Position.Vector(phase, RandomVector(random));
+        var emitterPosition = position;
         var box = definition.SpawnBox.Vector(phase, RandomVector(random));
         var randomBox = RandomVector(random) - new Vector3(0.5f);
         position += Vector3.TransformNormal(box * randomBox, rotation);
@@ -295,13 +509,32 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             inner = outer = -inner;
         inner = Math.Max(0, inner);
         outer = Math.Max(inner, outer);
+        var radialRadius = 0f;
+        var radialArc = 0f;
         if (outer > 0)
         {
-            var radius = MathF.Sqrt(inner * inner + (outer * outer - inner * inner) * random.NextSingle());
-            var angle = random.NextSingle() * MathHelper.TwoPi;
-            position += Vector3.TransformNormal(new Vector3(MathF.Cos(angle) * radius, 0, MathF.Sin(angle) * radius), rotation);
+            var radiusRandom = random.NextSingle();
+            var arcRandom = random.NextSingle();
+            if (definition.SpawnAreaArc is { } birthArc)
+            {
+                radialRadius = inner + (outer - inner) * radiusRandom;
+                radialArc = MathHelper.ToRadians(birthArc.Sample(arcRandom));
+            }
+            else
+            {
+                var radius = MathF.Sqrt(inner * inner + (outer * outer - inner * inner) * radiusRandom);
+                var angle = arcRandom * MathHelper.TwoPi;
+                position += Vector3.TransformNormal(new Vector3(MathF.Cos(angle) * radius, 0, MathF.Sin(angle) * radius), rotation);
+            }
         }
         var azimuth = random.NextSingle();
+        if (definition.SpawnAreaArc != null && outer > 0)
+        {
+            // Native 6c0380 generates the angular birth offset before the independent velocity selector.
+            var birthAngle = MathHelper.ToRadians(definition.SpawnAreaAngle.Sample(azimuth));
+            position += Vector3.TransformNormal(new Vector3(MathF.Cos(birthAngle) * MathF.Cos(radialArc), MathF.Sin(birthAngle),
+                -MathF.Cos(birthAngle) * MathF.Sin(radialArc)) * radialRadius, rotation);
+        }
         var theta = MathHelper.ToRadians(definition.SpawnAngle.Sample(azimuth));
         var phi = MathHelper.ToRadians(definition.SpawnSpread.Sample(random.NextSingle()));
         // Preserve the float pole residue: native horizontal sprites still form a plane near vertical.
@@ -310,8 +543,18 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             : definition.DefaultVerticalSpawn || definition.LegacySpreadSpawn
             ? new Vector3(MathF.Cos(phi) * MathF.Cos(theta), MathF.Sin(phi), MathF.Cos(phi) * MathF.Sin(theta))
             : new Vector3(MathF.Sin(theta) * MathF.Cos(phi), MathF.Cos(theta), MathF.Sin(theta) * MathF.Sin(phi));
-        var velocity = Vector3.TransformNormal(direction, rotation) * definition.Speed.Sample("x", phase, random.NextSingle()) * state.TimeScale;
-        var birthRoot = distanceRoot ?? CurrentRoot(state, _simulatedTime);
+        if (definition.RadialSpawnDirection)
+        {
+            // Native SpreadMethod=false uses the birth displacement; zero length stays zero.
+            direction = position - emitterPosition;
+            var lengthSquared = direction.LengthSquared();
+            if (lengthSquared > 0) direction /= MathF.Sqrt(lengthSquared);
+        }
+        var sampledSpeed = definition.Speed.Sample("x", phase, random.NextSingle());
+        var velocity = Vector3.TransformNormal(direction, rotation) * sampledSpeed * state.TimeScale;
+        var birthRoot = distanceRoot ?? CurrentRoot(state, birthTime);
+        if (trailDirection is { } nativeDirection)
+            velocity = Vector3.TransformNormal(nativeDirection, Matrix.Transpose(RotationOnly(birthRoot))) * sampledSpeed * state.TimeScale;
         if (definition.SpawnInheritedSpeed != 0 && state.MotionVelocity.LengthSquared() > 0)
         {
             var speed = state.MotionVelocity.Length();
@@ -331,11 +574,12 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         var row = atlas.RowRestricted ? (atlas.RandomRow ? random.Next(atlas.Rows) : atlas.Row) : 0;
         _particles.Add(new Particle
         {
-            Emitter = state, Birth = _simulatedTime, Life = life, Position = position, Velocity = velocity,
+            Emitter = state, Birth = birthTime, Life = life, Position = position, Velocity = velocity,
             MotionOrigin = position, MotionInitialVelocity = velocity,
+            NativeFrameTrail = nativeFrameTrail,
             Root = birthRoot,
-            InitialScale = definition.InitialScale.Vector(phase, RandomVector(random)),
-            InitialAlpha = definition.InitialAlpha.Sample("x", phase, random.NextSingle()) * state.Tint.W,
+            InitialScale = definition.InitialScale.Vector(initialPhase, RandomVector(random)),
+            InitialAlpha = definition.InitialAlphaAt(initialPhase, random.NextSingle()) * state.Tint.W,
             Orientation = Vector3.Lerp(definition.OrientationMin, definition.OrientationMax, random.NextSingle()),
             RandomScale = RandomVector(random), RandomColour = RandomVector(random), RandomAlpha = random.NextSingle(),
             Cell = cell, Row = row, Loops = atlas.Loops.Sample(random.NextSingle()),
@@ -352,7 +596,7 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             // Keep the existing legacy/model representation separate from the sprite birth matrix.
             spawned.Orientation += orientation;
         }
-        if (definition.DynamicSpinDamping)
+        if (definition.DynamicSpinDamping || definition.SpriteIndependentSpinRandom)
         {
             // Reuse independent, unused colour channels without shifting non-angular birth randomness.
             var spinDirection = definition.SpinDirection.Z;
@@ -379,31 +623,54 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             spawned.AngularVelocity = Vector3.TransformNormal(spawned.Spin * (MathHelper.Pi / 180), spawned.BirthRotation);
             spawned.SpinTime = spawned.Birth;
         }
+        spawned.ModelMotionRoot = birthRoot;
+        spawned.ModelMotionTime = spawned.Birth;
+        if (definition.ParticleForceCurve && definition.ConstantForceDamping == null && definition.Force.HasSingleKeyVector)
+        {
+            var force = definition.Force.Vector(0, new Vector3(spawned.RandomAlpha)) * .01f;
+            if (float.IsFinite(force.X) && float.IsFinite(force.Y) && float.IsFinite(force.Z)) spawned.FixedForce = force;
+        }
         state.ActiveCount++;
-        TriggerEvents(_particles[^1], false);
+        TriggerEvents(_particles[^1], false, birthTime);
     }
 
     public EffekseerParticle[] Frame(CommonShaderParameters camera)
         => ProjectedFrame(camera).Select(particle => particle.Render).ToArray();
 
-    public VfxPreviewParticle[] ProjectedFrame(CommonShaderParameters camera)
+    public VfxPreviewParticle[] ProjectedFrame(CommonShaderParameters camera, bool applyCameraCulling = true)
     {
+        var result = new List<VfxPreviewParticle>(_particles.Count);
+        FillProjectedFrame(camera, result, applyCameraCulling);
+        return result.ToArray();
+    }
+
+    public void FillProjectedFrame(CommonShaderParameters camera, List<VfxPreviewParticle> result, bool applyCameraCulling = true)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        result.Clear();
         TerrainBasisUnsupported = false;
+        SpriteCullScaleUnsupported = false;
+        _spriteCullScales.Clear();
         if (_groundHeight != camera.VfxGroundHeight)
         {
             _groundHeight = camera.VfxGroundHeight;
             if (conversion.Emitters.Any(e => e.RequiresFlatTerrain && e.Events.Count > 0))
             {
-                var time = (float)_requestedTime; Reset(); SeekCore(time, _attachment, _attachmentAtTime, _useCurrentAttachmentForFrame, _continueMotionTrails);
+                var time = (float)_requestedTime; Reset(); SeekCore(time, _attachment, _attachmentAtTime, _useCurrentAttachmentForFrame,
+                    _continueMotionTrails, nextAttachmentSample: _nextAttachmentSample);
             }
         }
-        var result = new List<VfxPreviewParticle>(_particles.Count);
+        _spriteFrameUnsupported.Clear();
+        SpriteSpinRangeUnsupported = _emitters.Any(state => state.SpriteAngularUnsupported);
+        result.EnsureCapacity(_particles.Count);
         var inverseView = Matrix.Invert(camera.View);
         inverseView.Translation = Vector3.Zero;
         foreach (var particle in _particles)
         {
             var definition = particle.Emitter.Definition;
-            if (definition.IsEventHelper || particle.Emitter.ModelAngularUnsupported) continue;
+            if (particle.NativeFrameTrail && _requestedTime - particle.Birth >= particle.Life) continue;
+            if (definition.IsEventHelper || particle.Emitter.ModelAngularUnsupported || particle.Emitter.SpriteAngularUnsupported
+                || _spriteFrameUnsupported.Contains(particle.Emitter.DefinitionIndex)) continue;
             if (particle.Emitter.Parent != null)
             {
                 EventAnchor(particle.Emitter, _requestedTime, out var valid, currentFrame: true);
@@ -411,37 +678,60 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             }
             var age = Math.Clamp(AppearanceAge(particle, definition, _requestedTime), 0, particle.Life);
             var phase = age / particle.Life;
+            var spritePhase = definition.SpriteScaleTable != null || definition.SpriteAlphaTable != null
+                ? Math.Clamp(((float)_requestedTime - (float)particle.Birth) / (particle.Life + .000001f), 0, 1) : 0;
             var emitterState = particle.Emitter;
             var root = ParticleRoot(particle, _requestedTime, currentFrame: true);
             var position = particle.Position;
             var velocity = particle.Velocity;
-            if (definition.ConstantForceDamping != null && ForceBasisSupported(particle, definition))
+            if (particle.NativeFrameTrail) position = particle.MotionOrigin + particle.MotionInitialVelocity * (float)(_requestedTime - particle.Birth);
+            else if (definition.ConstantForceDamping != null && ForceBasisSupported(particle, definition))
                 (position, velocity) = ConstantMotion(particle, definition, age);
+            if (definition.ModelEmitterMotion != null)
+                (position, velocity) = ModelMotionAt(particle, _requestedTime, root);
             var inheritedScale = EventScale(emitterState, _requestedTime, currentFrame: true);
             var worldPosition = Vector3.Transform(position * inheritedScale, root);
+            var terrainDecalBirth = definition.RequiresFlatTerrain && definition.Kind == 2 && definition.SpawnOnTerrain
+                && definition.SimulationSpace == 2;
             // Native terrain birth keeps the emitter height offset while uniform scale changes geometry.
             var terrainBasis = definition.RequiresFlatTerrain && definition.Kind != 2 && definition.SpawnOnTerrain
                 && root.M11 > 0 && float.IsFinite(root.M11) ? Matrix.CreateScale(1 / root.M11) * root : root;
             if (definition.RequiresFlatTerrain && (camera.VfxGroundHeight is not { } ground || !float.IsFinite(ground)
-                || !MatrixClose(terrainBasis, Matrix.CreateTranslation(root.Translation))
-                || definition.Kind == 2 && definition.SpawnOnTerrain && Math.Abs(worldPosition.Y - ground) > .00001f))
+                || (terrainDecalBirth ? !TerrainDecalRootSupported(root) || !PositiveUniformScale(inheritedScale)
+                    : !MatrixClose(terrainBasis, Matrix.CreateTranslation(root.Translation)))
+                || !terrainDecalBirth && definition.Kind == 2 && definition.SpawnOnTerrain
+                    && Math.Abs(worldPosition.Y - ground) > .00001f))
             {
                 TerrainBasisUnsupported = true;
                 continue;
             }
             if (definition.RequiresFlatTerrain && definition.Kind != 2 && definition.SpawnOnTerrain)
                 worldPosition.Y = camera.VfxGroundHeight!.Value + position.Y;
+            // The native terrain query replaces world Y after transforming the random spawn area.
+            if (terrainDecalBirth) worldPosition.Y = camera.VfxGroundHeight!.Value;
             var distanceAlpha = 1f;
-            if (definition.ParticleCullDistances is { } distances)
+            if (applyCameraCulling && definition.ParticleCullDistances is { } distances)
             {
                 var distance = Vector3.Distance(camera.CameraPosition, worldPosition);
-                if (distance < distances.X || distance > distances.W) continue;
-                if (distance < distances.Y) distanceAlpha *= (distance - distances.X) / (distances.Y - distances.X);
-                if (distance > distances.Z) distanceAlpha *= (distances.W - distance) / (distances.W - distances.Z);
+                if (definition.Kind == 0)
+                    distanceAlpha = SpriteDistanceAlpha(emitterState, inheritedScale, distance, distances);
+                else
+                {
+                    if (distance < distances.X || distance > distances.W) continue;
+                    if (distance < distances.Y) distanceAlpha *= (distance - distances.X) / (distances.Y - distances.X);
+                    if (distance > distances.Z) distanceAlpha *= (distances.W - distance) / (distances.W - distances.Z);
+                }
                 if (distanceAlpha <= 0) continue;
             }
+            var inheritedTint = EventTint(emitterState, _requestedTime);
+            var cullOpacity = applyCameraCulling && definition.Kind == 0 && definition.Render.MeshMaterialIndex < 0;
+            // Native ordinary VS rejects weak emitter tint before evaluating particle opacity.
+            if (cullOpacity && !(camera.VfxLowOpacityCulling < emitterState.Tint.W * inheritedTint.W * distanceAlpha)) continue;
             var worldVelocity = Vector3.TransformNormal(velocity, root);
-            var scale = definition.Scale.Vector(phase, new(particle.RandomScale.X)) * particle.InitialScale;
+            var scale = (definition.SpriteScaleTable is { } scaleTable
+                ? new Vector3(scaleTable.Sample("x", spritePhase, particle.RandomScale.X), scaleTable.Sample("y", spritePhase, particle.RandomScale.X),
+                    scaleTable.Sample("z", spritePhase, particle.RandomScale.X))
+                : definition.Scale.Vector(phase, new(particle.RandomScale.X))) * particle.InitialScale;
             if (!root.Decompose(out var rootScale, out _, out _)) rootScale = Vector3.One;
             scale *= rootScale * inheritedScale;
             if (definition.Kind == 2 && (MathF.Abs(scale.X) < 0.0000001f || MathF.Abs(scale.Y) < 0.0000001f || MathF.Abs(scale.Z) < 0.0000001f))
@@ -463,7 +753,10 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
                 definition.Alignment == 5 ? Matrix.CreateRotationZ(MathHelper.ToRadians(orientation.Z))
                     * Matrix.CreateRotationX(MathHelper.PiOver2) * RotationOnly(root) :
                 Matrix.CreateRotationZ(MathHelper.ToRadians(definition.Alignment == 0 && reflectedCamera ? -orientation.Z : orientation.Z)) * inverseView;
-            if (emitterState.ModelAngularUnsupported) continue;
+            if (terrainDecalBirth)
+                basis = VfxTerrainDecalOrientation.BirthBasis(orientation, Vector3.Up);
+            if (emitterState.ModelAngularUnsupported || emitterState.SpriteAngularUnsupported
+                || _spriteFrameUnsupported.Contains(emitterState.DefinitionIndex)) continue;
             var localTransform = Matrix.CreateScale(scale);
             if (definition.Kind == 0 && definition.Alignment is 0 or 5 or 6)
             {
@@ -494,9 +787,16 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
                 var look = Vector3.Normalize(worldVelocity);
                 var side = Vector3.Cross(viewDirection, look);
                 var sideLength = side.Length();
-                side = sideLength > (horizontalVelocityPlane ? 0 : 0.000001f) ? side / sideLength : inverseView.Right;
+                var cameraRight = definition.Kind == 0 && definition.Alignment == 3 && reflectedCamera ? -inverseView.Right : inverseView.Right;
+                if (definition.Kind == 0 && definition.Alignment == 1)
+                {
+                    // The native legacy shader normalizes directly; a parallel ray has no drawable plane.
+                    if (!(sideLength > 0) || !float.IsFinite(sideLength)) continue;
+                    side /= sideLength;
+                }
+                else side = sideLength > (horizontalVelocityPlane ? 0 : 0.000001f) ? side / sideLength : cameraRight;
                 if (definition.Alignment == 3)
-                    side = Vector3.Lerp(inverseView.Right, side, Math.Clamp(sideLength * 100, 0, 1));
+                    side = Vector3.Lerp(cameraRight, side, Math.Clamp(sideLength * 100, 0, 1));
                 var up = definition.Alignment == 3 ? Vector3.Normalize(Vector3.Cross(side, viewDirection)) : look;
                 // Native yaw-only mode projects velocity onto the horizontal plane, but stretches by its full length.
                 if (definition.Alignment == 7) up = Vector3.Normalize(Vector3.Cross(side, Vector3.Up));
@@ -527,7 +827,8 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             }
             if (definition.Kind == 0 && definition.MinimumPixelSize > 0)
             {
-                var pixelScale = MinimumPixelScale(definition.MinimumPixelSize, scale, velocityStretch, worldPosition, camera);
+                var pixelScale = MinimumPixelScale(definition.MinimumPixelSize, definition.MinimumPixelHalfResolution,
+                    scale, velocityStretch, worldPosition, camera);
                 scale.X *= pixelScale; scale.Y *= pixelScale;
                 localTransform = Matrix.CreateScale(pixelScale, pixelScale, 1) * localTransform;
             }
@@ -547,15 +848,17 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
                 definition.Colour.Sample("g", phase, particle.RandomColour.X), definition.Colour.Sample("b", phase, particle.RandomColour.X));
             colour *= definition.Colour.Sample("brightness", phase, particle.RandomColour.X);
             colour *= new Vector3(emitterState.Tint.X, emitterState.Tint.Y, emitterState.Tint.Z);
-            var inheritedTint = EventTint(emitterState, _requestedTime);
             colour *= new Vector3(inheritedTint.X, inheritedTint.Y, inheritedTint.Z);
-            var authoredAlpha = definition.AlphaAt(phase, particle.RandomAlpha) * particle.InitialAlpha * inheritedTint.W;
+            var authoredAlpha = (definition.SpriteAlphaTable?.Sample("x", spritePhase, particle.RandomAlpha)
+                ?? definition.AlphaAt(phase, particle.RandomAlpha)) * particle.InitialAlpha * inheritedTint.W;
             var customSprite = definition.Kind == 0 && definition.Render.MeshMaterialIndex >= 0;
-            var rawSpriteAlpha = customSprite || definition.Kind == 0 && (definition.PremultipliedAlpha || definition.Render.Distortion != 0);
+            // Texture opacity is applied after sampling, including straight-alpha sprites.
+            var rawSpriteAlpha = definition.Kind == 0 || definition.Kind == 2 && definition.Render.MaterialMode < 3;
             var rawMaterialAlpha = definition.Kind == 1 && definition.RenderParts(particle.ModelVariant)
                 .Any(part => part.OpaqueModel != 0 && part.MeshMaterialIndex >= 0);
             var alpha = rawSpriteAlpha || rawMaterialAlpha ? Math.Max(0, authoredAlpha) : Math.Clamp(authoredAlpha, 0, 1);
             alpha *= distanceAlpha;
+            if (cullOpacity && !(camera.VfxLowOpacityCulling < alpha)) continue;
             var flipbook = definition.Atlas.Animated
                 ? definition.Atlas.FixedSpeed
                     ? definition.Atlas.FrameAtSeconds(phase, age * emitterState.TimeScale, particle.RandomAlpha)
@@ -585,21 +888,69 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             };
             result.Add(new(native, particle.ModelVariant));
         }
-        if (ModelSpinRangeUnsupported)
+        if (ModelSpinRangeUnsupported || SpriteSpinRangeUnsupported)
         {
-            var disabled = _emitters.Where(state => state.ModelAngularUnsupported).Select(state => state.DefinitionIndex).ToHashSet();
+            var disabled = _emitters.Where(state => state.ModelAngularUnsupported || state.SpriteAngularUnsupported).Select(state => state.DefinitionIndex).ToHashSet();
+            disabled.UnionWith(_spriteFrameUnsupported);
             result.RemoveAll(particle => disabled.Contains(particle.Render.Layer));
         }
         // Alpha particles within a material are drawn back to front; authored layer order is retained.
-        return result.OrderBy(x => x.Render.Layer).ThenByDescending(x => Vector3.DistanceSquared(x.Render.Transform.Translation, camera.CameraPosition)).ToArray();
+        SortProjectedFrame(result, camera.CameraPosition);
     }
 
-    private static Matrix SpriteRotation(Particle particle, double time, Matrix root)
+    private void SortProjectedFrame(List<VfxPreviewParticle> result, Vector3 cameraPosition)
+    {
+        var count = result.Count;
+        if (count < 2) return;
+        if (_projectedOrder.Length < count)
+            Array.Resize(ref _projectedOrder, Math.Max(count, Math.Max(4, _projectedOrder.Length * 2)));
+        for (var index = 0; index < count; index++)
+        {
+            var particle = result[index].Render;
+            _projectedOrder[index] = new()
+            {
+                Layer = particle.Layer,
+                Distance = Vector3.DistanceSquared(particle.Transform.Translation, cameraPosition),
+                Index = index,
+            };
+        }
+        Array.Sort(_projectedOrder, 0, count);
+        // A unique original index preserves LINQ's stable ties; move each large value only once.
+        for (var start = 0; start < count; start++)
+        {
+            if (_projectedOrder[start].Index == start) continue;
+            var saved = result[start];
+            var position = start;
+            while (true)
+            {
+                var next = _projectedOrder[position].Index;
+                _projectedOrder[position].Index = position;
+                if (next == start) { result[position] = saved; break; }
+                result[position] = result[next];
+                position = next;
+            }
+        }
+    }
+
+    private struct ProjectedOrder : IComparable<ProjectedOrder>
+    {
+        public int Layer, Index;
+        public float Distance;
+        public readonly int CompareTo(ProjectedOrder other)
+        {
+            var layer = Layer.CompareTo(other.Layer);
+            if (layer != 0) return layer;
+            var distance = other.Distance.CompareTo(Distance);
+            return distance != 0 ? distance : Index.CompareTo(other.Index);
+        }
+    }
+
+    private Matrix SpriteRotation(Particle particle, double time, Matrix root)
     {
         if (particle.Emitter.Definition.DynamicSpinDamping)
             return Matrix.CreateFromQuaternion(DynamicSpinAt(particle, time).Rotation);
         if (particle.Emitter.Definition.ComplexSpinDamping)
-            return Matrix.CreateFromQuaternion(ComplexSpinAt(particle, time).Rotation);
+            return Matrix.CreateFromQuaternion(ComplexSpinAt(particle, time, root: root).Rotation);
         var age = Math.Max(0, time - particle.Birth) * particle.Emitter.TimeScale;
         var damping = particle.Emitter.Definition.SpinDeceleration.Sample("x", 0, particle.RandomAlpha);
         var spinTime = damping > 0 ? (1 - Math.Exp(-damping * age)) / damping : age;
@@ -612,36 +963,81 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         return rotation;
     }
 
-    private static (Quaternion Rotation, float Speed) DynamicSpinAt(Particle particle, double time)
+    private (Quaternion Rotation, float Speed) DynamicSpinAt(Particle particle, double time, bool commit = false)
     {
+        if (particle.Emitter.SpriteAngularUnsupported) return (particle.SpinRotation, 0);
         var sourceDelta = (float)(Math.Max(0, time - particle.SpinTime) * particle.Emitter.TimeScale);
         if (sourceDelta == 0) return (particle.SpinRotation, particle.AngularSpeed);
         var sourceAge = Math.Max(0, time - particle.Birth) * particle.Emitter.TimeScale;
         var phase = sourceAge / (particle.Life * particle.Emitter.TimeScale + .000001);
-        var damping = particle.Emitter.Definition.SpinDeceleration.Sample("x", phase, particle.RandomAlpha);
+        var damping = particle.Emitter.Definition.SpriteNativeSpinDamping?.Sample(phase)
+            ?? particle.Emitter.Definition.SpriteConstantSpinDamping
+            ?? particle.Emitter.Definition.SpinDeceleration.Sample("x", phase, particle.RandomAlpha);
         var speed = particle.AngularSpeed * MathF.Exp(-damping * sourceDelta);
         var q = particle.SpinRotation;
         var derivative = Quaternion.Multiply(new Quaternion(0, 0, speed, 0), q);
         var halfDelta = sourceDelta * .5f;
         // Native decays world Z first, then normalizes an explicit quaternion step.
-        return (Quaternion.Normalize(new(q.X + derivative.X * halfDelta, q.Y + derivative.Y * halfDelta,
-            q.Z + derivative.Z * halfDelta, q.W + derivative.W * halfDelta)), speed);
+        var rotation = Quaternion.Normalize(new(q.X + derivative.X * halfDelta, q.Y + derivative.Y * halfDelta,
+            q.Z + derivative.Z * halfDelta, q.W + derivative.W * halfDelta));
+        return SpriteSpinSupported(particle, new(0, 0, speed), rotation, commit)
+            ? (rotation, speed) : (particle.SpinRotation, 0);
     }
 
-    private static (Quaternion Rotation, Vector3 Velocity) ComplexSpinAt(Particle particle, double time)
+    private (Quaternion Rotation, Vector3 Velocity, Quaternion RootRotation) ComplexSpinAt(Particle particle, double time,
+        bool commit = false, Matrix? root = null)
     {
+        if (particle.Emitter.SpriteAngularUnsupported) return (particle.SpinRotation, Vector3.Zero, particle.SpinRootRotation);
         var sourceDelta = (float)(Math.Max(0, time - particle.SpinTime) * particle.Emitter.TimeScale);
-        if (sourceDelta == 0) return (particle.SpinRotation, particle.AngularVelocity);
-        var sourceAge = Math.Max(0, time - particle.Birth) * particle.Emitter.TimeScale;
-        var phase = sourceAge / (particle.Life * particle.Emitter.TimeScale + .000001);
-        var damping = particle.Emitter.Definition.SpinDeceleration.Sample("x", phase, particle.RandomAlpha);
+        var definition = particle.Emitter.Definition;
+        if (sourceDelta == 0 && definition.SimulationSpace != 1)
+            return (particle.SpinRotation, particle.AngularVelocity, particle.SpinRootRotation);
         var velocity = particle.AngularVelocity;
-        velocity.Z *= MathF.Exp(-damping * sourceDelta);
-        var q = particle.SpinRotation;
-        var derivative = Quaternion.Multiply(new Quaternion(velocity, 0), q);
-        var halfDelta = sourceDelta * .5f;
-        return (Quaternion.Normalize(new(q.X + derivative.X * halfDelta, q.Y + derivative.Y * halfDelta,
-            q.Z + derivative.Z * halfDelta, q.W + derivative.W * halfDelta)), velocity);
+        var rotation = particle.SpinRotation;
+        if (sourceDelta > 0)
+        {
+            var sourceAge = Math.Max(0, time - particle.Birth) * particle.Emitter.TimeScale;
+            var phase = sourceAge / (particle.Life * particle.Emitter.TimeScale + .000001);
+            var damping = definition.SpriteNativeSpinDamping?.Sample(phase)
+                ?? definition.SpriteConstantSpinDamping
+                ?? definition.SpinDeceleration.Sample("x", phase, particle.RandomAlpha);
+            velocity.Z *= MathF.Exp(-damping * sourceDelta);
+            var derivative = Quaternion.Multiply(new Quaternion(velocity, 0), rotation);
+            var halfDelta = sourceDelta * .5f;
+            rotation = Quaternion.Normalize(new(rotation.X + derivative.X * halfDelta, rotation.Y + derivative.Y * halfDelta,
+                rotation.Z + derivative.Z * halfDelta, rotation.W + derivative.W * halfDelta));
+        }
+        var rootRotation = particle.SpinRootRotation;
+        if (definition.SimulationSpace == 1)
+        {
+            var currentRoot = root ?? CurrentRoot(particle.Emitter, time);
+            var decomposed = currentRoot.Decompose(out var scale, out var currentRotation, out _);
+            var nextRootRotation = decomposed ? Quaternion.Normalize(currentRotation) : Quaternion.Identity;
+            if (!decomposed || scale.X <= 0 || scale.Y <= 0 || scale.Z <= 0
+                || Math.Abs(scale.X - scale.Y) > .00001f || Math.Abs(scale.X - scale.Z) > .00001f
+                || !MatrixClose(currentRoot, Matrix.CreateScale(scale) * Matrix.CreateFromQuaternion(nextRootRotation)
+                    * Matrix.CreateTranslation(currentRoot.Translation)))
+                SpriteSpinBasisUnsupported = true;
+            // Ordinary CS transports the world angular state after its own world-Z decay and turn.
+            var delta = Quaternion.Normalize(Quaternion.Multiply(nextRootRotation, Quaternion.Conjugate(rootRotation)));
+            rotation = Quaternion.Normalize(Quaternion.Multiply(delta, rotation));
+            velocity = Vector3.Transform(velocity, delta);
+            rootRotation = nextRootRotation;
+        }
+        return SpriteSpinSupported(particle, velocity, rotation, commit)
+            ? (rotation, velocity, rootRotation) : (particle.SpinRotation, Vector3.Zero, particle.SpinRootRotation);
+    }
+
+    private bool SpriteSpinSupported(Particle particle, Vector3 velocity, Quaternion rotation, bool commit)
+    {
+        if (float.IsFinite(velocity.X) && float.IsFinite(velocity.Y) && float.IsFinite(velocity.Z)
+            && float.IsFinite(rotation.X) && float.IsFinite(rotation.Y) && float.IsFinite(rotation.Z) && float.IsFinite(rotation.W)
+            && float.IsFinite(rotation.LengthSquared()) && rotation.LengthSquared() >= .5f) return true;
+        // Reject unrepresentable native float growth without inventing an angular-velocity cap.
+        if (commit) particle.Emitter.SpriteAngularUnsupported = true;
+        else _spriteFrameUnsupported.Add(particle.Emitter.DefinitionIndex);
+        SpriteSpinRangeUnsupported = true;
+        return false;
     }
 
     private (Quaternion Rotation, Vector3 Velocity, Quaternion RootRotation) ModelSpinAt(Particle particle, double time, Matrix? root = null)
@@ -735,10 +1131,85 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         ? currentFrame && _useCurrentAttachmentForFrame ? _attachment : _attachmentAtTime?.Invoke(Math.Max(0, (float)time)) ?? _attachment
         : EventAnchor(state, time, out _, currentFrame));
 
+    private float SpriteDistanceAlpha(EmitterState state, Vector3 inheritedScale, float distance, Vector4 distances)
+    {
+        if (!_spriteCullScales.TryGetValue(state, out var scale))
+        {
+            var root = CurrentRoot(state, _requestedTime, currentFrame: true);
+            scale = root.Decompose(out var rootScale, out var rotation, out var translation)
+                && PositiveUniformScale(rootScale) && PositiveUniformScale(inheritedScale)
+                && MatrixClose(root, Matrix.CreateScale(rootScale) * Matrix.CreateFromQuaternion(rotation) * Matrix.CreateTranslation(translation))
+                ? rootScale.X * inheritedScale.X : null;
+            _spriteCullScales.Add(state, scale);
+        }
+        if (scale is not { } emitterScale || !float.IsFinite(emitterScale))
+        {
+            SpriteCullScaleUnsupported = true;
+            return 1;
+        }
+        // Native sprite VS uses the current emitter scale, including for existing world-space particles.
+        distances *= emitterScale;
+        if (distance < distances.X || distance >= distances.W) return 0;
+        if (distance < distances.Y) return Math.Clamp((distance - distances.X) / (distances.Y - distances.X + .000001f), 0, 1);
+        if (distance < distances.Z) return 1;
+        return Math.Clamp((distances.W - distance) / (distances.W - distances.Z + .000001f), 0, 1);
+    }
+
+    private void CommitModelMotion(Particle particle, double time)
+    {
+        if (particle.Emitter.Definition.ModelEmitterMotion == null) return;
+        var root = CurrentRoot(particle.Emitter, time);
+        (particle.Position, particle.Velocity) = ModelMotionAt(particle, time, root);
+        particle.ModelMotionRoot = root;
+        particle.ModelMotionTime = time;
+    }
+
+    private (Vector3 Position, Vector3 Velocity) ModelMotionAt(Particle particle, double time, Matrix root)
+    {
+        var state = particle.Emitter; var definition = state.Definition; var motion = definition.ModelEmitterMotion!;
+        var previousPhase = Phase(particle.ModelMotionTime - state.Start, state.Duration, definition.ModelEmitterFollowLoop);
+        var phase = Phase(time - state.Start, state.Duration, definition.ModelEmitterFollowLoop);
+        var previousPosition = motion.Position(previousPhase, state.RandomRate);
+        var currentPosition = motion.Position(phase, state.RandomRate);
+        var previousOrientation = motion.Orientation(previousPhase, state.RandomRate);
+        var currentOrientation = motion.Orientation(phase, state.RandomRate);
+        var previousRoot = particle.ModelMotionRoot;
+        bool SupportedRoot(Matrix value, out Vector3 rootScale)
+            => value.Decompose(out rootScale, out var rotation, out var translation) && PositiveUniformScale(rootScale)
+                && MatrixClose(value, Matrix.CreateScale(rootScale) * Matrix.CreateFromQuaternion(Quaternion.Normalize(rotation))
+                    * Matrix.CreateTranslation(translation));
+        var previousScale = EventScale(state, particle.ModelMotionTime);
+        var scale = EventScale(state, time);
+        if (!SupportedRoot(previousRoot, out var previousRootScale) || !SupportedRoot(root, out var rootScale)
+            || !PositiveUniformScale(previousScale) || !PositiveUniformScale(scale))
+        {
+            ModelSpinBasisUnsupported = true;
+            return (particle.Position, particle.Velocity);
+        }
+        bool UnitScale(Vector3 value) => Math.Abs(value.X - 1) <= .00001f
+            && Math.Abs(value.Y - 1) <= .00001f && Math.Abs(value.Z - 1) <= .00001f;
+        // The native block's raw emitter-position inputs have only been calibrated at unit scale.
+        if (!UnitScale(previousRootScale) || !UnitScale(rootScale) || !UnitScale(previousScale) || !UnitScale(scale))
+        {
+            ModelMotionScaleUnsupported = true;
+            return (particle.Position, particle.Velocity);
+        }
+        // The existing local representation already transports an unchanged emitter with its node.
+        if (previousPosition == currentPosition && previousOrientation == currentOrientation)
+            return (particle.Position, particle.Velocity);
+        var worldPosition = Vector3.Transform(particle.Position * previousScale, previousRoot);
+        var worldVelocity = Vector3.TransformNormal(particle.Velocity * previousScale, previousRoot);
+        (worldPosition, worldVelocity) = VfxModelNativeMotion.Transport(worldPosition, worldVelocity, previousRoot, root,
+            previousPosition, currentPosition, previousOrientation, currentOrientation);
+        var inverse = Matrix.Invert(root);
+        return (Vector3.Transform(worldPosition, inverse) / scale, Vector3.TransformNormal(worldVelocity, inverse) / scale);
+    }
+
     private Matrix ParticleRoot(Particle particle, double time, bool currentFrame = false)
     {
-        var current = CurrentRoot(particle.Emitter, time, currentFrame);
         var space = particle.Emitter.Definition.SimulationSpace;
+        if (space == 2) return particle.Root;
+        var current = CurrentRoot(particle.Emitter, time, currentFrame);
         var root = space == 1 ? current : particle.Root;
         if (space == 0) root.Translation = current.Translation;
         return root;
@@ -759,6 +1230,8 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         var position = definition.Kind == 1 && !definition.IsEventHelper ? parent.MotionOrigin : parent.Position;
         if (definition.ConstantForceDamping != null && ForceBasisSupported(parent, definition))
             (position, _) = ConstantMotion(parent, definition, Math.Min(parent.Life, time - parent.Birth));
+        if (definition.ModelEmitterMotion != null)
+            (position, _) = ModelMotionAt(parent, Math.Min(time, parent.Birth + parent.Life), root);
         var world = Vector3.Transform(position * EventScale(parent.Emitter, time, currentFrame), root);
         if (definition.RequiresFlatTerrain && definition.SpawnOnTerrain)
         {
@@ -771,8 +1244,9 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         var damping = definition.SpinDeceleration.Sample("x", 0, parent.RandomAlpha);
         var spinTime = damping > 0 ? (1 - Math.Exp(-damping * age)) / damping : age;
         var orientation = state.Event!.Orientation == "orientation"
-            ? (definition.Kind == 1 ? ModelRotation(parent.Orientation + parent.Spin * (float)spinTime)
-                : Rotation(parent.Orientation + parent.Spin * (float)spinTime)) * RotationOnly(root) : Matrix.Identity;
+            ? (definition.ModelQuaternionSpin ? Matrix.CreateFromQuaternion(ModelSpinAt(parent, time, root).Rotation)
+                : (definition.Kind == 1 ? ModelRotation(parent.Orientation + parent.Spin * (float)spinTime)
+                    : Rotation(parent.Orientation + parent.Spin * (float)spinTime)) * RotationOnly(root)) : Matrix.Identity;
         var anchor = orientation * Matrix.CreateTranslation(world);
         if (!state.Event.TrackPosition && state.SpawnAnchor.HasValue) anchor.Translation = state.SpawnAnchor.Value.Translation;
         return anchor;
@@ -817,7 +1291,10 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         var age = time - particle.Birth;
         if (definition.MeshLoop is not { } loop) return age;
         var emitter = particle.Emitter;
-        return LoopedAge(age, particle.Life, loop, definition.Infinite ? null : emitter.Start + emitter.Duration - particle.Birth);
+        double? end = definition.Infinite ? null : emitter.Start + emitter.Duration;
+        if (emitter.Parent == null && _emissionEndTimeSeconds is { } emissionEnd)
+            end = end is { } authoredEnd ? Math.Min(authoredEnd, emissionEnd) : emissionEnd;
+        return LoopedAge(age, particle.Life, loop, end - particle.Birth);
     }
 
     internal static double LoopedAge(double age, double life, Vector2 loop, double? stopAge = null)
@@ -844,13 +1321,20 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         return (float)(atlas.Loop ? (frame % count + count) % count : Math.Clamp(frame, 0, count - 1));
     }
 
+    private static float InitialParameterPhase(EmitterState state, double birthTime)
+    {
+        if (!(state.Duration > 0)) return 0;
+        var time = (float)birthTime - (float)state.Start;
+        return state.Definition.InitialParameterLoop ? time % state.Duration / state.Duration : Math.Clamp(time / state.Duration, 0, 1);
+    }
+
     private static double Phase(double time, float duration, bool loop)
     {
         var phase = Math.Max(0, time) / duration;
         return loop ? phase - Math.Floor(phase) : Math.Clamp(phase, 0, 1);
     }
 
-    private static float MinimumPixelScale(float limit, Vector3 scale, float stretch, Vector3 position, CommonShaderParameters camera)
+    private static float MinimumPixelScale(float limit, bool halfResolution, Vector3 scale, float stretch, Vector3 position, CommonShaderParameters camera)
     {
         if (!(camera.ViewportWidth > 0) || !float.IsFinite(camera.ViewportWidth) || !(scale.X > 0)) return 1;
         var distance = Vector3.Distance(position, camera.CameraPosition);
@@ -858,13 +1342,19 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         var origin = Vector4.Transform(new Vector4(0, 0, distance, 1), camera.Projection);
         if (edge.W == 0 || origin.W == 0) return 1;
         // Projection reflection changes screen direction, not the authored signed particle width.
-        var pixels = Math.Abs(edge.X / edge.W - origin.X / origin.W) * camera.ViewportWidth * .5f;
+        var viewportWidth = halfResolution ? Math.Max(1, MathF.Floor(camera.ViewportWidth * .5f)) : camera.ViewportWidth;
+        var pixels = Math.Abs(edge.X / edge.W - origin.X / origin.W) * viewportWidth * .5f;
         var factor = limit / pixels;
         return pixels > 0 && float.IsFinite(factor) ? Math.Max(1, factor) : 1;
     }
 
     private bool ForceBasisSupported(Particle particle, VfxPreviewEmitter definition)
     {
+        if (definition.SimulationSpace == 2 && particle.WorldForceBasisSupported is { } cached)
+        {
+            if (!cached) ForceBasisUnsupported = true;
+            return cached;
+        }
         var emitter = particle.Emitter;
         var basis = ParticleRoot(particle, _simulatedTime);
         var allowed = definition.ConstantForceDamping == null && float.IsFinite(basis.M11) && basis.M11 > 0
@@ -872,6 +1362,7 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         allowed.Translation = basis.Translation;
         var supported = Math.Abs(emitter.TimeScale - 1) <= 0.00001f && MatrixClose(basis, allowed)
             && (definition.ConstantForceDamping == null || emitter.LifeBias == 0);
+        if (definition.SimulationSpace == 2) particle.WorldForceBasisSupported = supported;
         if (!supported) ForceBasisUnsupported = true;
         return supported;
     }
@@ -903,6 +1394,12 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
     private static Matrix ModelRotation(Vector3 degrees) => Matrix.CreateRotationX(MathHelper.ToRadians(degrees.X))
         * Matrix.CreateRotationY(MathHelper.ToRadians(degrees.Y)) * Matrix.CreateRotationZ(MathHelper.ToRadians(degrees.Z));
     private static Matrix RotationOnly(Matrix matrix) => matrix.Decompose(out _, out var rotation, out _) ? Matrix.CreateFromQuaternion(rotation) : Matrix.Identity;
+    private static bool PositiveUniformScale(Vector3 scale) => float.IsFinite(scale.X) && scale.X > 0.000001f
+        && Math.Abs(scale.X - scale.Y) < 0.00001f && Math.Abs(scale.X - scale.Z) < 0.00001f;
+    private static bool TerrainDecalRootSupported(Matrix root) => root.Decompose(out var scale, out var rotation, out var position)
+        && PositiveUniformScale(scale)
+        && float.IsFinite(position.X) && float.IsFinite(position.Y) && float.IsFinite(position.Z)
+        && MatrixClose(root, Matrix.CreateScale(scale.X) * Matrix.CreateFromQuaternion(rotation) * Matrix.CreateTranslation(position));
     private static bool MatrixClose(Matrix left, Matrix right) =>
         Math.Abs(left.M11 - right.M11) < 0.00001f && Math.Abs(left.M12 - right.M12) < 0.00001f && Math.Abs(left.M13 - right.M13) < 0.00001f && Math.Abs(left.M14 - right.M14) < 0.00001f
         && Math.Abs(left.M21 - right.M21) < 0.00001f && Math.Abs(left.M22 - right.M22) < 0.00001f && Math.Abs(left.M23 - right.M23) < 0.00001f && Math.Abs(left.M24 - right.M24) < 0.00001f
@@ -926,15 +1423,19 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         public readonly Vector4 Tint;
         public int ActiveCount;
         public bool ModelAngularUnsupported;
+        public bool SpriteAngularUnsupported;
         public bool Started;
         public double Accumulator;
         public Matrix? DistanceRoot;
         public double DistanceRemainder;
+        public Matrix? NativeTrailRoot;
+        public double NativeTrailTime;
         public Matrix? MotionRoot;
         public double MotionTime;
         public Vector3 MotionVelocity;
         public EmitterState(VfxPreviewEmitter definition, int seed, int definitionIndex, Particle? parent = null,
-            VfxPreviewParticleEvent? particleEvent = null, double eventTime = 0)
+            VfxPreviewParticleEvent? particleEvent = null, double eventTime = 0,
+            Dictionary<object, ReferenceRandoms>? referenceRandoms = null)
         {
             Definition = definition; DefinitionIndex = definitionIndex; Parent = parent; Event = particleEvent; Random = new(seed);
             Start = definition.Start.Sample(Random.NextSingle()); Duration = definition.Duration.Sample(Random.NextSingle());
@@ -942,26 +1443,38 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
             TimeScale = RateScale = 1; LifeBias = 0; ReferenceTransform = Matrix.Identity; Tint = Vector4.One;
             foreach (var reference in definition.References)
             {
-                Start = reference.Start.Sample(Random.NextSingle()) + Start / reference.Speed;
-                Duration = Math.Max(0.0001f, Duration + reference.DurationBias.Sample(Random.NextSingle())) / reference.Speed;
-                LifeBias += reference.LifeBias.Sample(Random.NextSingle()) * TimeScale;
-                TimeScale *= reference.Speed; RateScale *= reference.Rate.Sample(Random.NextSingle());
-                ReferenceTransform *= Matrix.CreateScale(reference.Scale.Sample(Random.NextSingle())) * Rotation(reference.Rotation) * Matrix.CreateTranslation(reference.Position);
-                Tint *= Vector4.Lerp(reference.TintMin, reference.TintMax, Random.NextSingle());
+                // Keep each emitter's random stream while sharing the reference instance's six controller weights.
+                var sampled = new ReferenceRandoms(Random.NextSingle(), Random.NextSingle(), Random.NextSingle(),
+                    Random.NextSingle(), Random.NextSingle(), Random.NextSingle());
+                if (referenceRandoms != null)
+                {
+                    if (referenceRandoms.TryGetValue(reference.InstanceKey, out var shared)) sampled = shared;
+                    else referenceRandoms.Add(reference.InstanceKey, sampled);
+                }
+                Start = reference.Start.Sample(sampled.Start) + Start / reference.Speed;
+                Duration = Math.Max(0.0001f, Duration + reference.DurationBias.Sample(sampled.DurationBias)) / reference.Speed;
+                LifeBias += reference.LifeBias.Sample(sampled.LifeBias) * TimeScale;
+                TimeScale *= reference.Speed; RateScale *= reference.Rate.Sample(sampled.Rate);
+                ReferenceTransform *= Matrix.CreateScale(reference.Scale.Sample(sampled.Scale)) * Rotation(reference.Rotation) * Matrix.CreateTranslation(reference.Position);
+                Tint *= Vector4.Lerp(reference.TintMin, reference.TintMax, sampled.Tint);
             }
             Start += (float)eventTime;
         }
     }
+    private readonly record struct ReferenceRandoms(float Start, float DurationBias, float LifeBias, float Rate, float Scale, float Tint);
     private sealed class Particle
     {
         public EmitterState Emitter = null!;
         public List<EmitterState>? EventInstances;
         public bool Alive = true;
+        public bool NativeFrameTrail;
         public int Cell, Row, ModelVariant;
         public double Birth;
         public double MotionStart;
         public float Life, InitialAlpha, RandomAlpha, Loops;
         public Vector3 Position, Velocity, InitialScale, Orientation, Spin, RandomScale, RandomColour;
+        public Vector3? FixedForce;
+        public bool? WorldForceBasisSupported;
         public Vector3 MotionOrigin, MotionInitialVelocity;
         public Matrix Root;
         public Matrix BirthRotation;
@@ -970,5 +1483,7 @@ internal sealed class TotalWarVfxSimulation(VfxConversion conversion)
         public float AngularSpeed;
         public Vector3 AngularVelocity;
         public double SpinTime;
+        public Matrix ModelMotionRoot;
+        public double ModelMotionTime;
     }
 }

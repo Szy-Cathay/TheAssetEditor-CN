@@ -17,7 +17,7 @@ std::vector<uint8_t> PremultipliedMaterial(bool projectedDecal = false)
         string(name); string(name); string("");
         integer(i); integer(0); integer(0); integer(1); integer(1); // value textures, clamp
     }
-    integer(projectedDecal ? 14 : 15);
+    integer(projectedDecal ? 17 : 15);
     for (auto name : {"parameters", "ambientPX", "ambientNX", "ambientPY", "ambientNY", "ambientPZ", "ambientNZ", "sunDirection", "sunColour", "lighting", "scattering"})
     {
         if (projectedDecal && std::strcmp(name, "parameters") != 0) continue;
@@ -26,7 +26,8 @@ std::vector<uint8_t> PremultipliedMaterial(bool projectedDecal = false)
     }
     if (projectedDecal)
         for (auto name : {"decalInfo", "decalProjection", "decalDistances", "decalUV", "decalPivot",
-            "decalClip0", "decalClip1", "decalClip2", "decalClip3", "decalGround"})
+            "decalClip0", "decalClip1", "decalClip2", "decalClip3", "decalGround",
+            "decalWorld0", "decalWorld1", "decalWorld2"})
         {
             string(name); string(name);
             integer(0); integer(0); integer(4); integer(0); integer(0); integer(0); integer(0);
@@ -67,6 +68,20 @@ std::vector<uint8_t> PremultipliedMaterial(bool projectedDecal = false)
             receiver = start + ray * t;
             decalMask = abs(divisor) > 0.0000001 && t >= 0 ? 1 : 0;
         }
+        $F1$ receiverAngle = 1;
+        if (parameters.z < 1.5)
+        {
+            // Depth reconstructs receiver geometry; normal-mapped G-buffer normals remain a separate boundary.
+            $F4$ receiverPoint = $F4$(receiver, 1);
+            $F3$ receiverWorld = $F3$(dot(receiverPoint, decalWorld0), dot(receiverPoint, decalWorld1), dot(receiverPoint, decalWorld2));
+            $F3$ receiverNormal = cross(ddx(receiverWorld), ddy(receiverWorld));
+            $F1$ receiverNormalLength = length(receiverNormal);
+            receiverNormal = receiverNormalLength > 0 ? receiverNormal / receiverNormalLength : $F3$(0,0,0);
+            $F3$ projectorZ = normalize($F3$(decalWorld0.z, decalWorld1.z, decalWorld2.z));
+            $F1$ angleUnary = min(abs(dot(projectorZ, receiverNormal)) * 2.5, 1);
+            receiverAngle = angleUnary * angleUnary * (3 - 2 * angleUnary);
+            decalMask *= receiverAngle >= 0.1 ? 1 : 0;
+        }
         $F2$ localUV = $F2$(receiver.x + decalPivot.x, 1 - receiver.y - decalPivot.y);
         decalMask *= all(localUV >= 0) && all(localUV <= 1) && abs(receiver.z) <= 0.5 ? 1 : 0;
         if (decalInfo.z > 1.5) localUV = $F2$(1 - localUV.y, localUV.x);
@@ -92,6 +107,8 @@ std::vector<uint8_t> PremultipliedMaterial(bool projectedDecal = false)
         $F3$ covered = min(sampled.rgb, alpha) * saturate(vertexAlpha) / max(sourceOpacity, 0.00000001);
         $F3$ emission = max(sampled.rgb - alpha, 0);
         $F3$ coverageColour = parameters.z < 0.5 ? sampled.rgb : covered;
+        // Negative crush progress can restore coverage, but native zero-opacity RGB stays black.
+        if (parameters.z < 0.5 && sourceOpacity == 0) coverageColour = $F3$(0,0,0);
         if (scattering.z > 0.5 && lighting.x > 0.5 && parameters.z < 1.5 && customData1.w > 0)
         {
             $F4$ raw0 = $TEX_P1$uv1$TEX_S1$;
@@ -143,6 +160,23 @@ std::vector<uint8_t> PremultipliedMaterial(bool projectedDecal = false)
         if (parameters.z > 1.5 && particleInfo.y > 0) opacity *= fade;
     )";
     if (projectedDecal) code += R"(
+        if (parameters.z < 1.5)
+        {
+            // Keep full particle RGBA before reproducing the native G-buffer output and blend.
+            $F1$ originalOpacity = saturate(alpha * customData2.w);
+            $F1$ crushedOpacity = originalOpacity;
+            if (particleInfo.w > 0.5)
+            {
+                crushedOpacity = saturate(originalOpacity - particleInfo.z) / (saturate(1 - particleInfo.z) + 0.001);
+                if (particleInfo.w > 1.5 && crushedOpacity < particleInfo.z) crushedOpacity = 0;
+            }
+            $F1$ correction = parameters.z > 0.5 ? saturate(customData2.w) : originalOpacity;
+            $F3$ diffuse = parameters.z > 0.5 ? min(sampled.rgb, alpha) : sampled.rgb;
+            $F1$ crushRatio = originalOpacity > 0 ? crushedOpacity / originalOpacity : 1;
+            $F3$ diffuseOutput = saturate(diffuse * customData2.rgb * crushRatio * correction * receiverAngle);
+            opacity = saturate(crushedOpacity * correction * receiverAngle);
+            emissive = opacity > 0 ? diffuseOutput / opacity : $F3$(0,0,0);
+        }
         if (parameters.z > 2.5)
         {
             // Shipped ps_main_deferred_decal_emissive writes radiance into an additive RGB target.
