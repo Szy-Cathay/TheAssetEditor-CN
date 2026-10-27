@@ -38,6 +38,7 @@ public class VfxHiddenRenderingTests
             Set(host, "_isRendering", true);
             Set(host, "_resetBackBuffer", pendingResize);
             Set(host, "_dpiChanged", pendingResize);
+            var sharedDevice = host.GraphicsDevice;
             Assert.That(() => Tick(host, 2), Throws.Nothing);
             Assert.Multiple(() =>
             {
@@ -45,7 +46,11 @@ public class VfxHiddenRenderingTests
                 Assert.That(Read(host, "_renderingSuspended"), Is.True);
                 Assert.That(Read(host, "_resetBackBuffer"), Is.EqualTo(pendingResize));
                 Assert.That(Read(host, "_dpiChanged"), Is.EqualTo(pendingResize));
-                Assert.That(host.GraphicsDevice, Is.Null);
+                Assert.That(host.GraphicsDevice, Is.SameAs(sharedDevice),
+                    "A hidden tick must preserve any device shared by earlier viewports.");
+                Assert.That(Read(host, "GraphicsDeviceInitialized"), Is.False);
+                foreach (var field in new[] { "_graphicsDevice", "_cachedRenderTarget", "_sharedRenderTarget", "_d3D11Image", "_presentationQuery", "_presentationContext", "_spriteBatch" })
+                    Assert.That(Read(host, field), Is.Null, $"A hidden tick must not initialize {field}.");
             });
         });
     }
