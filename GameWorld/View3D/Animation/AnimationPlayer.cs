@@ -9,6 +9,9 @@ using System.Windows;
 
 namespace GameWorld.Core.Animation
 {
+    public readonly record struct AnimationPlaybackTime(float ClipTimeSeconds, double ElapsedSeconds, long Revision,
+        long CycleIndex, bool IsRunning, bool IsStopped);
+
     public class AnimationFrame
     {
         public class BoneKeyFrame
@@ -64,6 +67,10 @@ namespace GameWorld.Core.Animation
         AnimationClip _animationClip;
         bool _seekPending;
         bool _interpolateTimeSeek;
+        double _playbackElapsedSeconds;
+        long _playbackRevision;
+        long _playbackCycleIndex;
+        bool _playbackClockRunning;
         public bool IsScrubbing { get; set; }
         GameSkeleton Skeleton { get { return _skeleton; } }
         public AnimationClip AnimationClip { get { return _animationClip; } }
@@ -72,6 +79,10 @@ namespace GameWorld.Core.Animation
         public bool IsEnabled { get; set; } = false;
         public bool RefreshWhilePaused { get; set; } = true;
         public bool LoopAnimation { get; set; } = true;
+        public bool ContinuePlaybackTimeAfterAnimationEnd { get; set; }
+        public AnimationPlaybackTime PlaybackTime => new((float)CurrentTime.TotalSeconds, _playbackElapsedSeconds,
+            _playbackRevision, _playbackCycleIndex, IsEnabled && !IsScrubbing && _playbackClockRunning
+                && (IsPlaying || ContinuePlaybackTimeAfterAnimationEnd), !IsEnabled);
         public bool MarkedForRemoval { get; set; } = false;
 
         public List<IAnimationChangeRule> AnimationRules { get; set; } = new List<IAnimationChangeRule>();
@@ -99,12 +110,16 @@ namespace GameWorld.Core.Animation
                 _seekPending = false;
                 _interpolateTimeSeek = false;
                 if (CurrentFrame == value && CurrentTime == FrameToStartTime(value))
+                {
+                    ResetPlaybackTime(CurrentTime.TotalSeconds);
                     return;
+                }
 
                 if (_animationClip != null)
                 {
                     if (FrameCount == 0)
                     {
+                        ResetPlaybackTime(0);
                         OnFrameChanged?.Invoke(0);
                         Refresh();
                         return;
@@ -112,10 +127,12 @@ namespace GameWorld.Core.Animation
 
                     var frameIndex = MathUtil.EnsureRange(value, 0, FrameCount - 1);
                     _timeSinceStart = new TimeSpanExtension(FrameToStartTime(frameIndex));
+                    ResetPlaybackTime(_timeSinceStart.TimeSpan.TotalSeconds);
                     OnFrameChanged?.Invoke(CurrentFrame);
                 }
                 else
                 {
+                    ResetPlaybackTime(0);
                     OnFrameChanged?.Invoke(0);
                 }
                 Refresh();
@@ -136,6 +153,8 @@ namespace GameWorld.Core.Animation
             _skeleton = skeleton;
             _animationClip = animation;
             _timeSinceStart = new TimeSpanExtension();
+            ResetPlaybackTime(0);
+            _playbackClockRunning = IsPlaying;
             Refresh();
         }
 
@@ -156,6 +175,9 @@ namespace GameWorld.Core.Animation
                 return;
             }
 
+            if (!IsScrubbing && _playbackClockRunning && (IsPlaying || ContinuePlaybackTimeAfterAnimationEnd))
+                _playbackElapsedSeconds += Math.Max(0, gameTime.ElapsedGameTime.TotalSeconds);
+
             if (IsScrubbing || !IsPlaying && !RefreshWhilePaused)
                 return;
 
@@ -169,11 +191,13 @@ namespace GameWorld.Core.Animation
                     if (LoopAnimation)
                     {
                         _timeSinceStart = new TimeSpanExtension();
+                        _playbackCycleIndex++;
                     }
                     else
                     {
                         _timeSinceStart = new TimeSpanExtension(animationDuration);
                         IsPlaying = false;
+                        if (!ContinuePlaybackTimeAfterAnimationEnd) _playbackClockRunning = false;
                     }
                 }
 
@@ -208,9 +232,36 @@ namespace GameWorld.Core.Animation
             }
         }
 
-        public void Play() { IsPlaying = true; IsEnabled = true; }
+        public void Play()
+        {
+            if (!IsEnabled) _playbackElapsedSeconds = CurrentTime.TotalSeconds;
+            IsPlaying = true; IsEnabled = true; _playbackClockRunning = true;
+        }
 
-        public void Pause() { IsPlaying = false; }
+        public void Pause() { IsPlaying = false; _playbackClockRunning = false; }
+
+        public void HoldAtEnd()
+        {
+            IsPlaying = false;
+            if (!ContinuePlaybackTimeAfterAnimationEnd) _playbackClockRunning = false;
+        }
+
+        public void RestartForLoop()
+        {
+            _seekPending = false; _interpolateTimeSeek = false; IsScrubbing = false;
+            _timeSinceStart = new TimeSpanExtension();
+            _playbackCycleIndex++;
+            IsPlaying = true; IsEnabled = true; _playbackClockRunning = true;
+            OnFrameChanged?.Invoke(CurrentFrame);
+            Refresh();
+        }
+
+        private void ResetPlaybackTime(double seconds)
+        {
+            _playbackElapsedSeconds = seconds;
+            _playbackCycleIndex = 0;
+            _playbackRevision++;
+        }
 
         public void SeekToTimeSeconds(float timeSeconds)
         {
@@ -230,6 +281,7 @@ namespace GameWorld.Core.Animation
                 requestedTime = Duration;
 
             _timeSinceStart = new TimeSpanExtension(requestedTime);
+            ResetPlaybackTime(requestedTime.TotalSeconds);
             _interpolateTimeSeek = true;
             _seekPending = true;
             OnFrameChanged?.Invoke(CurrentFrame);
@@ -242,6 +294,8 @@ namespace GameWorld.Core.Animation
             IsPlaying = false;
             _currentAnimFrame = null;
             IsEnabled = false;
+            _playbackClockRunning = false;
+            ResetPlaybackTime(0);
             _skeleton?.Update();
         }
 

@@ -158,10 +158,12 @@ public class VfxConstantForceDampingTests
         }
         var bytes = document.Write();
         var conversion = TotalWarVfxConverter.Convert(original with { GameBytes = bytes });
-        var unsupported = control is "emitter-rotation" or "additional-force" or "wind";
+        var unsupported = control is "emitter-rotation" or "additional-force";
         Assert.That(conversion.Emitters.Single().ConstantForceDamping, Is.Null);
         Assert.That(conversion.Emitters.Single().ParticleForceCurve, Is.EqualTo(!unsupported));
         Assert.That(conversion.Diagnostics.Any(item => item.Field == "ForceA" && item.ReasonKey == "Vfx.Preview.ForceUnsupported"), Is.EqualTo(unsupported));
+        if (control == "wind")
+            Assert.That(conversion.Diagnostics.Any(item => item.Field == "WindVarianceFactor" && item.ReasonKey == "Vfx.Preview.Unmapped"), Is.True);
         Set("ForceA", VectorCurve(0));
         var expected = new TotalWarVfxSimulation(TotalWarVfxConverter.Convert(original with { GameBytes = document.Write() }));
         var actual = new TotalWarVfxSimulation(conversion);

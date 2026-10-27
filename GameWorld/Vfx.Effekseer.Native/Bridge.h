@@ -33,6 +33,14 @@ struct AecnParticle
     float SoftParticleScale;
 };
 
+// Original particles remain unsplit; legacy layer IDs permit an exact fallback.
+struct AecnHalfLayerConfig
+{
+    int32_t LayerIndex, LegacyCoverageIndex, LegacyEmissionIndex, Premultiplied;
+    float CoveredColourMultiplier, EmissionMultiplier;
+};
+static_assert(sizeof(AecnHalfLayerConfig) == 24, "Invalid half-resolution layer ABI");
+
 struct AecnLighting
 {
     float PositiveX[4], NegativeX[4], PositiveY[4], NegativeY[4], PositiveZ[4], NegativeZ[4];

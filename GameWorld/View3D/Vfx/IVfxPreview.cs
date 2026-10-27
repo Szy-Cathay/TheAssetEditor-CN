@@ -1,4 +1,4 @@
-﻿using GameWorld.Core.Rendering;
+using GameWorld.Core.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
@@ -29,8 +29,17 @@ public interface IVfxPreview : IDisposable
     int DisabledEmitterCount => 0;
     int ParticleCount { get; }
     float CycleDuration => 8;
+    bool HasInfiniteEmitters => false;
     bool HasMotionTrailEmitters => false;
+    // Only interactive owners opt in; synchronous/offscreen callers retain the existing contract.
+    void EnableInteractivePrewarm() { }
+    bool IsPreparing => false;
+    void PrepareInteractiveFrame(Matrix attachment, Func<float, Matrix>? attachmentAtTime) { }
+    // Instance-local root emission boundary; particles and their event tails keep their authored lifetime.
+    float? EmissionEndTimeSeconds { get => null; set { } }
+    bool IsDrained => false;
     BoundingBox? PreviewBounds => null;
+    IVfxPreview? CreatePlaybackInstance() => null;
     void Reload(VfxPreviewSnapshot snapshot);
     void Advance(float seconds, Matrix attachment);
     void Seek(float seconds, Matrix attachment);
@@ -43,7 +52,11 @@ public interface IVfxPreview : IDisposable
         if (attachmentAtTime != null) Seek(seconds, attachment, attachmentAtTime, useCurrentAttachmentForFrame: true);
         else Seek(seconds, attachment);
     }
+    void SeekContinuousTrail(float seconds, Matrix attachment, Func<float, Matrix>? attachmentAtTime,
+        Func<float, float?>? nextAttachmentSample) => SeekContinuousTrail(seconds, attachment, attachmentAtTime);
     void Draw(CommonShaderParameters parameters);
+    void Draw(CommonShaderParameters parameters, IDisposable? scene) => Draw(parameters);
+    IDisposable? BeginScene(CommonShaderParameters parameters) => null;
 }
 
 public interface IVfxPreviewFactory

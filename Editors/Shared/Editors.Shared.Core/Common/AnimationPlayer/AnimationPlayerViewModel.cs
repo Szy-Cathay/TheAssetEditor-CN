@@ -180,11 +180,10 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
             {
                 if (LoopAnimation.Value)
                 {
-                    SetAnimationFirstFrame();
-                    _assetList.ForEach(Resume);
+                    foreach (var player in GetPlayers()) player.RestartForLoop();
                 }
                 else
-                    _assetList.ForEach(Pause);
+                    foreach (var player in GetPlayers()) player.HoldAtEnd();
             }
 
             UpdatePlayingState();
@@ -215,7 +214,8 @@ namespace Editors.Shared.Core.Common.AnimationPlayer
         {
             var player = SelectedMainAnimation?.Asset.Player;
             IsPlaying.Value = player != null && player.FrameCount > 0
-                && player.IsPlaying && player.IsEnabled;
+                && (player.IsPlaying || player.ContinuePlaybackTimeAfterAnimationEnd && player.PlaybackTime.IsRunning)
+                && player.IsEnabled;
         }
 
         HashSet<GameAnimationPlayer> GetPlayers()

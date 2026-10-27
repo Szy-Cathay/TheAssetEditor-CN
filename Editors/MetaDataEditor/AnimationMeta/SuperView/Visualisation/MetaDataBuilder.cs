@@ -423,7 +423,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         skeleton,
                         selectedAttribute,
                         owner,
-                        diagnostics));
+                        diagnostics,
+                        rootPlayer));
 
             foreach (var attribute in file.Attributes
                 .OfType<ParsedMetadataAttribute>())
@@ -589,7 +590,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         skeleton,
                         isSelected ? attribute : null,
                         owner,
-                        diagnostics),
+                        diagnostics,
+                        rootPlayer),
                     _ => null
                 };
             }
@@ -1458,7 +1460,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             ISkeletonProvider skeleton,
             ParsedMetadataAttribute? selectedAttribute,
             MetaDataDocumentOwner owner,
-            ICollection<MetaDataBuildDiagnostic> diagnostics)
+            ICollection<MetaDataBuildDiagnostic> diagnostics,
+            AnimationPlayer rootPlayer)
         {
             var source = (ParsedMetadataAttribute)effect;
             AddEffectSettingsDiagnostics(effect, source, owner, diagnostics);
@@ -1500,7 +1503,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             if (resource != null && _vfxFactory != null && _devices != null && _liveDocuments != null)
             {
                 var documentSource = new VfxPreviewDocumentSource(_resourceResolver.Files, resource, _liveDocuments);
-                var particles = new VfxPreviewSceneNode(_vfxFactory, _devices, documentSource);
+                // The SuperView grid is a world-Y0 preview receiver, independent of animated bones.
+                var particles = new VfxPreviewSceneNode(_vfxFactory, _devices, documentSource) { FlatGroundHeight = 0 };
                 var scale = GetEffectScale(effect);
                 particles.ModelMatrix = Matrix.CreateScale(scale);
                 particles.IsVisible = scale != 0;
@@ -1532,7 +1536,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 {
                     diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, "Vfx.Preview.InvalidData", documentSource.Path));
                 }
-                return new EffectMetaInstance(instance, particles, GetActiveTimeRange(source));
+                rootPlayer.ContinuePlaybackTimeAfterAnimationEnd = true;
+                return new EffectMetaInstance(instance, particles, GetActiveTimeRange(source), owner == MetaDataDocumentOwner.Persistent, rootPlayer);
             }
             return instance;
         }

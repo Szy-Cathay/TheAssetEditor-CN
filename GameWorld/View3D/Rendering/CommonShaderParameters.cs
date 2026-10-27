@@ -29,7 +29,10 @@ namespace GameWorld.Core.Rendering
         GameEnvironmentLighting? GameWeather = null,
         float? VfxGroundHeight = null,
         float MaterialTimeSeconds = 0,
-        SharpDX.Direct3D11.ShaderResourceView? VfxSoftDepth = null
+        SharpDX.Direct3D11.ShaderResourceView? VfxSoftDepth = null,
+        bool VfxWriteGroundDepth = false,
+        // Native ordinary-sprite global default; explicit overrides are renderer diagnostics.
+        float VfxLowOpacityCulling = .01f
         );
 
 }

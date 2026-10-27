@@ -31,6 +31,14 @@ internal struct EffekseerLayer
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 4)]
+internal struct EffekseerHalfLayer
+{
+    internal const int Bytes = 24;
+    public int LayerIndex, LegacyCoverageIndex, LegacyEmissionIndex, Premultiplied;
+    public float CoveredColourMultiplier, EmissionMultiplier;
+}
+
+[StructLayout(LayoutKind.Sequential, Pack = 4)]
 internal struct EffekseerParticle
 {
     public int Layer;
@@ -81,6 +89,9 @@ internal static class EffekseerNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern void AecnVfxDestroy(nint preview);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxDepthAvailable(EffekseerHandle preview);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxDrawCalls(EffekseerHandle preview);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxBeginScene(EffekseerHandle preview, in EffekseerLighting lighting);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxEndScene(EffekseerHandle preview);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxEndScene(nint preview);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxTextureRgba(EffekseerHandle preview, byte[] pixels, int length, int width, int height, int srgb);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxTextureRgbaMipChain(EffekseerHandle preview, byte[] pixels, int length, int width, int height, int srgb, int mipLevels);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxTextureAlias(EffekseerHandle preview, int sourceIndex);
@@ -89,7 +100,10 @@ internal static class EffekseerNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxModelAlias(EffekseerHandle preview, int sourceIndex);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxMeshMaterial(EffekseerHandle preview, int[] textures, int textureCount, float[] parameters, int parameterCount);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxConfigure(EffekseerHandle preview, [In] EffekseerLayer[] layers, int count);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxConfigureHalf(EffekseerHandle preview, [In] EffekseerHalfLayer[] layers, int count, int configBytes);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxConfigureFull(EffekseerHandle preview, [In] EffekseerHalfLayer[] layers, int count, int configBytes);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxDraw(EffekseerHandle preview, float[] view, float[] projection, [In] EffekseerParticle[] particles, int count, in EffekseerLighting lighting = default, nint softDepth = 0);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxDrawInScene(nint owner, EffekseerHandle preview, float[] view, float[] projection, [In] EffekseerParticle[] particles, int count, in EffekseerLighting lighting = default, nint softDepth = 0);
 
     internal static void Check(int result)
     {

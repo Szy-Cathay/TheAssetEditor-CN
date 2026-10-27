@@ -14,6 +14,8 @@
 namespace
 {
 #include "CoverageMaterial.h"
+#include "BulkSpriteShaderSources.h"
+#include "NativeMboitShaderSources.h"
 #include "DistortionMaterial.h"
 #include "OneShotMeshMaterial.h"
 #include "BasicMeshMaterial.h"
@@ -47,6 +49,12 @@ bool IsCoverage(const Effekseer::MaterialFile& material)
         && std::strcmp(material.GetUniformName(1), "ambientPX") == 0;
 }
 
+bool IsProjectedDecal(const Effekseer::MaterialFile& material)
+{
+    return material.GetUniformCount() > 1 && std::strcmp(material.GetUniformName(0), "parameters") == 0
+        && std::strcmp(material.GetUniformName(1), "decalInfo") == 0;
+}
+
 void ReplaceRequired(std::string& code, const std::string& from, const std::string& to)
 {
     const auto position = code.find(from);
@@ -68,7 +76,7 @@ std::vector<uint8_t> CompileShader(const std::string& code, const char* profile)
     return {data, data + shader->GetBufferSize()};
 }
 
-std::vector<uint8_t> CompileCoverageVertexShader(Effekseer::MaterialFile& material, Effekseer::MaterialShaderType type)
+std::string CoverageVertexSource(Effekseer::MaterialFile& material, Effekseer::MaterialShaderType type)
 {
     using namespace Effekseer;
     auto generator = DirectX::ShaderGenerator(DirectX::ShaderGeneratorTarget::DirectX11);
@@ -93,10 +101,10 @@ std::vector<uint8_t> CompileCoverageVertexShader(Effekseer::MaterialFile& materi
         )");
     }
     else ReplaceRequired(code, "Output.PosP = Output.Position;", "Output.PosP = Output.Position;\n Output.AecnSoftViewZ = 0;");
-    return CompileShader(code, "vs_5_0");
+    return code;
 }
 
-std::vector<uint8_t> CompileTrilinearPixelShader(Effekseer::MaterialFile& material, Effekseer::MaterialShaderType type)
+std::string TrilinearPixelSource(Effekseer::MaterialFile& material, Effekseer::MaterialShaderType type)
 {
     using namespace Effekseer;
     auto generator = DirectX::ShaderGenerator(DirectX::ShaderGeneratorTarget::DirectX11);
@@ -123,6 +131,38 @@ std::vector<uint8_t> CompileTrilinearPixelShader(Effekseer::MaterialFile& materi
             "uint tideDepthWidth, tideDepthHeight; efk_depth_texture.GetDimensions(tideDepthWidth, tideDepthHeight);\n"
             "int2 tideDepthPixel = clamp(int2(floor(screenUV)), int2(0,0), int2(tideDepthWidth,tideDepthHeight)-1);\n"
             "float backgroundZ = efk_depth_texture.Load(int3(tideDepthPixel,0)).x;");
+    }
+    if (IsProjectedDecal(material))
+    {
+        // The copied depth covers the whole target; screenUV remains local for decal reconstruction.
+        ReplaceRequired(code, "CalcDepthFade(screenUV, 0, 1000000)",
+            "CalcDepthFade(Input.Position.xy, 0, 1000000)");
+        ReplaceRequired(code, "CalcDepthFade(screenUV, meshZ, parameters.y)",
+            "CalcDepthFade(Input.Position.xy, meshZ, parameters.y)");
+        ReplaceRequired(code, "float backgroundZ = efk_depth_texture.Sample(efk_depth_sampler, GetUVBack(screenUV)).x;",
+            "uint decalDepthWidth, decalDepthHeight; efk_depth_texture.GetDimensions(decalDepthWidth, decalDepthHeight);\n"
+            "int2 decalDepthPixel = clamp(int2(floor(screenUV)), int2(0,0), int2(decalDepthWidth,decalDepthHeight)-1);\n"
+            "float backgroundZ = efk_depth_texture.Load(int3(decalDepthPixel,0)).x;");
+    }
+    if (material.GetUniformCount() > 1 && std::strcmp(material.GetUniformName(0), "mesh0") == 0
+        && std::strcmp(material.GetUniformName(material.GetUniformCount() - 1), "meshRender") == 0)
+    {
+        const std::string depthCall = "CalcDepthFade(screenUV,";
+        const std::string absoluteDepthCall = "CalcDepthFade(Input.Position.xy,";
+        auto position = code.find(depthCall);
+        if (position != std::string::npos)
+        {
+            // Specialized sprite and model materials share the full copied scene-depth target.
+            do
+            {
+                code.replace(position, depthCall.size(), absoluteDepthCall);
+                position = code.find(depthCall, position + absoluteDepthCall.size());
+            } while (position != std::string::npos);
+            ReplaceRequired(code, "float backgroundZ = efk_depth_texture.Sample(efk_depth_sampler, GetUVBack(screenUV)).x;",
+                "uint meshDepthWidth, meshDepthHeight; efk_depth_texture.GetDimensions(meshDepthWidth, meshDepthHeight);\n"
+                "int2 meshDepthPixel = clamp(int2(floor(screenUV)), int2(0,0), int2(meshDepthWidth,meshDepthHeight)-1);\n"
+                "float backgroundZ = efk_depth_texture.Load(int3(meshDepthPixel,0)).x;");
+        }
     }
     const bool distortion = material.GetUniformCount() > 0 && std::strcmp(material.GetUniformName(0), "distortionInfo") == 0;
     const bool coverage = IsCoverage(material);
@@ -191,7 +231,16 @@ float4 AecnTrilinear(Texture2D source, SamplerState sourceSampler, float2 uv)
         source.SampleLevel(sourceSampler, uv, min(lower + 1, levels - 1)), lod - lower);
 }
 )" + code;
-    return CompileShader(code, "ps_5_0");
+    return code;
+}
+
+std::vector<uint8_t> CompileCoverageVertexShader(Effekseer::MaterialFile& material, Effekseer::MaterialShaderType type)
+{
+    return CompileShader(CoverageVertexSource(material, type), "vs_5_0");
+}
+std::vector<uint8_t> CompileTrilinearPixelShader(Effekseer::MaterialFile& material, Effekseer::MaterialShaderType type)
+{
+    return CompileShader(TrilinearPixelSource(material, type), "ps_5_0");
 }
 
 std::vector<uint8_t> Compile(std::vector<uint8_t> source)
@@ -272,6 +321,27 @@ int main(int argc, char** argv)
             std::cout << "Compile VFX material " << i + 1 << " / " << sources.size() << std::endl;
             materials[i] = Compile(std::move(sources[i]));
         }
+        auto bulkSource = PremultipliedMaterial();
+        Effekseer::MaterialFile bulkMaterial;
+        if (!bulkMaterial.Load(bulkSource.data(), static_cast<int32_t>(bulkSource.size())))
+            throw std::runtime_error("Invalid bulk sprite source");
+        const auto originalVertex = CoverageVertexSource(bulkMaterial, Effekseer::MaterialShaderType::Standard);
+        const auto originalPixel = TrilinearPixelSource(bulkMaterial, Effekseer::MaterialShaderType::Standard);
+        std::array<std::vector<uint8_t>, 3> bulkShaders = {
+            CompileShader(BulkSpriteVertexSource(originalVertex), "vs_5_0"),
+            CompileShader(BulkSpritePixelSource(originalPixel, false), "ps_5_0"),
+            CompileShader(BulkSpritePixelSource(originalPixel, true), "ps_5_0")};
+        std::array<std::vector<uint8_t>, 10> halfShaders = {
+            CompileShader(HalfSceneVertexSource(originalVertex), "vs_5_0"),
+            CompileShader(HalfSceneMomentPixelSource(originalPixel), "ps_5_0"),
+            CompileShader(HalfSceneColourPixelSource(originalPixel), "ps_5_0"),
+            CompileShader(HalfSceneFullscreenVertexSource(), "vs_5_0"),
+            CompileShader(HalfSceneMergePixelSource(), "ps_5_0"),
+            CompileShader(HalfSceneComposePixelSource(), "ps_5_0"),
+            CompileShader(HalfSceneDepthPixelSource(), "ps_5_0"),
+            CompileShader(HalfSceneMomentPixelSource(originalPixel, true), "ps_5_0"),
+            CompileShader(HalfSceneColourPixelSource(originalPixel, true), "ps_5_0"),
+            CompileShader(HalfSceneComposePixelSource(true), "ps_5_0")};
         std::ofstream output(argv[1], std::ios::binary | std::ios::trunc);
         output.exceptions(std::ios::badbit | std::ios::failbit);
         output << "#pragma once\n// Generated from the pinned compiler and current material sources.\n";
@@ -282,10 +352,30 @@ int main(int argc, char** argv)
                 output << static_cast<unsigned>(materials[i][j]) << ',' << (j % 32 == 31 ? '\n' : ' ');
             output << "\n};\n";
         }
+        for (size_t i = 0; i < bulkShaders.size(); ++i)
+        {
+            output << "static const uint8_t VfxBulkSprite" << i << "[] = {\n";
+            for (size_t j = 0; j < bulkShaders[i].size(); ++j)
+                output << static_cast<unsigned>(bulkShaders[i][j]) << ',' << (j % 32 == 31 ? '\n' : ' ');
+            output << "\n};\n";
+        }
+        for (size_t i = 0; i < halfShaders.size(); ++i)
+        {
+            output << "static const uint8_t VfxHalfScene" << i << "[] = {\n";
+            for (size_t j = 0; j < halfShaders[i].size(); ++j)
+                output << static_cast<unsigned>(halfShaders[i][j]) << ',' << (j % 32 == 31 ? '\n' : ' ');
+            output << "\n};\n";
+        }
         output << "struct CompiledVfxMaterial { const uint8_t* Data; int32_t Size; };\n"
             << "static const CompiledVfxMaterial CompiledVfxMaterials[] = {\n";
         for (size_t i = 0; i < materials.size(); ++i)
             output << "{VfxMaterial" << i << ", sizeof(VfxMaterial" << i << ")},\n";
+        output << "};\nstatic const CompiledVfxMaterial CompiledBulkSpriteShaders[] = {\n";
+        for (size_t i = 0; i < bulkShaders.size(); ++i)
+            output << "{VfxBulkSprite" << i << ", sizeof(VfxBulkSprite" << i << ")},\n";
+        output << "};\nstatic const CompiledVfxMaterial CompiledHalfSceneShaders[] = {\n";
+        for (size_t i = 0; i < halfShaders.size(); ++i)
+            output << "{VfxHalfScene" << i << ", sizeof(VfxHalfScene" << i << ")},\n";
         output << "};\n";
     }
     catch (const std::exception& error)

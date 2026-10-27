@@ -1,4 +1,5 @@
 #pragma once
+#include "CompiledFloatSceneShaders.h"
 
 // Consecutive distortion layers share native weighted vectors and transmittance before resolving once.
 class WeightedDistortionTarget
@@ -29,38 +30,10 @@ class WeightedDistortionTarget
     {
         if (!vertex_)
         {
-            const char* vs = "float4 main(uint i:SV_VertexID):SV_Position { float2 p=float2((i<<1)&2,i&2); return float4(p*float2(2,-2)+float2(-1,1),0,1); }";
-            const char* ps = R"(
-                Texture2D<float4> vectors : register(t0), transmittance : register(t1), background : register(t2);
-                SamplerState linearClamp : register(s0);
-                float4 main(float4 position : SV_Position) : SV_Target
-                {
-                    uint width, height; vectors.GetDimensions(width, height);
-                    float2 inverseSize = 1.0 / float2(width, height);
-                    float2 uv = position.xy * inverseSize;
-                    // Captured native resolve samples the distortion buffer half a texel before the background.
-                    float2 bufferUV = uv - 0.5 * inverseSize;
-                    float3 accumulated = vectors.SampleLevel(linearClamp, bufferUV, 0).rgb;
-                    // Native mode 1 squares 1-T even when floating transmittance leaves [0,1].
-                    float visibility = 1 - transmittance.SampleLevel(linearClamp, bufferUV, 0).r;
-                    if (visibility == 0 || accumulated.z <= 0) discard;
-                    float2 offset = 0.02 * accumulated.xy / (accumulated.z < 0.001 ? 1 : accumulated.z)
-                        * visibility * visibility;
-                    if (all(offset == 0)) discard;
-                    return float4(background.SampleLevel(linearClamp, uv + offset, 0).rgb, 0);
-                }
-            )";
-            auto compile = [](const char* sourceCode, const char* profile)
-            {
-                ComPtr<ID3DBlob> code, errors;
-                if (FAILED(D3DCompile(sourceCode, std::strlen(sourceCode), "AECN weighted distortion resolve", nullptr, nullptr,
-                    "main", profile, 0, 0, code.GetAddressOf(), errors.GetAddressOf())))
-                    throw std::runtime_error(errors ? static_cast<const char*>(errors->GetBufferPointer()) : "Cannot compile VFX distortion resolve");
-                return code;
-            };
-            const auto vertexCode = compile(vs, "vs_5_0"), pixelCode = compile(ps, "ps_5_0");
-            Check(device->CreateVertexShader(vertexCode->GetBufferPointer(), vertexCode->GetBufferSize(), nullptr, vertex_.GetAddressOf()));
-            Check(device->CreatePixelShader(pixelCode->GetBufferPointer(), pixelCode->GetBufferSize(), nullptr, resolve_.GetAddressOf()));
+            const auto& vertexCode = CompiledSceneUtilityShaders[1];
+            const auto& pixelCode = CompiledSceneUtilityShaders[2];
+            Check(device->CreateVertexShader(vertexCode.Data, vertexCode.Size, nullptr, vertex_.GetAddressOf()));
+            Check(device->CreatePixelShader(pixelCode.Data, pixelCode.Size, nullptr, resolve_.GetAddressOf()));
             D3D11_SAMPLER_DESC sampler{}; sampler.Filter = D3D11_FILTER_MIN_MAG_LINEAR_MIP_POINT;
             sampler.AddressU = sampler.AddressV = sampler.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP; sampler.MaxLOD = D3D11_FLOAT32_MAX;
             Check(device->CreateSamplerState(&sampler, linearClamp_.GetAddressOf()));

@@ -97,7 +97,9 @@ namespace Editors.Shared.Core.Common
 
             var currentTimeSeconds = (float)Player.CurrentTime.TotalSeconds;
             foreach (var item in MetaDataItems)
-                item.Update(currentTimeSeconds);
+                if (item is IMetaDataPlaybackInstance playbackItem)
+                    playbackItem.Update(Player.PlaybackTime);
+                else item.Update(currentTimeSeconds);
         }
 
     }

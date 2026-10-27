@@ -1,0 +1,278 @@
+{
+  "Provenance": "Original current official small-arm library and retained27352 selected VS0f1c, 128RGBA16_FLOAT row fingerprints. Whole-row expected SHA comes from original native capture, not generated product rows.",
+  "CaptureSha256": "f6fbb9ffd2ff5a6ff5b2007ff114805acc5ff7231db73c8aaea224d84e7b8ab8",
+  "LibrarySha256": "7525659489e6ff3e79d788204a9c2f6e512e2606ddae6cff5f0eaafb585b6be7",
+  "Rows": [
+    {
+      "Layer": "_rifle_100ms",
+      "Slice": 0,
+      "SourceField": "ParticleScale",
+      "NativeRow": 6,
+      "NativeSha256": "f5dbd02cc533d0661e75a097016f6ce11167eff4ce280ab6c6371734bca4466a",
+      "GeneratedSha256": "f5dbd02cc533d0661e75a097016f6ce11167eff4ce280ab6c6371734bca4466a",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0999755859375,
+        0.199951171875,
+        0.0,
+        1.0
+      ],
+      "NativeLast": [
+        0.00406646728515625,
+        0.199951171875,
+        0.0,
+        1.0
+      ],
+      "SourceCurve": "x_min,8405056,1;0.12,0.2,log3,sine_recip,-0.05,0.0,0.05,0.0,0;0.998198,0.0,exp3,linear,-0.05,0.0,0.05,0.0,0;0.0,0.1,linear,log1,-0.05,0.0,0.05,0.0,0|x_max,16728128,1;0.12,0.2,log3,sine_recip,-0.05,0.0,0.05,0.0,0;0.998198,0.0,exp3,linear,-0.05,0.0,0.05,0.0,0;0.0,0.1,linear,log1,-0.05,0.0,0.05,0.0,0|y_min,4227136,0;0.5,0.2,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|y_max,4259648,0;0.5,0.2,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|z_min,4210816,0;0.2,0.0,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|z_max,4210943,0;0.2,0.0,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1:x,0;0,1|y,0;2,3|z,0;4,5"
+    },
+    {
+      "Layer": "_rifle_100ms",
+      "Slice": 0,
+      "SourceField": "ParticleScale",
+      "NativeRow": 7,
+      "NativeSha256": "f5dbd02cc533d0661e75a097016f6ce11167eff4ce280ab6c6371734bca4466a",
+      "GeneratedSha256": "f5dbd02cc533d0661e75a097016f6ce11167eff4ce280ab6c6371734bca4466a",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0999755859375,
+        0.199951171875,
+        0.0,
+        1.0
+      ],
+      "NativeLast": [
+        0.00406646728515625,
+        0.199951171875,
+        0.0,
+        1.0
+      ],
+      "SourceCurve": "x_min,8405056,1;0.12,0.2,log3,sine_recip,-0.05,0.0,0.05,0.0,0;0.998198,0.0,exp3,linear,-0.05,0.0,0.05,0.0,0;0.0,0.1,linear,log1,-0.05,0.0,0.05,0.0,0|x_max,16728128,1;0.12,0.2,log3,sine_recip,-0.05,0.0,0.05,0.0,0;0.998198,0.0,exp3,linear,-0.05,0.0,0.05,0.0,0;0.0,0.1,linear,log1,-0.05,0.0,0.05,0.0,0|y_min,4227136,0;0.5,0.2,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|y_max,4259648,0;0.5,0.2,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|z_min,4210816,0;0.2,0.0,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|z_max,4210943,0;0.2,0.0,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1:x,0;0,1|y,0;2,3|z,0;4,5"
+    },
+    {
+      "Layer": "_rifle_100ms",
+      "Slice": 0,
+      "SourceField": "ParticleInitialAlpha",
+      "NativeRow": 10,
+      "NativeSha256": "b2d369c352c7111ee83992be3c7cf2d7242321f0f461a4501a8716c37af4f898",
+      "GeneratedSha256": "b2d369c352c7111ee83992be3c7cf2d7242321f0f461a4501a8716c37af4f898",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0999755859375,
+        0.0999755859375,
+        0.0999755859375,
+        0.0999755859375
+      ],
+      "NativeLast": [
+        0.75,
+        0.75,
+        0.75,
+        0.75
+      ],
+      "SourceCurve": "x_min,8405056,1;0.0,0.1,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.75,sine,sine_recip,-0.05,0.0,0.05,0.0,0|x_max,16728128,1;0.0,0.1,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.75,sine,sine_recip,-0.05,0.0,0.05,0.0,0:x,1;0,1"
+    },
+    {
+      "Layer": "_rifle_100ms",
+      "Slice": 0,
+      "SourceField": "ParticleInitialAlpha",
+      "NativeRow": 11,
+      "NativeSha256": "b2d369c352c7111ee83992be3c7cf2d7242321f0f461a4501a8716c37af4f898",
+      "GeneratedSha256": "b2d369c352c7111ee83992be3c7cf2d7242321f0f461a4501a8716c37af4f898",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0999755859375,
+        0.0999755859375,
+        0.0999755859375,
+        0.0999755859375
+      ],
+      "NativeLast": [
+        0.75,
+        0.75,
+        0.75,
+        0.75
+      ],
+      "SourceCurve": "x_min,8405056,1;0.0,0.1,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.75,sine,sine_recip,-0.05,0.0,0.05,0.0,0|x_max,16728128,1;0.0,0.1,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.75,sine,sine_recip,-0.05,0.0,0.05,0.0,0:x,1;0,1"
+    },
+    {
+      "Layer": "_rifle_100ms",
+      "Slice": 0,
+      "SourceField": "curve_alpha",
+      "NativeRow": 12,
+      "NativeSha256": "0f7fb1b827b3ec9747ed069a72552e5ab6073eeb57ef5363940257976b8db35f",
+      "GeneratedSha256": "0f7fb1b827b3ec9747ed069a72552e5ab6073eeb57ef5363940257976b8db35f",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeLast": [
+        0.00010347366333007812,
+        0.00010347366333007812,
+        0.00010347366333007812,
+        0.00010347366333007812
+      ],
+      "SourceCurve": "alpha_min,8388608,1;0.0,0.0,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.0,sine,linear,-0.05,0.0,0.05,0.0,0;0.15,1.0,sine,log3,-0.05,0.0,0.05,0.0,0|alpha_max,16711680,1;0.0,0.0,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.0,sine,linear,-0.05,0.0,0.05,0.0,0;0.15,1.0,sine,log3,-0.05,0.0,0.05,0.0,0:alpha,1;0,1"
+    },
+    {
+      "Layer": "_rifle_100ms",
+      "Slice": 0,
+      "SourceField": "curve_alpha",
+      "NativeRow": 13,
+      "NativeSha256": "0f7fb1b827b3ec9747ed069a72552e5ab6073eeb57ef5363940257976b8db35f",
+      "GeneratedSha256": "0f7fb1b827b3ec9747ed069a72552e5ab6073eeb57ef5363940257976b8db35f",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeLast": [
+        0.00010347366333007812,
+        0.00010347366333007812,
+        0.00010347366333007812,
+        0.00010347366333007812
+      ],
+      "SourceCurve": "alpha_min,8388608,1;0.0,0.0,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.0,sine,linear,-0.05,0.0,0.05,0.0,0;0.15,1.0,sine,log3,-0.05,0.0,0.05,0.0,0|alpha_max,16711680,1;0.0,0.0,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.0,sine,linear,-0.05,0.0,0.05,0.0,0;0.15,1.0,sine,log3,-0.05,0.0,0.05,0.0,0:alpha,1;0,1"
+    },
+    {
+      "Layer": "_arrow_glowing_large",
+      "Slice": 1,
+      "SourceField": "ParticleScale",
+      "NativeRow": 6,
+      "NativeSha256": "c9a4d78e5f01cb6c0a176e372512585c936980c24c88d213db43902d42c82e91",
+      "GeneratedSha256": "c9a4d78e5f01cb6c0a176e372512585c936980c24c88d213db43902d42c82e91",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0999755859375,
+        0.199951171875,
+        0.0,
+        1.0
+      ],
+      "NativeLast": [
+        0.10003662109375,
+        0.199951171875,
+        0.0,
+        1.0
+      ],
+      "SourceCurve": "x_min,8405056,1;0.0,0.1,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.1,sine,linear,-0.05,0.0,0.05,0.0,0;0.05,0.67,sine,log3,-0.05,0.0,0.05,0.0,0|x_max,16728128,1;0.0,0.1,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.1,sine,linear,-0.05,0.0,0.05,0.0,0;0.05,0.67,sine,log3,-0.05,0.0,0.05,0.0,0|y_min,4227136,0;0.798911,0.2,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|y_max,4259648,0;0.798911,0.2,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|z_min,4210816,0;0.104505,0.0,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|z_max,4210943,0;0.104505,0.0,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1:x,0;0,1|y,0;2,3|z,0;4,5"
+    },
+    {
+      "Layer": "_arrow_glowing_large",
+      "Slice": 1,
+      "SourceField": "ParticleScale",
+      "NativeRow": 7,
+      "NativeSha256": "c9a4d78e5f01cb6c0a176e372512585c936980c24c88d213db43902d42c82e91",
+      "GeneratedSha256": "c9a4d78e5f01cb6c0a176e372512585c936980c24c88d213db43902d42c82e91",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0999755859375,
+        0.199951171875,
+        0.0,
+        1.0
+      ],
+      "NativeLast": [
+        0.10003662109375,
+        0.199951171875,
+        0.0,
+        1.0
+      ],
+      "SourceCurve": "x_min,8405056,1;0.0,0.1,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.1,sine,linear,-0.05,0.0,0.05,0.0,0;0.05,0.67,sine,log3,-0.05,0.0,0.05,0.0,0|x_max,16728128,1;0.0,0.1,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.1,sine,linear,-0.05,0.0,0.05,0.0,0;0.05,0.67,sine,log3,-0.05,0.0,0.05,0.0,0|y_min,4227136,0;0.798911,0.2,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|y_max,4259648,0;0.798911,0.2,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|z_min,4210816,0;0.104505,0.0,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1|z_max,4210943,0;0.104505,0.0,bezier_c,bezier_c,-0.05,0.0,0.05,0.0,1:x,0;0,1|y,0;2,3|z,0;4,5"
+    },
+    {
+      "Layer": "_arrow_glowing_large",
+      "Slice": 1,
+      "SourceField": "ParticleInitialAlpha",
+      "NativeRow": 10,
+      "NativeSha256": "3410dc13a9552555ace57bb6a041c25c1d7c1e5485e5aec3f1e66a43ed345949",
+      "GeneratedSha256": "3410dc13a9552555ace57bb6a041c25c1d7c1e5485e5aec3f1e66a43ed345949",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.04998779296875,
+        0.04998779296875,
+        0.04998779296875,
+        0.04998779296875
+      ],
+      "NativeLast": [
+        0.39990234375,
+        0.39990234375,
+        0.39990234375,
+        0.39990234375
+      ],
+      "SourceCurve": "x_min,8405056,1;0.0,0.05,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.4,sine,log3,-0.05,0.0,0.05,0.0,0|x_max,16728128,1;0.0,0.05,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.4,sine,log3,-0.05,0.0,0.05,0.0,0:x,1;0,1"
+    },
+    {
+      "Layer": "_arrow_glowing_large",
+      "Slice": 1,
+      "SourceField": "ParticleInitialAlpha",
+      "NativeRow": 11,
+      "NativeSha256": "3410dc13a9552555ace57bb6a041c25c1d7c1e5485e5aec3f1e66a43ed345949",
+      "GeneratedSha256": "3410dc13a9552555ace57bb6a041c25c1d7c1e5485e5aec3f1e66a43ed345949",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.04998779296875,
+        0.04998779296875,
+        0.04998779296875,
+        0.04998779296875
+      ],
+      "NativeLast": [
+        0.39990234375,
+        0.39990234375,
+        0.39990234375,
+        0.39990234375
+      ],
+      "SourceCurve": "x_min,8405056,1;0.0,0.05,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.4,sine,log3,-0.05,0.0,0.05,0.0,0|x_max,16728128,1;0.0,0.05,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,0.4,sine,log3,-0.05,0.0,0.05,0.0,0:x,1;0,1"
+    },
+    {
+      "Layer": "_arrow_glowing_large",
+      "Slice": 1,
+      "SourceField": "curve_alpha",
+      "NativeRow": 12,
+      "NativeSha256": "1c3597bae9e85b85af7163c58c1ad1018f06061cf34b8322859220f225395afc",
+      "GeneratedSha256": "1c3597bae9e85b85af7163c58c1ad1018f06061cf34b8322859220f225395afc",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeLast": [
+        0.00018978118896484375,
+        0.00018978118896484375,
+        0.00018978118896484375,
+        0.00018978118896484375
+      ],
+      "SourceCurve": "alpha_min,8388608,1;0.148509,1.0,log3,exp3,-0.05,0.0,0.05,0.0,0;0.0,0.0,linear,log1,-0.05,0.0,0.05,0.0,0;1.0,0.0,sine,linear,-0.05,0.0,0.05,0.0,0;0.477169,0.6993,exp3,log3,-0.05,0.0,0.05,0.0,0|alpha_max,16711680,1;0.148509,1.0,log3,exp3,-0.05,0.0,0.05,0.0,0;0.0,0.0,linear,log1,-0.05,0.0,0.05,0.0,0;1.0,0.0,sine,linear,-0.05,0.0,0.05,0.0,0;0.477169,0.6993,exp3,log3,-0.05,0.0,0.05,0.0,0:alpha,0;0,1"
+    },
+    {
+      "Layer": "_arrow_glowing_large",
+      "Slice": 1,
+      "SourceField": "curve_alpha",
+      "NativeRow": 13,
+      "NativeSha256": "1c3597bae9e85b85af7163c58c1ad1018f06061cf34b8322859220f225395afc",
+      "GeneratedSha256": "1c3597bae9e85b85af7163c58c1ad1018f06061cf34b8322859220f225395afc",
+      "Whole128RgbaHalfTexelsEqual": true,
+      "NativeFirst": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeLast": [
+        0.00018978118896484375,
+        0.00018978118896484375,
+        0.00018978118896484375,
+        0.00018978118896484375
+      ],
+      "SourceCurve": "alpha_min,8388608,1;0.148509,1.0,log3,exp3,-0.05,0.0,0.05,0.0,0;0.0,0.0,linear,log1,-0.05,0.0,0.05,0.0,0;1.0,0.0,sine,linear,-0.05,0.0,0.05,0.0,0;0.477169,0.6993,exp3,log3,-0.05,0.0,0.05,0.0,0|alpha_max,16711680,1;0.148509,1.0,log3,exp3,-0.05,0.0,0.05,0.0,0;0.0,0.0,linear,log1,-0.05,0.0,0.05,0.0,0;1.0,0.0,sine,linear,-0.05,0.0,0.05,0.0,0;0.477169,0.6993,exp3,log3,-0.05,0.0,0.05,0.0,0:alpha,0;0,1"
+    }
+  ],
+  "ActualSample": {
+    "Phase": 0.4749813675880432,
+    "PortableLinear": 0.7155762314796448,
+    "NativeHardwareSample": 0.7158203125,
+    "InitialAtBirthPhaseOne": 0.39990234375,
+    "Boundary": "Original27352 VS422/424 hardware trace. Portable linear is intentionally distinct; no global guessed half rounding."
+  }
+}

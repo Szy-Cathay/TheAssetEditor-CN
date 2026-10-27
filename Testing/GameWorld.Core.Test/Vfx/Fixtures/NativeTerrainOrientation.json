@@ -1,0 +1,870 @@
+{
+  "Source": "Unchanged official6c08f0+6be290 execution. Explicit flat terrain interface override fordirection2 follows6c1ec0; other normals passed through unchanged. Fixed-angle/radial/zero cases are diagnostic controls, not complete visual acceptance.",
+  "WarscapeSha256": "c75d40a30ce938958f445ae59eb256e4c23f51201984d1f3ea5cb25319f763b8",
+  "Cases": [
+    {
+      "Name": "angles-90-37-0_zero_direction0_identity",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 0,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1064486229,
+        1050834369,
+        0,
+        0
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_zero_direction0_tilt-x60",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 0,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1064486229,
+        1050834369,
+        0,
+        0
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_zero_direction1_identity",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 1,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1064486229,
+        1050834369,
+        0,
+        0
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_zero_direction1_tilt-x60",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 1,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1064486229,
+        1050834369,
+        0,
+        0
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_zero_direction2_identity",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 2,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_zero_direction2_tilt-x60",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 2,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_radial_direction0_identity",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 0,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "NativeQuaternionFloatBits": [
+        1064038367,
+        3179543695,
+        3200480485,
+        1020964532
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_radial_direction0_tilt-x60",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 0,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "NativeQuaternionFloatBits": [
+        1064038367,
+        3179543695,
+        3200480485,
+        1020964532
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_radial_direction1_identity",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 1,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "NativeQuaternionFloatBits": [
+        1064038367,
+        3179543695,
+        3200480485,
+        1020964532
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_radial_direction1_tilt-x60",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 1,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        -0.6123723983764648,
+        0.3535533845424652
+      ],
+      "OrientationInputNormal": [
+        0.7071067690849304,
+        -0.6123723983764648,
+        0.3535533845424652
+      ],
+      "NativeQuaternionFloatBits": [
+        1061069333,
+        3199403441,
+        3205240239,
+        3189633093
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_radial_direction2_identity",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 2,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ]
+    },
+    {
+      "Name": "angles-90-37-0_radial_direction2_tilt-x60",
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 2,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_zero_direction0_identity",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 0,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1062146310,
+        3199326354,
+        3173836340,
+        1056044064
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_zero_direction0_tilt-x60",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 0,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1062146310,
+        3199326354,
+        3173836340,
+        1056044064
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_zero_direction1_identity",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 1,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1062146310,
+        3199326354,
+        3173836340,
+        1056044064
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_zero_direction1_tilt-x60",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 1,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1062146310,
+        3199326354,
+        3173836340,
+        1056044064
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_zero_direction2_identity",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 2,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1047756696,
+        3196914131,
+        1046278808,
+        1063777838
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_zero_direction2_tilt-x60",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0,
+        0,
+        0
+      ],
+      "Direction": 2,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1047756696,
+        3196914131,
+        1046278808,
+        1063777838
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_radial_direction0_identity",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 0,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "NativeQuaternionFloatBits": [
+        1056409658,
+        3201816376,
+        3202374962,
+        1059140587
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_radial_direction0_tilt-x60",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 0,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "NativeQuaternionFloatBits": [
+        1056409658,
+        3201816376,
+        3202374962,
+        1059140587
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_radial_direction1_identity",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 1,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "NativeQuaternionFloatBits": [
+        1056409658,
+        3201816376,
+        3202374962,
+        1059140587
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_radial_direction1_tilt-x60",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 1,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        -0.6123723983764648,
+        0.3535533845424652
+      ],
+      "OrientationInputNormal": [
+        0.7071067690849304,
+        -0.6123723983764648,
+        0.3535533845424652
+      ],
+      "NativeQuaternionFloatBits": [
+        1048394926,
+        3201055222,
+        3208530119,
+        1056182855
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_radial_direction2_identity",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 2,
+      "RootQuaternion": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1047756696,
+        3196914131,
+        1046278808,
+        1063777838
+      ]
+    },
+    {
+      "Name": "angles-23--37-19_radial_direction2_tilt-x60",
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "LocalBirthPosition": [
+        0.1,
+        0,
+        0.1
+      ],
+      "Direction": 2,
+      "RootQuaternion": [
+        0.5,
+        0.0,
+        0.0,
+        0.8660253882408142
+      ],
+      "DirectionProducerNormal": [
+        0.7071067690849304,
+        0.0,
+        0.7071067690849304
+      ],
+      "OrientationInputNormal": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "NativeQuaternionFloatBits": [
+        1047756696,
+        3196914131,
+        1046278808,
+        1063777838
+      ]
+    }
+  ]
+}

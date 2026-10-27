@@ -22,6 +22,7 @@ using Shared.GameFormats.Animation;
 using Shared.Core.PackFiles.Models;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Vfx;
+using GameWorld.Core.WpfWindow;
 using Editors.AnimationMeta.SuperView.Visualisation.Instances;
 
 namespace Editors.AnimationMeta.SuperView
@@ -395,6 +396,7 @@ namespace Editors.AnimationMeta.SuperView
             VfxPreviewDocumentStore? vfxDocuments = null)
             : base(editorHostParameters)
         {
+            if (GameWorld is D3D11Host host) host.SuspendWhenHidden = true;
             EditorContentVerticalScrollBarVisibility =
                 ScrollBarVisibility.Auto;
             LeftColumnWidth = new System.Windows.GridLength(3, System.Windows.GridUnitType.Star);

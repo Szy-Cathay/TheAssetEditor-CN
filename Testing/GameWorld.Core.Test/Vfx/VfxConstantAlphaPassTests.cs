@@ -41,7 +41,7 @@ public class VfxConstantAlphaPassTests
             {
                 Assert.That(actual.Zip(expected).Max(pair => Vector4.Distance(pair.First, pair.Second)), Is.LessThan(.00001f),
                     "Removing an identity operation must preserve RGB and the native MAX alpha operation, including faint and high raw alpha.");
-                Assert.That(preview.DrawCallCount, Is.EqualTo(1));
+                Assert.That(preview.DrawCallCount, Is.EqualTo(particleAlpha == 0 ? 0 : 1));
             });
         }
         finally { graphics.Release(); }

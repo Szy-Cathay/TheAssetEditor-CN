@@ -5,6 +5,7 @@
 #include <Effekseer/Effekseer.MaterialLoader.h>
 #include <Effekseer/Renderer/Effekseer.SpriteRenderer.h>
 #include <Effekseer/Renderer/Effekseer.ModelRenderer.h>
+#include <Effekseer/Material/Effekseer.CompiledMaterial.h>
 #include <EffekseerRendererDX11.h>
 #include <wrl/client.h>
 #include <d3dcompiler.h>
@@ -18,6 +19,8 @@
 #include <cstdlib>
 #include <array>
 #include <memory>
+#include <atomic>
+#include "SpriteUploadCache.h"
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
@@ -32,11 +35,21 @@ thread_local std::string lastError;
 #include "CompiledVfxMaterials.h"
 #include "FloatSceneTarget.h"
 #include "WeightedDistortionTarget.h"
+#include "HalfResolutionScene.h"
 
 // Only the pinned resource container uses an internal API; particles use the renderer's public parameters.
 class ResourceEffect final : public EffectImplemented
 {
 public:
+    ResourceEffect(const ManagerRef& manager, const ResourceEffect& source, const MaterialRef& material)
+        : EffectImplemented(manager, nullptr, 0)
+    {
+        m_version = source.m_version;
+        m_pImages = source.m_pImages; m_distortionImages = source.m_distortionImages; m_normalImages = source.m_normalImages;
+        models_ = source.models_; materials_ = source.materials_;
+        materials_[0] = material;
+    }
+
     ResourceEffect(const ManagerRef& manager, const std::vector<TextureRef>& textures, const std::vector<ModelRef>& models,
         const MaterialRef& material, const MaterialRef& decalMaterial, const MaterialRef& scrollingMaterial, const MaterialRef& oneShotMaterial,
         const MaterialRef& basicMeshMaterial, const MaterialRef& gemstoneMaterial, const MaterialRef& animatedUVMaterial, const MaterialRef& basicSpriteMaterial,
@@ -71,8 +84,22 @@ public:
     }
 };
 
+struct Preview;
+struct SceneDraw
+{
+    std::shared_ptr<Preview> preview;
+    std::array<float, 16> view{}, projection{};
+    std::vector<AecnParticle> opaque, colour, distortion, fallback;
+    AecnLighting lighting{};
+    ComPtr<ID3D11ShaderResourceView> softDepth;
+};
+
 struct Preview
 {
+    std::atomic<int> references{1};
+    void Retain() { references.fetch_add(1, std::memory_order_relaxed); }
+    void Release() { if (references.fetch_sub(1, std::memory_order_acq_rel) == 1) delete this; }
+
     EffekseerRendererDX11::RendererRef renderer;
     ManagerRef manager;
     RefPtr<SpriteRenderer> sprites;
@@ -82,13 +109,27 @@ struct Preview
     std::vector<float> modelAnimationCycles;
     int64_t animatedVertices = 0, animatedIndices = 0;
     std::vector<AecnLayer> layers;
+    std::vector<AecnHalfLayerConfig> halfLayers;
+    std::vector<AecnHalfLayerConfig> fullLayers;
+    struct NativeAlphaLayer { const AecnHalfLayerConfig* config = nullptr; bool halfResolution = false; };
+    std::vector<NativeAlphaLayer> nativeAlphaLayers;
     EffectRef effect;
     MaterialLoaderRef materialLoader;
     MaterialRef material, decalMaterial, scrollingMaterial, oneShotMaterial, basicMeshMaterial, gemstoneMaterial, animatedUVMaterial, basicSpriteMaterial, premultiplyAnimatedMaterial, solidMaterial, prelitSpriteMaterial, soulPanningMaterial, growingVinesMaterial, rigidDissolveMaterial, distortionMaterial, tidecallMaterial, vertexAnimatedMaterial, rigidBasicDitherMaterial;
+    AecnSpriteUpload::Renderer* uploadRenderer = nullptr;
+    std::unique_ptr<AecnSpriteUpload::Shader> uploadShader;
+    MaterialRef uploadMaterial;
+    EffectRef uploadEffect;
+    SpriteRendererRef uploadSprites;
     struct MeshMaterial { std::vector<int32_t> textures; std::array<float, 104> parameters{}; ComPtr<ID3D11Buffer> extendedParameters; bool oneShot = false, basicMesh = false, gemstone = false, animatedUV = false, basicSprite = false, premultiplyAnimated = false, solid = false, prelitSprite = false, soulPanning = false, scrollingMesh = false, growingVines = false, rigidDissolve = false, tidecall = false, vertexAnimated = false, rigidBasicDither = false; };
     std::vector<MeshMaterial> meshMaterials;
     FloatSceneTarget floatingScene;
+    std::unique_ptr<FloatSceneTarget::Frame> sceneFrame;
+    std::vector<SceneDraw> sceneDraws;
+    std::vector<SceneDraw> recycledSceneDraws;
     WeightedDistortionTarget weightedDistortion;
+    HalfResolutionScene halfScene;
+    int halfDrawCalls = -1;
     ComPtr<ID3D11Texture2D> background;
     ComPtr<ID3D11ShaderResourceView> backgroundView;
     ComPtr<ID3D11Texture2D> depthCopy, resolvedDepth;
@@ -97,8 +138,41 @@ struct Preview
     ComPtr<ID3D11ComputeShader> depthResolveShader;
     bool depthAvailable = false;
 
+    void ResetSpriteUploads()
+    {
+        if (uploadRenderer) uploadRenderer->InvalidateCachedVertexBinding();
+        uploadSprites.Reset(); uploadEffect.Reset(); uploadMaterial.Reset(); uploadShader.reset();
+    }
+
+    void PrepareSpriteUploads()
+    {
+        ResetSpriteUploads();
+        if (!uploadRenderer || effect == nullptr || material == nullptr || !material->UserPtr || material->IsRefractionRequired) return;
+        // The copied resource container changes only the shader callback type, never geometry or material data.
+        CompiledMaterial compiled;
+        const auto& data = CompiledVfxMaterials[0];
+        if (!compiled.Load(data.Data, static_cast<int32_t>(data.Size))) return;
+        auto binary = compiled.GetBinary(CompiledMaterialPlatformType::DirectX11);
+        if (!binary) return;
+        auto shader = std::make_unique<AecnSpriteUpload::Shader>(static_cast<EffekseerRendererDX11::Shader*>(material->UserPtr), uploadRenderer->VertexBindingState());
+        if (!shader->Initialize(renderer->GetDevice(), renderer->GetContext(),
+            binary->GetVertexShaderData(MaterialShaderType::Standard), binary->GetVertexShaderSize(MaterialShaderType::Standard))) return;
+        auto shadow = MakeRefPtr<Material>();
+        shadow->ShadingModel = material->ShadingModel; shadow->IsSimpleVertex = material->IsSimpleVertex;
+        shadow->IsRefractionRequired = material->IsRefractionRequired; shadow->CustomData1 = material->CustomData1;
+        shadow->CustomData2 = material->CustomData2; shadow->TextureCount = material->TextureCount;
+        shadow->UniformCount = material->UniformCount; shadow->TextureWrapTypes = material->TextureWrapTypes;
+        shadow->UserPtr = shader.get(); shadow->ModelUserPtr = material->ModelUserPtr;
+        shadow->RefractionUserPtr = material->RefractionUserPtr; shadow->RefractionModelUserPtr = material->RefractionModelUserPtr;
+        auto shadowEffect = MakeRefPtr<ResourceEffect>(manager, *static_cast<ResourceEffect*>(effect.Get()), shadow);
+        auto sprites = uploadRenderer->CreateCachedSpriteRenderer();
+        uploadShader = std::move(shader); uploadMaterial = shadow; uploadEffect = shadowEffect; uploadSprites = sprites;
+    }
+
     ~Preview()
     {
+        sceneFrame.reset();
+        ResetSpriteUploads();
         if (materialLoader == nullptr) return;
         if (material != nullptr) materialLoader->Unload(material);
         if (decalMaterial != nullptr) materialLoader->Unload(decalMaterial);
@@ -176,14 +250,9 @@ struct Preview
             }
             if (!depthResolveShader)
             {
-                const char* source = "Texture2DMS<float> inputDepth : register(t0); RWTexture2D<float> outputDepth : register(u0);"
-                    "[numthreads(16,16,1)] void main(uint3 p:SV_DispatchThreadID) { uint w,h,n; inputDepth.GetDimensions(w,h,n);"
-                    "if(p.x>=w||p.y>=h)return; float z=1; for(uint s=0;s<n;s++)z=min(z,inputDepth.Load(p.xy,s)); outputDepth[p.xy]=z; }";
-                ComPtr<ID3DBlob> code, errors;
-                if (FAILED(D3DCompile(source, std::strlen(source), "AECN scene depth resolve", nullptr, nullptr, "main", "cs_5_0", 0, 0,
-                    code.GetAddressOf(), errors.GetAddressOf())) ||
-                    FAILED(device->CreateComputeShader(code->GetBufferPointer(), code->GetBufferSize(), nullptr, depthResolveShader.GetAddressOf())))
-                    throw std::runtime_error("Cannot compile scene depth resolve");
+                const auto& code = CompiledSceneUtilityShaders[0];
+                if (FAILED(device->CreateComputeShader(code.Data, code.Size, nullptr, depthResolveShader.GetAddressOf())))
+                    throw std::runtime_error("Cannot create scene depth resolve");
             }
             ComPtr<ID3D11ComputeShader> savedShader;
             ComPtr<ID3D11ShaderResourceView> savedResource;
@@ -294,6 +363,61 @@ SIMD::Mat43f Transform(const AecnParticle& particle)
     return SIMD::Mat43f(m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10], m[12], m[13], m[14]);
 }
 
+bool SpriteOriginInsideXY(const AecnParticle& particle, const Matrix44& viewProjection)
+{
+    const auto* m = particle.Transform;
+    const auto centre = [&](int c) { return m[12] * viewProjection.Values[0][c] + m[13] * viewProjection.Values[1][c]
+        + m[14] * viewProjection.Values[2][c] + viewProjection.Values[3][c]; };
+    const auto w = centre(3);
+    return w > 0 && std::abs(centre(0)) <= w && std::abs(centre(1)) <= w;
+}
+
+bool SpriteOutsideXY(const AecnLayer& layer, const AecnParticle& particle, const float* view, const float* projection,
+    const Matrix44& viewProjection)
+{
+    if (SpriteOriginInsideXY(particle, viewProjection)) return false;
+    const auto transform = Transform(particle); // Preserve validation even for a rejected batch.
+    const bool reflect = layer.CameraFacing && projection[0] * projection[5] - projection[1] * projection[4] < 0;
+    unsigned outside = 15;
+    for (int corner = 0; corner < 4; ++corner)
+    {
+        float x = (corner & 1 ? 1.0f : 0.0f) - layer.Pivot[0];
+        const float y = (corner & 2 ? 1.0f : 0.0f) - layer.Pivot[1];
+        if (reflect) x = -x;
+        // Use the same fixed-billboard CPU transform as the pinned sprite renderer.
+        const auto position = SIMD::Vec3f::Transform(SIMD::Vec3f(x, y, 0), transform);
+        const double world[] = {position.GetX(), position.GetY(), position.GetZ(), 1};
+        double camera[4] = {0, 0, 0, 1}, cameraError[4]{};
+        for (int c = 0; c < 3; ++c)
+            for (int r = 0; r < 4; ++r)
+            {
+                const auto term = world[r] * view[r * 4 + c];
+                camera[c] += term; cameraError[c] += std::abs(term) * 0.00001;
+            }
+        double clip[4]{}, error[4]{};
+        for (int c = 0; c < 4; ++c)
+            for (int r = 0; r < 4; ++r)
+            {
+                const auto term = camera[r] * projection[r * 4 + c];
+                clip[c] += term;
+                error[c] += std::abs(term) * 0.00001 + cameraError[r] * std::abs(projection[r * 4 + c]);
+            }
+        for (int c = 0; c < 4; ++c)
+            if (!std::isfinite(clip[c]) || !std::isfinite(error[c]) || std::abs(clip[c]) + error[c] > 1e30) return false;
+        // Near-plane crossings and uncertain floating-point results always keep the original draw.
+        if (clip[3] <= 0.01 + error[3] || clip[2] <= error[2]) return false;
+        const auto guard = std::abs(clip[3]) * 0.01 + 0.001 + error[3];
+        unsigned sides = 0;
+        if (clip[0] < -clip[3] - guard - error[0]) sides |= 1;
+        if (clip[0] > clip[3] + guard + error[0]) sides |= 2;
+        if (clip[1] < -clip[3] - guard - error[1]) sides |= 4;
+        if (clip[1] > clip[3] + guard + error[1]) sides |= 8;
+        outside &= sides;
+        if (!outside) return false;
+    }
+    return outside != 0;
+}
+
 Color Colour(const AecnParticle& particle, float brightness, float alphaScale = 1)
 {
     auto channel = [](float value) { return static_cast<uint8_t>(std::lround(std::max(0.0f, std::min(1.0f, value)) * 255)); };
@@ -346,6 +470,14 @@ std::array<float, 4> CustomData(const AecnLayer& layer, const AecnParticle& part
 }
 }
 
+static int DrawParticles(Preview* preview, const float* view, const float* projection,
+    const AecnParticle* particles, int count, const AecnLighting* lighting,
+    ID3D11ShaderResourceView* softDepth, int sharedDistortionPass);
+static const AecnHalfLayerConfig* HalfLayer(const Preview& preview, int layer);
+static const std::vector<AecnParticle>& ExpandHalfFallback(const Preview& preview,
+    const std::vector<AecnParticle>& particles, std::vector<AecnParticle>& result);
+static bool TryDrawHalfScene(Preview& owner, const std::vector<SceneDraw>& draws);
+
 API int AecnVfxAbi(int layerBytes, int particleBytes, int vertexBytes, int lightingBytes)
 {
     return layerBytes == sizeof(AecnLayer) && particleBytes == sizeof(AecnParticle) && vertexBytes == sizeof(AecnVertex)
@@ -365,7 +497,20 @@ API void* AecnVfxCreate(ID3D11Device* device, ID3D11DeviceContext* context)
     Guard([&]
     {
         auto preview = std::make_unique<Preview>();
-        preview->renderer = EffekseerRendererDX11::Renderer::Create(device, context, 8192);
+        auto renderer = MakeRefPtr<AecnSpriteUpload::Renderer>(8192);
+        auto graphics = EffekseerRendererDX11::CreateGraphicsDevice(device, context);
+        if (renderer->Initialize(graphics.DownCast<EffekseerRendererDX11::Backend::GraphicsDevice>(), D3D11_COMPARISON_LESS_EQUAL, false))
+        {
+            preview->renderer = renderer;
+            try
+            {
+                renderer->InitializeSpriteQueue(); preview->uploadRenderer = renderer.Get();
+                const auto& vs = CompiledBulkSpriteShaders[0]; const auto& colour = CompiledBulkSpriteShaders[1]; const auto& alpha = CompiledBulkSpriteShaders[2];
+                renderer->InitializeBulkSprites(vs.Data, vs.Size, colour.Data, colour.Size, alpha.Data, alpha.Size);
+            }
+            catch (...) { /* The unchanged renderer remains available if the optional queue cannot be allocated. */ }
+        }
+        else preview->renderer = EffekseerRendererDX11::Renderer::Create(device, context, 8192);
         if (preview->renderer == nullptr) throw std::runtime_error("Cannot create Effekseer DX11 renderer");
         preview->renderer->SetDistortingCallback(new CaptureDistortionBackground(preview.get()));
         preview->renderer->SetRestorationOfStatesFlag(true);
@@ -376,9 +521,78 @@ API void* AecnVfxCreate(ID3D11Device* device, ID3D11DeviceContext* context)
     });
     return result;
 }
-API void AecnVfxDestroy(Preview* preview) { delete preview; }
+API void AecnVfxDestroy(Preview* preview)
+{
+    if (!preview) return;
+    // Cancel an unclosed client frame before dropping its own reference, including self submissions.
+    auto draws = std::move(preview->sceneDraws);
+    preview->sceneFrame.reset();
+    draws.clear();
+    preview->Release();
+}
+API int AecnVfxBeginScene(Preview* preview, const AecnLighting* lighting)
+{
+    return Guard([&]
+    {
+        if (!preview || preview->renderer == nullptr || preview->sceneFrame)
+            throw std::runtime_error("Invalid or already active VFX scene");
+        preview->halfDrawCalls = -1;
+        preview->sceneFrame = std::make_unique<FloatSceneTarget::Frame>(preview->floatingScene,
+            preview->renderer->GetDevice(), preview->renderer->GetContext(),
+            lighting ? lighting->Display : nullptr, lighting ? lighting->Bloom : nullptr);
+    });
+}
+API int AecnVfxEndScene(Preview* preview)
+{
+    return Guard([&]
+    {
+        if (!preview) throw std::runtime_error("Invalid VFX scene");
+        auto frame = std::move(preview->sceneFrame);
+        auto draws = std::move(preview->sceneDraws);
+        if (!frame) return;
+        struct Recycle
+        {
+            Preview& Owner;
+            std::vector<SceneDraw>& Draws;
+            ~Recycle()
+            {
+                for (auto& command : Draws)
+                {
+                    command.preview.reset(); command.softDepth.Reset();
+                    command.opaque.clear(); command.colour.clear(); command.distortion.clear(); command.fallback.clear();
+                }
+                // Retain only buffer capacity; never retain another preview or an old scene/depth snapshot.
+                if (!Draws.empty()) Owner.recycledSceneDraws = std::move(Draws);
+            }
+        } recycle{*preview, draws};
+        auto draw = [&](const SceneDraw& command, const std::vector<AecnParticle>& particles, int phase)
+        {
+            if (!particles.empty() && !DrawParticles(command.preview.get(), command.view.data(), command.projection.data(),
+                particles.data(), static_cast<int>(particles.size()), &command.lighting, command.softDepth.Get(), phase))
+                throw std::runtime_error(lastError);
+        };
+        // All opaque receivers precede colour; all colour precedes one scene-wide refraction resolve.
+        for (const auto& command : draws) draw(command, command.opaque, -1);
+        if (!TryDrawHalfScene(*preview, draws))
+            for (auto& command : draws)
+            {
+                if (command.preview->halfLayers.empty() && command.preview->fullLayers.empty()) draw(command, command.colour, -1);
+                else draw(command, ExpandHalfFallback(*command.preview, command.colour, command.fallback), -1);
+            }
+        if (std::any_of(draws.begin(), draws.end(), [](const SceneDraw& command) { return !command.distortion.empty(); }))
+        {
+            WeightedDistortionTarget::Frame distortion(preview->weightedDistortion,
+                preview->renderer->GetDevice(), preview->renderer->GetContext());
+            for (const auto& command : draws) draw(command, command.distortion, 0);
+            distortion.BindTransmittance();
+            for (const auto& command : draws) draw(command, command.distortion, 1);
+            distortion.Finish();
+        }
+        frame->Finish();
+    });
+}
 API int AecnVfxDepthAvailable(Preview* preview) { return preview->depthAvailable ? 1 : 0; }
-API int AecnVfxDrawCalls(Preview* preview) { return preview->renderer->GetDrawCallCount(); }
+API int AecnVfxDrawCalls(Preview* preview) { return preview->halfDrawCalls >= 0 ? preview->halfDrawCalls : preview->renderer->GetDrawCallCount(); }
 
 API int AecnVfxTextureRgbaMipChain(Preview* preview, const void* pixels, int length, int width, int height, int srgb, int mipLevels)
 {
@@ -475,12 +689,20 @@ API int AecnVfxModelFrames(Preview* preview, const AecnVertex* vertices, int ver
 {
     return Guard([&]
     {
+        static_assert(sizeof(AecnVertex) == 72);
+        constexpr int64_t maximumBytes = 96000000, maximumIndices = 6000000;
+        constexpr auto vertexBytes = static_cast<int64_t>(sizeof(AecnVertex));
+        constexpr auto indexBytes = static_cast<int64_t>(sizeof(int32_t));
         const auto totalVertices = static_cast<int64_t>(verticesPerFrame) * frameCount;
         const auto totalIndices = static_cast<int64_t>(indexCount) * frameCount;
-        if (vertices == nullptr || indices == nullptr || verticesPerFrame < 3 || frameCount < 2 || frameCount > 1800
-            || totalVertices != vertexLength || totalVertices > 1000000 || indexCount < 3 || indexCount % 3 != 0
-            || totalIndices > 6000000 || preview->animatedVertices + totalVertices > 1000000
-            || preview->animatedIndices + totalIndices > 6000000 || !std::isfinite(cycles) || cycles <= 0 || cycles > 10)
+        if (preview == nullptr || vertices == nullptr || indices == nullptr || verticesPerFrame < 3 || frameCount < 2 || frameCount > 1800
+            || totalVertices != vertexLength || totalVertices > maximumBytes / vertexBytes || indexCount < 3 || indexCount % 3 != 0
+            || totalIndices > maximumIndices || preview->animatedVertices > maximumBytes / vertexBytes - totalVertices
+            || preview->animatedIndices > maximumIndices - totalIndices || !std::isfinite(cycles) || cycles <= 0 || cycles > 10)
+            throw std::runtime_error("Invalid animated model geometry or budget");
+        const auto accumulatedVertices = preview->animatedVertices + totalVertices;
+        const auto accumulatedIndices = preview->animatedIndices + totalIndices;
+        if (accumulatedVertices * vertexBytes + accumulatedIndices * indexBytes > maximumBytes)
             throw std::runtime_error("Invalid animated model geometry or budget");
         for (int i = 0; i < indexCount; ++i)
             if (indices[i] < 0 || indices[i] >= verticesPerFrame) throw std::runtime_error("Animated model index out of range");
@@ -513,8 +735,8 @@ API int AecnVfxModelFrames(Preview* preview, const AecnVertex* vertices, int ver
         }
         preview->models.push_back(MakeRefPtr<Model>(bytes.data(), static_cast<int32_t>(bytes.size())));
         preview->modelAnimationCycles.push_back(cycles);
-        preview->animatedVertices += totalVertices;
-        preview->animatedIndices += totalIndices;
+        preview->animatedVertices = accumulatedVertices;
+        preview->animatedIndices = accumulatedIndices;
     });
 }
 API int AecnVfxMeshMaterial(Preview* preview, const int32_t* textures, int textureCount, const float* parameters, int parameterCount)
@@ -645,7 +867,7 @@ API int AecnVfxConfigure(Preview* preview, const AecnLayer* layers, int count)
                     || !std::isfinite(layer.GradientScale) || layer.GradientScale < 1 || layer.GradientScale > 1000000)))
                 throw std::runtime_error("Invalid particle gradient");
         }
-        if (preview->material == nullptr && std::any_of(layers, layers + count, [](const AecnLayer& layer) { return layer.MaterialMode != 0 || layer.LightingMode != 0 || layer.GradientIndex >= 0; }))
+        if (preview->material == nullptr && std::any_of(layers, layers + count, [](const AecnLayer& layer) { return layer.MaterialMode != 0 || layer.LightingMode != 0 || layer.GradientIndex >= 0 || (layer.Kind == 0 && layer.MeshMaterialIndex < 0 && layer.TextureIndex >= 0); }))
         {
             if (preview->materialLoader == nullptr) preview->materialLoader = preview->renderer->CreateMaterialLoader();
             const auto& bytes = CompiledVfxMaterials[0];
@@ -674,6 +896,10 @@ API int AecnVfxConfigure(Preview* preview, const AecnLayer* layers, int count)
             if (preview->oneShotMaterial == nullptr) throw std::runtime_error("Cannot compile the one-shot mesh material");
         }
         preview->layers.assign(layers, layers + count);
+        preview->halfLayers.clear();
+        preview->fullLayers.clear();
+        preview->nativeAlphaLayers.clear();
+        preview->halfDrawCalls = -1;
         if (preview->basicMeshMaterial == nullptr && std::any_of(preview->meshMaterials.begin(), preview->meshMaterials.end(), [](const auto& material) { return material.basicMesh; }))
         {
             if (preview->materialLoader == nullptr) preview->materialLoader = preview->renderer->CreateMaterialLoader();
@@ -773,15 +999,165 @@ API int AecnVfxConfigure(Preview* preview, const AecnLayer* layers, int count)
             if (preview->rigidBasicDitherMaterial == nullptr) throw std::runtime_error("Cannot load the rigid dither material");
         }
         preview->effect = MakeRefPtr<ResourceEffect>(preview->manager, preview->textures, preview->models, preview->material, preview->decalMaterial, preview->scrollingMaterial, preview->oneShotMaterial, preview->basicMeshMaterial, preview->gemstoneMaterial, preview->animatedUVMaterial, preview->basicSpriteMaterial, preview->premultiplyAnimatedMaterial, preview->solidMaterial, preview->prelitSpriteMaterial, preview->soulPanningMaterial, preview->growingVinesMaterial, preview->rigidDissolveMaterial, preview->distortionMaterial, preview->tidecallMaterial, preview->vertexAnimatedMaterial, preview->rigidBasicDitherMaterial);
+        try { preview->PrepareSpriteUploads(); }
+        catch (...) { preview->ResetSpriteUploads(); }
     });
 }
 
-API int AecnVfxDraw(Preview* preview, const float* view, const float* projection, const AecnParticle* particles, int count, const AecnLighting* lighting,
-    ID3D11ShaderResourceView* softDepth)
+static int ConfigureNativeAlpha(Preview* preview, const AecnHalfLayerConfig* configs, int count, int configBytes, bool halfResolution)
+{
+    return Guard([&]
+    {
+        if (!preview || preview->sceneFrame || count < 0 || count > 512 || configBytes != sizeof(AecnHalfLayerConfig)
+            || (count > 0 && !configs)) throw std::runtime_error("Invalid half-resolution layer configuration");
+        std::vector<AecnHalfLayerConfig> validated;
+        validated.reserve(count);
+        const auto& other = halfResolution ? preview->fullLayers : preview->halfLayers;
+        for (int index = 0; index < count; ++index)
+        {
+            const auto& config = configs[index];
+            const auto validLayer = [&](int layer) { return layer >= 0 && layer < static_cast<int>(preview->layers.size()); };
+            if (!validLayer(config.LayerIndex) || config.Premultiplied < 0 || config.Premultiplied > 1
+                || !std::isfinite(config.CoveredColourMultiplier) || config.CoveredColourMultiplier < 0
+                || !std::isfinite(config.EmissionMultiplier) || config.EmissionMultiplier < 0
+                || (config.LegacyCoverageIndex == -1 && config.LegacyEmissionIndex == -1))
+                throw std::runtime_error("Invalid original half-resolution particle layer");
+            const auto& layer = preview->layers[config.LayerIndex];
+            if (layer.Kind != 0 || layer.Distortion != 0 || layer.ModelIndex >= 0 || layer.OpaqueModel != 0
+                || layer.MeshMaterialIndex >= 0 || layer.GradientIndex >= 0 || layer.MaterialMode < 0 || layer.MaterialMode > 1
+                || layer.TextureIndex < 0 || layer.Blend != 1 || layer.MaterialMode != config.Premultiplied)
+                throw std::runtime_error("Unsupported half-resolution particle material");
+            const auto checkLegacy = [&](int legacy, bool coverage)
+            {
+                if (legacy == -1) return;
+                if (!validLayer(legacy) || legacy == config.LayerIndex)
+                    throw std::runtime_error("Invalid half-resolution fallback layer");
+                const auto& fallback = preview->layers[legacy];
+                const bool validMode = coverage
+                    ? fallback.MaterialMode == config.Premultiplied || (config.Premultiplied && fallback.MaterialMode == PreciseCoverageMode)
+                    : config.Premultiplied && (fallback.MaterialMode == 2 || fallback.MaterialMode == PreciseEmissionMode);
+                auto expected = layer; expected.MaterialMode = fallback.MaterialMode; expected.Blend = coverage ? 1 : 2;
+                if (!validMode || std::memcmp(&expected, &fallback, sizeof(AecnLayer)) != 0)
+                    throw std::runtime_error("Inconsistent half-resolution fallback material");
+            };
+            checkLegacy(config.LegacyCoverageIndex, true);
+            checkLegacy(config.LegacyEmissionIndex, false);
+            if (std::any_of(validated.begin(), validated.end(), [&](const AecnHalfLayerConfig& value) { return value.LayerIndex == config.LayerIndex; }))
+                throw std::runtime_error("Duplicate half-resolution layer");
+            if (std::any_of(other.begin(), other.end(), [&](const AecnHalfLayerConfig& value) { return value.LayerIndex == config.LayerIndex; }))
+                throw std::runtime_error("Conflicting native alpha resolution");
+            validated.push_back(config);
+        }
+        std::vector<Preview::NativeAlphaLayer> lookup;
+        if (!validated.empty() || !other.empty())
+        {
+            lookup.resize(preview->layers.size());
+            for (const auto& config : other) lookup[config.LayerIndex] = { &config, !halfResolution };
+            for (const auto& config : validated) lookup[config.LayerIndex] = { &config, halfResolution };
+        }
+        // Vector moves retain element addresses; publish only after every validation/allocation succeeds.
+        (halfResolution ? preview->halfLayers : preview->fullLayers) = std::move(validated);
+        preview->nativeAlphaLayers = std::move(lookup);
+    });
+}
+
+API int AecnVfxConfigureHalf(Preview* preview, const AecnHalfLayerConfig* configs, int count, int configBytes)
+{
+    return ConfigureNativeAlpha(preview, configs, count, configBytes, true);
+}
+
+API int AecnVfxConfigureFull(Preview* preview, const AecnHalfLayerConfig* configs, int count, int configBytes)
+{
+    return ConfigureNativeAlpha(preview, configs, count, configBytes, false);
+}
+
+static const AecnHalfLayerConfig* HalfLayer(const Preview& preview, int layer)
+{
+    if (preview.nativeAlphaLayers.empty() || layer < 0 || static_cast<size_t>(layer) >= preview.nativeAlphaLayers.size())
+        return nullptr;
+    return preview.nativeAlphaLayers[layer].config;
+}
+
+static const std::vector<AecnParticle>& ExpandHalfFallback(const Preview& preview,
+    const std::vector<AecnParticle>& particles, std::vector<AecnParticle>& result)
+{
+    result.clear();
+    result.reserve(particles.size() * 2);
+    for (const auto& particle : particles)
+    {
+        const auto config = HalfLayer(preview, particle.Layer);
+        if (!config) { result.push_back(particle); continue; }
+        const auto append = [&](int layer, float multiplier)
+        {
+            if (layer < 0) return;
+            auto copy = particle; copy.Layer = layer;
+            for (int channel = 0; channel < 3; ++channel) copy.Colour[channel] *= multiplier;
+            result.push_back(copy);
+        };
+        // Match the existing per-particle coverage/emission order, including absent constant-alpha layers.
+        append(config->LegacyCoverageIndex, config->CoveredColourMultiplier);
+        append(config->LegacyEmissionIndex, config->EmissionMultiplier);
+    }
+    if (result.size() > 1048576) throw std::runtime_error("Half-resolution fallback exceeds the particle budget");
+    return result;
+}
+
+static bool TryDrawHalfScene(Preview& owner, const std::vector<SceneDraw>& draws)
+{
+    std::vector<HalfResolutionScene::Draw> halfDraws;
+    for (const auto& command : draws)
+    {
+        // Preserve the established ordering for mixed full-resolution, model, decal and refraction scenes.
+        if (!command.opaque.empty() || !command.distortion.empty()) return false;
+        const auto& preview = *command.preview;
+        size_t begin = 0;
+        while (begin < command.colour.size())
+        {
+            const auto layerIndex = command.colour[begin].Layer;
+            const auto config = HalfLayer(preview, layerIndex);
+            if (!config) return false;
+            size_t end = begin + 1;
+            while (end < command.colour.size() && command.colour[end].Layer == layerIndex) ++end;
+            const auto& layer = preview.layers[layerIndex];
+            const auto texture = [&](int index)
+            {
+                return EffekseerRendererDX11::GetTextureProperty(preview.textures[index]->GetBackend()).ShaderResourceViewPtr;
+            };
+            HalfResolutionScene::Draw draw;
+            draw.Layer = &layer; draw.Config = config; draw.Particles = command.colour.data() + begin;
+            draw.Count = static_cast<int>(end - begin); draw.View = command.view.data(); draw.Projection = command.projection.data();
+            draw.Lighting = &command.lighting; draw.SoftDepth = command.softDepth.Get();
+            draw.HalfResolution = preview.nativeAlphaLayers[layerIndex].halfResolution;
+            draw.Textures = { texture(layer.TextureIndex), texture(layer.NormalIndex >= 0 ? layer.NormalIndex : layer.TextureIndex),
+                texture(layer.GradientIndex >= 0 ? layer.GradientIndex : layer.TextureIndex) };
+            halfDraws.push_back(draw);
+            begin = end;
+        }
+    }
+    if (halfDraws.empty()) return false;
+    // Even materials without soft fading need the current hardware depth for the native half-size raster pass.
+    owner.CaptureDepth(halfDraws.front().Projection);
+    ID3D11ShaderResourceView* fullDepth = nullptr;
+    if (owner.depthAvailable)
+    {
+        D3D11_TEXTURE2D_DESC description{}; owner.depthCopy->GetDesc(&description);
+        fullDepth = description.SampleDesc.Count > 1 ? owner.resolvedDepthView.Get() : owner.depthView.Get();
+    }
+    auto context = owner.renderer->GetContext();
+    if (!HalfResolutionScene::CanRender(context, halfDraws, fullDepth)) return false;
+    for (const auto& command : draws) { command.preview->renderer->ResetDrawCallCount(); command.preview->halfDrawCalls = 0; }
+    owner.halfScene.Render(owner.renderer->GetDevice(), context, halfDraws, fullDepth);
+    owner.halfDrawCalls = static_cast<int>(owner.halfScene.DrawCallCount());
+    return true;
+}
+
+static int DrawParticles(Preview* preview, const float* view, const float* projection, const AecnParticle* particles, int count, const AecnLighting* lighting,
+    ID3D11ShaderResourceView* softDepth, int sharedDistortionPass)
 {
     return Guard([&]
     {
         if (count < 0 || count > 1048576) throw std::runtime_error("Invalid particle count");
+        preview->halfDrawCalls = -1;
         preview->renderer->ResetDrawCallCount();
         if (count == 0) return;
         bool sawDistortion = false, needsFinalDistortionPass = false;
@@ -836,12 +1212,45 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                 + particle.Transform[14] * view[10] + view[14] < 0;
         };
         bool rendering = false;
+        const bool preparedSprites = lighting != nullptr && preview->uploadSprites != nullptr && preview->uploadEffect != nullptr;
+        bool preparedActive = false;
         std::unique_ptr<ExtendedMeshStageState> extendedMeshState;
         ComPtr<ID3D11SamplerState> displacementSampler;
-        auto beginRendering = [&] { preview->renderer->BeginRendering(); rendering = true; };
-        auto endRendering = [&] { if (rendering) { preview->renderer->EndRendering(); rendering = false; } };
+        auto flushPrepared = [&] {
+            if (preparedActive) { preview->uploadRenderer->FlushCachedSprites(); preparedActive = false; }
+        };
+        auto beginRendering = [&] { preview->renderer->BeginRendering(); preparedActive = false; rendering = true; };
+        auto endRendering = [&] { if (rendering) { flushPrepared(); preview->renderer->EndRendering(); rendering = false; } };
         std::unique_ptr<WeightedDistortionTarget::Frame> distortionFrame;
-        int distortionBegin = 0, distortionEnd = 0, distortionPass = 0;
+        int distortionBegin = 0, distortionEnd = 0, distortionPass = std::max(0, sharedDistortionPass);
+        struct SpriteMaterialTemplate
+        {
+            NodeRendererBasicParameter Basic;
+            MaterialRenderData Material;
+            explicit SpriteMaterialTemplate(const AecnLayer& layer) : Basic(BuildMaterial(layer, 1))
+            {
+                Material.MaterialTextures.reserve(3);
+                Material.MaterialUniforms.reserve(15);
+            }
+        };
+        // Templates live only for this draw: lighting, camera and layer resources cannot become stale.
+        std::vector<std::unique_ptr<SpriteMaterialTemplate>> spriteMaterials(preview->layers.size());
+        MaterialRenderData materialScratch;
+        ComPtr<ID3D11GeometryShader> geometryShader;
+        preview->renderer->GetContext()->GSGetShader(geometryShader.GetAddressOf(), nullptr, nullptr);
+        // File sprite shaders have no vertex displacement. Only affine views and an unextended raster pipeline qualify.
+        bool canCullSprites = !geometryShader && view[3] == 0 && view[7] == 0 && view[11] == 0 && view[15] == 1
+            && std::all_of(view, view + 16, [](float value) { return std::isfinite(value); })
+            && std::all_of(projection, projection + 16, [](float value) { return std::isfinite(value); });
+        Matrix44 spriteViewProjection;
+        if (canCullSprites)
+        {
+            Matrix44::Mul(spriteViewProjection, camera, lens);
+            // Opportunistically keep an overview intact; this sample can only disable culling, never reject a particle.
+            canCullSprites = !SpriteOriginInsideXY(particles[0], spriteViewProjection)
+                || !SpriteOriginInsideXY(particles[count / 2], spriteViewProjection)
+                || !SpriteOriginInsideXY(particles[count - 1], spriteViewProjection);
+        }
         beginRendering();
         try
         {
@@ -851,7 +1260,8 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                 int layerIndex = particles[begin].Layer;
                 if (layerIndex < 0 || layerIndex >= static_cast<int>(preview->layers.size())) throw std::runtime_error("Invalid particle layer");
                 const auto& layer = preview->layers[layerIndex];
-                if (layer.Distortion != 0 && !distortionFrame)
+                if (layer.Kind != 0 || layer.MeshMaterialIndex >= 0 || layer.Distortion != 0 || layer.OpaqueModel) flushPrepared();
+                if (layer.Distortion != 0 && !distortionFrame && sharedDistortionPass < 0)
                 {
                     // Submit all colour before the one final distortion accumulation and resolve.
                     endRendering(); distortionBegin = begin; distortionEnd = begin;
@@ -883,7 +1293,8 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                 const auto mode = layer.MaterialMode == PreciseCoverageMode ? 1 : layer.MaterialMode == PreciseEmissionMode ? 2 : layer.MaterialMode;
                 const bool normalFlips = layer.Kind == 0 && layer.Distortion == 0 && layer.MeshMaterialIndex < 0
                     && layer.LightingMode != 0 && layer.NormalIndex >= 0 && lighting->Parameters[0] != 0 && mode < 2;
-                const bool rawAlpha = layer.MeshMaterialIndex < 0 && (layer.Distortion != 0 || (layer.Kind == 0 && (mode == 1 || mode == 2)));
+                const bool rawAlpha = layer.MeshMaterialIndex < 0 && (layer.Distortion != 0
+                    || ((layer.Kind == 0 || (layer.Kind == 2 && layer.MaterialMode < 3)) && layer.TextureIndex >= 0));
                 const auto alphaRange = rawAlpha ? AlphaExponent(particles[begin].Colour[3]) : 0;
                 const auto colourScale = precise ? ParticleBrightness(particles[begin]) : 0;
                 const auto preciseAlphaScale = precise && rawAlpha
@@ -917,7 +1328,17 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                 float alphaScale = alphaRange < 0 ? 0 : 1;
                 if (rawAlpha)
                     for (int i = begin; i < end; ++i) alphaScale = std::max(alphaScale, particles[i].Colour[3]);
-                auto basic = BuildMaterial(layer, brightness);
+                SpriteMaterialTemplate* spriteMaterial = nullptr;
+                if (layer.Kind == 0 && layer.MeshMaterialIndex < 0 && layer.Distortion == 0 && !layer.OpaqueModel
+                    && (layer.MaterialMode || layer.NativeSoftDepth || layer.GradientIndex >= 0 || layer.TextureIndex >= 0
+                        || (layer.LightingMode && lighting->Parameters[0] != 0)))
+                {
+                    auto& cached = spriteMaterials[layerIndex];
+                    if (!cached) cached = std::make_unique<SpriteMaterialTemplate>(layer);
+                    spriteMaterial = cached.get();
+                }
+                auto basic = spriteMaterial ? spriteMaterial->Basic : BuildMaterial(layer, brightness);
+                if (spriteMaterial) basic.EmissiveScaling = brightness;
                 float softBias = 0;
                 if (layer.NativeSoftDepth)
                 {
@@ -937,7 +1358,17 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                 }
                 basic.Flipbook.OneSize = {std::abs(particles[begin].UV[2]), std::abs(particles[begin].UV[3])};
                 if (!preview->depthAvailable) basic.SoftParticleDistanceFar = 0;
-                MaterialRenderData material;
+                auto& material = materialScratch;
+                const bool reuseSpriteMaterial = spriteMaterial && spriteMaterial->Material.MaterialIndex == 0;
+                // The renderer also compares this pointer when batching, so always submit the same scratch address.
+                if (reuseSpriteMaterial) material = spriteMaterial->Material;
+                else
+                {
+                    material.MaterialIndex = -1;
+                    material.MaterialTextures.clear();
+                    material.MaterialUniforms.clear();
+                    material.MaterialGradients.clear();
+                }
                 if (layer.MeshMaterialIndex >= 0)
                 {
                     const auto& source = preview->meshMaterials[layer.MeshMaterialIndex];
@@ -1014,7 +1445,19 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                     basic.MaterialType = RendererMaterialType::File; basic.MaterialRenderDataPtr = &material;
                     basic.AlphaBlend = distortionPass == 0 ? AlphaBlendType::Add : AlphaBlendType::Mul;
                 }
-                else if (!layer.OpaqueModel && (layer.MaterialMode || layer.NativeSoftDepth || layer.GradientIndex >= 0 || layer.Kind == 2 || (layer.LightingMode && lighting->Parameters[0] != 0)))
+                else if (reuseSpriteMaterial)
+                {
+                    // Retain every original batch while refreshing all particle-dependent uniforms.
+                    material.MaterialUniforms[0] = {brightness, basic.SoftParticleDistanceFar, static_cast<float>(mode), layer.NormalIndex >= 0 ? 1.0f : 0.0f};
+                    material.MaterialUniforms[12] = {alphaScale, layer.EmissionShapeWeight, crush[0], crush[1]};
+                    material.MaterialUniforms[13] = {particles[begin].UV[2] < 0 ? -1.0f : 1.0f,
+                        particles[begin].UV[3] < 0 ? -1.0f : 1.0f, 0, 0};
+                    const auto nearDistance = std::abs(projection[14] / projection[10]);
+                    material.MaterialUniforms[14] = {inverseWidth, inverseHeight, softBias,
+                        layer.NativeSoftDepth ? (inFront(particles[begin]) ? nearDistance : -nearDistance) : 0};
+                    basic.MaterialType = RendererMaterialType::File; basic.MaterialRenderDataPtr = &material;
+                }
+                else if (!layer.OpaqueModel && (layer.MaterialMode || layer.NativeSoftDepth || layer.GradientIndex >= 0 || layer.Kind == 2 || (layer.Kind == 0 && layer.MeshMaterialIndex < 0 && layer.TextureIndex >= 0) || (layer.LightingMode && lighting->Parameters[0] != 0)))
                 {
                     material.MaterialIndex = layer.Kind == 2 ? 1 : 0; material.MaterialTextures.push_back({0, layer.TextureIndex});
                     material.MaterialTextures.push_back({0, layer.NormalIndex >= 0 ? layer.NormalIndex : layer.TextureIndex});
@@ -1046,6 +1489,9 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                         material.MaterialUniforms.push_back({layer.Pivot[0], layer.Pivot[1], 0, 0});
                         for (const auto& row : clipToLocal.Values) material.MaterialUniforms.push_back({row[0], row[1], row[2], row[3]});
                         material.MaterialUniforms.push_back({model.Values[0][1], model.Values[1][1], model.Values[2][1], model.Values[3][1] - lighting->Parameters[3]});
+                        // Pack world-coordinate columns for reconstructing the receiver's geometric normal.
+                        for (int column = 0; column < 3; ++column)
+                            material.MaterialUniforms.push_back({model.Values[0][column], model.Values[1][column], model.Values[2][column], model.Values[3][column]});
                         // Keep the actual depth texture bound without applying ordinary soft-particle fading.
                         basic.SoftParticleDistanceFar = 1;
                     }
@@ -1062,14 +1508,33 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                     }
                     basic.MaterialType = RendererMaterialType::File; basic.MaterialRenderDataPtr = &material;
                 }
+                if (spriteMaterial && !reuseSpriteMaterial) spriteMaterial->Material = material;
                 NodeRendererDepthParameter depth;
                 if (layer.Kind == 0)
                 {
+                    if (canCullSprites && layer.MeshMaterialIndex < 0 && layer.Distortion == 0 && !layer.OpaqueModel
+                        && basic.MaterialType == RendererMaterialType::File && material.MaterialIndex == 0)
+                    {
+                        bool outside = true;
+                        for (int i = begin; i < end; ++i)
+                            if (!SpriteOutsideXY(layer, particles[i], view, projection, spriteViewProjection)) { outside = false; break; }
+                        if (outside) { begin = end; continue; }
+                    }
+                    const bool usePrepared = preparedSprites && layer.MeshMaterialIndex < 0 && layer.Distortion == 0
+                        && !layer.OpaqueModel && basic.MaterialType == RendererMaterialType::File && material.MaterialIndex == 0;
+                    if (!usePrepared) flushPrepared();
+                    else if (!preparedActive)
+                    {
+                        preview->uploadRenderer->FlushOriginalSprites();
+                        preview->uploadRenderer->BeginCachedSprites(); preparedActive = true;
+                    }
+                    const auto sprites = usePrepared ? preview->uploadSprites.Get() : preview->sprites.Get();
                     SpriteRenderer::NodeParameter node{};
-                    node.EffectPointer = preview->effect.Get(); node.ZTest = layer.ZTest != 0; node.ZWrite = false;
+                    node.EffectPointer = usePrepared ? preview->uploadEffect.Get() : preview->effect.Get(); node.ZTest = layer.ZTest != 0; node.ZWrite = false;
                     node.Billboard = BillboardType::Fixed; node.IsRightHand = true; node.ZSort = ZSortType::None;
                     node.DepthParameterPtr = &depth; node.BasicParameterPtr = &basic;
-                    preview->sprites->BeginRendering(node, end - begin, nullptr);
+                    if (usePrepared) preview->uploadRenderer->SelectCachedSpriteLayer(static_cast<size_t>(layerIndex));
+                    sprites->BeginRendering(node, end - begin, nullptr);
                     for (int i = begin; i < end; ++i)
                     {
                         const auto& particle = particles[i];
@@ -1136,9 +1601,9 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                             instance.CustomData1 = {particle.MaterialTime, particle.AppearancePhase, particle.ParticleSize, 0};
                             std::copy_n(particle.Colour, 4, instance.CustomData2.begin());
                         }
-                        preview->sprites->Rendering(node, instance, nullptr);
+                        sprites->Rendering(node, instance, nullptr);
                     }
-                    preview->sprites->EndRendering(node, nullptr);
+                    sprites->EndRendering(node, nullptr);
                 }
                 else
                 {
@@ -1168,6 +1633,8 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
                             * preview->models[layer.ModelIndex]->GetFrameCount())) : 0;
                         instance.FlipbookIndexAndNextRate = particle.Flipbook;
                         instance.CustomData1 = CustomData(layer, particle);
+                        if (layer.Kind == 2 && layer.MaterialMode < 3)
+                            std::copy_n(particle.Colour, 4, instance.CustomData2.begin());
                         if (layer.MeshMaterialIndex >= 0)
                         {
                             instance.CustomData1 = {particle.MaterialTime, particle.AppearancePhase, particle.Time, 0};
@@ -1201,5 +1668,102 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
         if (std::getenv("ASSETEDITOR_VFX_HEADLESS_TEST") != nullptr)
             std::fprintf(stderr, "Effekseer draw calls: %d; particles: %d\n", preview->renderer->GetDrawCallCount(), count);
 #endif
+    });
+}
+
+API int AecnVfxDrawInScene(Preview* owner, Preview* preview, const float* view, const float* projection,
+    const AecnParticle* particles, int count, const AecnLighting* lighting, ID3D11ShaderResourceView* softDepth);
+
+API int AecnVfxDraw(Preview* preview, const float* view, const float* projection, const AecnParticle* particles, int count,
+    const AecnLighting* lighting, ID3D11ShaderResourceView* softDepth)
+{
+    if (preview && (!preview->halfLayers.empty() || !preview->fullLayers.empty()))
+    {
+        if (!AecnVfxBeginScene(preview, lighting)) return 0;
+        if (!AecnVfxDrawInScene(preview, preview, view, projection, particles, count, lighting, softDepth))
+        {
+            auto draws = std::move(preview->sceneDraws);
+            preview->sceneFrame.reset();
+            return 0;
+        }
+        return AecnVfxEndScene(preview);
+    }
+    return DrawParticles(preview, view, projection, particles, count, lighting, softDepth, -1);
+}
+
+API int AecnVfxDrawInScene(Preview* owner, Preview* preview, const float* view, const float* projection,
+    const AecnParticle* particles, int count, const AecnLighting* lighting, ID3D11ShaderResourceView* softDepth)
+{
+    return Guard([&]
+    {
+        if (!owner || !preview || !owner->sceneFrame || count < 0 || count > 1048576
+            || owner->renderer->GetContext() != preview->renderer->GetContext())
+            throw std::runtime_error("Invalid VFX scene submission");
+        if (count == 0) return;
+        if (!view || !projection || !particles || !lighting) throw std::runtime_error("Missing VFX scene data");
+        if (softDepth)
+        {
+            D3D11_SHADER_RESOURCE_VIEW_DESC description{}; softDepth->GetDesc(&description);
+            if (description.ViewDimension != D3D11_SRV_DIMENSION_TEXTURE2D)
+                throw std::runtime_error("Soft depth must be a single-sample Texture2D view");
+        }
+        // Validate each submission before retaining it so a rejected effect cannot poison the scene queue.
+        size_t opaqueCount = 0, colourCount = 0, distortionCount = 0;
+        for (int index = 0; index < count; ++index)
+        {
+            const auto& particle = particles[index];
+            if (particle.Layer < 0 || particle.Layer >= static_cast<int>(preview->layers.size()))
+                throw std::runtime_error("Invalid particle layer");
+            const auto& layer = preview->layers[particle.Layer];
+            for (float value : particle.Colour)
+                if (!std::isfinite(value)) throw std::runtime_error("Invalid particle colour");
+            if (HalfLayer(*preview, particle.Layer))
+                for (float value : particle.Transform)
+                    if (!std::isfinite(value)) throw std::runtime_error("Invalid particle transform");
+            if (!std::isfinite(particle.AlphaCrush[0]) || !std::isfinite(particle.AlphaCrush[1])
+                || particle.AlphaCrush[1] < 0 || particle.AlphaCrush[1] > 2)
+                throw std::runtime_error("Invalid particle alpha crush");
+            if (layer.NativeSoftDepth)
+            {
+                if (!std::isfinite(particle.SoftParticleScale)) throw std::runtime_error("Invalid particle soft depth scale");
+                using namespace DirectX::PackedVector;
+                const auto factor = XMConvertHalfToFloat(XMConvertFloatToHalf(layer.SoftDistance));
+                const auto strength = XMConvertHalfToFloat(XMConvertFloatToHalf(layer.DistortionSoftScaleStrength));
+                const auto bias = factor * (1 + strength * (std::max(0.0f, std::min(1.0f, particle.SoftParticleScale)) - 1));
+                if (!std::isfinite(bias) || bias < 0) throw std::runtime_error("Invalid native soft depth distance");
+            }
+            if (layer.Distortion != 0)
+            {
+                if (!std::isfinite(particle.ParticleSize)) throw std::runtime_error("Invalid distortion particle size");
+                for (float value : particle.NormalRotation)
+                    if (!std::isfinite(value)) throw std::runtime_error("Invalid distortion shading basis");
+            }
+            if (layer.Distortion != 0) ++distortionCount;
+            else if (layer.OpaqueModel) ++opaqueCount;
+            else ++colourCount;
+        }
+        preview->Retain();
+        SceneDraw command;
+        if (!owner->recycledSceneDraws.empty())
+        {
+            command = std::move(owner->recycledSceneDraws.back());
+            owner->recycledSceneDraws.pop_back();
+        }
+        command.preview = std::shared_ptr<Preview>(preview, [](Preview* value) { value->Release(); });
+        std::copy_n(view, 16, command.view.begin()); std::copy_n(projection, 16, command.projection.begin());
+        command.lighting = *lighting; command.softDepth = softDepth;
+        command.opaque.reserve(opaqueCount);
+        command.colour.reserve(colourCount);
+        command.distortion.reserve(distortionCount);
+        for (int index = 0; index < count; ++index)
+        {
+            const auto& particle = particles[index]; const auto& layer = preview->layers[particle.Layer];
+            auto& target = layer.Distortion != 0 ? command.distortion : layer.OpaqueModel ? command.opaque : command.colour;
+            target.push_back(particle);
+        }
+        owner->sceneDraws.push_back(std::move(command));
+        ComPtr<ID3D11DepthStencilView> depth;
+        preview->renderer->GetContext()->OMGetRenderTargets(0, nullptr, depth.GetAddressOf());
+        preview->depthAvailable = depth != nullptr || softDepth != nullptr;
     });
 }

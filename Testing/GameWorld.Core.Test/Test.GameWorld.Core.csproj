@@ -40,6 +40,10 @@
     <EmbeddedResource Include="Vfx/Fixtures/NativeUvTransforms.json" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeUvAsymmetric.dds" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeStaticAtlasCells.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeOuterAtlasZero.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeTerrainAttachment.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeTerrainOrientation.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeTerrainOrientationProduction.json" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeStaticAtlas.dds" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeHorizontalGeometry.json" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeDefaultVerticalMotion.json" />
@@ -50,6 +54,13 @@
     <EmbeddedResource Include="Vfx/Fixtures/NativeAnalyticCurves.json" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeMixedCurves.json" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeRigidOrientation.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeSpriteHalf.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeSpriteDynamicScalar.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeSpriteFullLocalTransport.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeSpriteQuadraticScale.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeOrdinaryAppearanceTables.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/OfficialSiegeSmokeLarge.xml" />
+    <EmbeddedResource Include="Vfx/Fixtures/OfficialSiegeSmokeDiffuse.dds" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeEntangleTiming.json" />
   </ItemGroup>
 

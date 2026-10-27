@@ -1,0 +1,47 @@
+{
+  "Source": "Official actual producer6c1ec0→writer6c10c0→6be290 dataflow, plus retained actual6be290 Up-input executions. This is not complete original-effect runtime acceptance.",
+  "WarscapeSha256": "c75d40a30ce938958f445ae59eb256e4c23f51201984d1f3ea5cb25319f763b8",
+  "ProducerContractSha256": "b3dde3be932563ab76f7903c7796f49426532257c664a12dbcc93819b5b22b1f",
+  "ProducerRule": "stack+70 generated spawn direction goes only to velocity; independentstack+50 Up or actual scene terrain normal is passed as writer argument7 and becomes6be290 r9. Supported flat receiver always suppliesUp.",
+  "PreviousTestCorrection": "R10224 low-level cases are real function outputs but manual6c08f0→6be290 composition was not real caller dataflow. Keep those as explicitnormal mathematical controls; simulated particles use this separate production oracle.",
+  "Oracles": [
+    {
+      "Angles": [
+        23,
+        -37,
+        19
+      ],
+      "ReceiverNormal": [
+        0,
+        1,
+        0
+      ],
+      "NativeQuaternionFloatBits": [
+        1047756696,
+        3196914131,
+        1046278808,
+        1063777838
+      ],
+      "NativeExecutionCase": "angles-23--37-19_zero_direction2_identity"
+    },
+    {
+      "Angles": [
+        90,
+        37,
+        0
+      ],
+      "ReceiverNormal": [
+        0,
+        1,
+        0
+      ],
+      "NativeQuaternionFloatBits": [
+        1059826231,
+        1046855883,
+        3194339531,
+        1059826231
+      ],
+      "NativeExecutionCase": "angles-90-37-0_zero_direction2_identity"
+    }
+  ]
+}

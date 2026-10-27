@@ -1,6 +1,676 @@
 # VFX 本地项目交接
 
-> **当前接续入口为下方 R96**；R95 及更早正文按历史范围保留。本轮新增验证证据位于 `E:\AECN-VFX-R96-evidence`，源码及正常 Debug 仍在原仓库；实机测试由用户负责。
+> **当前接续入口为下方 R115；用户已反馈“目前基本可用”（2026-10-28）**。已补显式全／半分辨率普通面片的共享七矩透明合成、原生外观表及提交性能修复，正常 Debug 已更新。该反馈只代表用户本次实际测试范围，不扩大为所有特效原生等价；复杂渐变／折射混合通道、局部边缘及窗口长时性能仍有边界。本次按用户新授权更新文档、提交、推送并经检查合并，随后等待下一步指示；覆盖历史“不提交、不推送”限制，不恢复桌面测试，不继续扩展实现，不清理。源码、正常 Debug、原件、备份、失败及现有证据全部保留。
+
+## 本次交付确认（2026-10-28）
+
+- 用户确认“目前基本可用”，授权文档更新后提交、推送、合并；未要求发布、修改版本号或清理。沿用当前 `codex/vfx-preview-native-parity-r97`，交付前 140 个修改／未跟踪路径与 R115 最后快照逐文件散列一致，暂存区为空；全部为累计 VFX、共享 Effect 播放、对应测试与文档。
+- 本次文档更正超级视图的全／半分辨率七矩合成准入说明，以及简单速度朝向光照的范围表述。R115 的 Debug 构建、883 项 CPU、21 项渲染协议及 7 项编辑器／中文检查为上一轮实际结果，本次复用，不能记为重新执行；新的提交／远端 CI／合并结果以本次实际交付记录为准。
+- 首轮 [PR #228 CI](https://github.com/Szy-Cathay/TheAssetEditor-CN/actions/runs/40564720235) 的原生／Release 构建与部署通过，全套测试仅 `VfxHiddenRenderingTests` 两项失败：测试误把进程共享设备当成该视口私有初始化状态。与既有呈现生命周期测试一起离屏复现为 9 通过／2 失败／0 跳过；修正为设备引用严格不变，并检查该隐藏视口七项私有 GPU 资源仍为空、初始化标记仍为 false，保留时钟、待重建及早退断言。仅重建测试项目后，同组 11 通过／0 失败／0 跳过；产品源码和正常 Debug 不变，没有清全局设备、放宽行为断言或改 CI。红绿 TRX、日志及本次交付盘点在 `artifacts/vfx-r97-r115-delivery-20261028/`，后续远端完整结果以对应 PR 检查为准。
+- 下方各轮中的分支、HEAD、操作限制与待验描述均为当时时点的历史记录；本节及当前用户指令优先。Nurgle 混合路线、完整原生对照及未覆盖组合继续保留为待办，不因本次“基本可用”反馈宣称全部修复。
+
+## 后续 VFX 实机验收授权（2026-10-26）
+
+- **2026-10-28最新覆盖**：用户明确“你就离屏测试改吧，修复完了我人工核验”。当前仅源码、构建与离屏，不恢复下方历史桌面许可；后续实窗和人工观感由用户核验。本轮Debug与Terry均已正常退出，未丢弃未保存内容。
+- 用户明确指示“你以后可以自己实机验收”，覆盖后续 VFX 任务所需的正常 Debug、Terry 及必要采样窗口操作；不再因旧阶段写着“用户自行测试”而把可自行执行的验收留给用户。已有测试许可持续有效，不重复索要同一许可。
+- 开测范围、目标窗口与用户键鼠安排仍按根 `AGENTS.md` 核对；检测到真实输入或焦点冲突时立即停止本任务桌面输入并报告，不循环抢占。保留未保存内容，不强制结束用户程序。
+- 继续仅用官方原版及其原始依赖，核实实际 Pack 来源；Terry 关闭并核实泛光，对齐画质、相机、挂点和播放阶段。自动、离屏、实机及游戏原生对照分别记录。
+- 本次只登记授权，没有执行新的窗口测试，也没有新增视觉验收结论；下方历史记录中的用户分工按当时时点保留。
+
+## R115 Trail 共用透明合成、外观表与性能（2026-10-28）
+
+### 现场、交付与本轮边界
+
+- 实际仓库仍为 `D:\Project\Szy-Cathay\TheAssetEditor-CN`，沿用 `codex/vfx-preview-native-parity-r97`，HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存区为空。接手的 128 个修改／未跟踪路径与 R114 最后快照逐文件散列相同；本轮没有切分支、worktree、暂存、收起、提交、推送或清理。所有历史源码、Mod 记录、正常 Debug、唯一备份、采样、原始 RDC 与失败保留。证据根为 `artifacts/vfx-native-halfres-trails-r115/`，接手快照在 `parent-validation/workspace-before.json`。
+- 用户本轮明确只做离屏修改、修完自行人工核验，覆盖所有历史桌面授权；本轮没有显示 Debug／Terry 窗口或发送键鼠输入。已有 RDC 只是受控原生记录；本轮重新执行的是离线回读、同输入产品渲染及完整官方资源对照，不记作新 Terry／游戏实机验收。
+- 当前正常入口 `AssetEditor/bin/Debug/net10.0-windows/AssetEditor.CN.exe` 已构建。正常输出与测试实际 Core 为 **484C5689750CBC6FC298F79CDDA5E5807EE894F2760232E19941BDA59CD9A1FE**，native 为 **2607DCED27ACB5024DB5577E958871407FAC88B575169691C7549368338FD63A**。中文资源为 **9C8481338217D1F476FBCD3AF71F7C8F8DA28E1F525515F33CE8EFAE0DD17754**。源码、正常 Debug 与独有验证记录全部保留，最终保护盘点见 `parent-validation/workspace-after.json`。
+
+### 原生依据与共享实现
+
+- 原版吹管 q0 的两条启用层实际为 `FULLRES_DEFERRED_ALPHA`，q1／q2 才是 `HALFRES_DEFERRED_ALPHA`；没有把 FULL 降成 HALF，也没有因库中另有未启用模板而删层。新管线保留原始浮点 RGBA 及完整旧覆盖／发光配置，另以 24 字节配置登记原始粒子；旧 ABI 仍为 Layer132／Particle148／Vertex72／Lighting176。整组普通颜色全部准入时，全部实例先累计七矩，半尺寸全部七矩以整数 2 倍坐标加进完整矩池，再以坐标倍率 1／2 分别求全／半尺寸颜色，最后统一重建与显示；未准入混合整组使用原 C/E 层、原倍率及原顺序，模型、贴花、渐变、折射不因删守卫进入新路线。
+- 原 134793 回读重新闭合：完整分配 1707×1067、完整视口 360×655；half 分配 853×533、视口 180×327。实际半尺寸硬件 D24S8 与四分之一尺寸 soft SRV 是两份不同资源。两级生产 PS 对 2×2 取 MAX4、尺寸 floor；本轮原 full→half **58,860**、half→quarter **14,670** 深度值逐低24bit相同，原 packed 上传读回也相同。实际 1413 三 MRT 对全部七矩 ONE/ONE 累加，1462 从完整合并矩池以 scaler2 读取；原生 nofilter 最终颜色使用线性上采样，不能改说深度引导过滤。完整证据入口 `native-depth-oracle-v1/native31-oracle-v1.json`。
+- 正常窗口真实使用 4 倍抗锯齿，因此完整尺寸矩／颜色保留 4 倍与原硬件深度，逐采样求值；半尺寸读取采样平均的完整矩场，原完整深度的 MSAA 最小值解析独立保留。原生记录只证单采样，4 倍是 AECN 兼容，不冒充游戏 MSAA 实证。新材质保留全部原 mip，使用实证的硬件三线性／Clamp；旧材质已经有手动 mip 混合，不能把 Point 采样器单独当作旧灰边成因。Alpha 采用 AECN 的 MAX(有效覆盖率1−T,场景Alpha)，原参考目标写零的 Alpha 约定不直接照搬。
+- 原先普通解析尺寸／透明度仍直接求值。新可选 `ParticleScale`／初始 Alpha／生命 Alpha 表仅限显式全／半通道的普通 File0、已证解析模式及有效上下表相等；生命 Alpha 非零偏移等不准入。两个原层 12 行完整128点RGBA16F的 SHA 全匹配；Scale／lifeAlpha 用 float `age/(life+1e-6)`，初始 Alpha 保持独立出生阶段及原 RNG。模型128float、旧直接曲线、已支持 quadratic、物理时钟、寿命、过期、段距和全局1/120不变。31项原数据重新生产，裁剪决定／UV保持，角点最大误差 **.23117→.00945像素**，Alpha 最大相对误差约 **3.61%→.0416%**；GPU 末位过滤仍有 half 残差，未强加偏置或焊接几何。
+- 同一31原输入、实际完整 DSV、同相机与显式实测环境光，经产品 Frame 和新渲染器绘制黑白背景；原根与原 DDS 均鲜核官方 Pack。对原生局部32²的透射 MAE **.006746→.000190**、线性辐射 MAE **.009861→.000891**。这是固定原捕获输入的 DIAG，未把 PostVS 颜色拷进产品，也不代表完整运动；局部最大辐射差仍约 .146，不能用均值盖过边界误差。最终2607与6F同图块逐字节一致，见 `production-native31-v1/final-lookup-pixel-identity-v1.json`。
+
+### 性能、完整原件与真实验证结果
+
+- 独立编辑器仅把可选的复杂取景范围估算移到单独 CPU 任务；不读取实时挂点、不操作GPU、不冻结正常模拟，完成后只在用户未导航／改投影时补自动取景。范围独立工作与旧负开始完整模拟预热分别准入，共享同一个工作许可；取消／重载／异常不发布旧范围，早晚共享副本读同一不可变范围。早期 Bounds-only 原件对照保持范围与8帧数据逐字节相同，Comet 初次范围调用从约385ms移到约3.8ms的调度；这是移走调用阻塞，不是整次冷启动或总工作量减少。
+- Native 按完整材质、纹理、光照、分辨率和深度键稳定分组，复用提交／回退向量容量。6F 曾新增空配置逐粒子 checked-iterator 搜索，烟雾提交约多 .77ms；已在2607改为配置时建立原子提交索引、空配置直返与O(1)查找。实际源码抽取CPU **7,603**检查通过；同Core下120相位粒子包、RGBA和绘制次数全部相同，6对PNG相同。烟雾 PreviewDraw 同轮中位约 **2.540→1.790ms**，Comet **2.636→2.281ms**；旧退步和全部候选保留，不用早期时钟漂移伪造全帧收益。
+- 完整官方吹管 q0／q1 的弧线、急转、停止／重启，在暗亮背景共36份原PNG及CPU／真实shader包，本轮重新执行。q0分节明显减轻、q1细小半尺寸阶梯仍需用户看实际运动；停止阶段按原寿命归零。不能把捕获中近直线31项或一张缩图当作弯折全部正确。见 `official-moving-trails-v1/`。
+- 另以同一最终工具 actual4×、800×600、24°／26°／FOV45及受控挂点，复测完整 Crowman、Bear、Pox、Nurgle、siege 原件共11对阶段图；每根8／9／9／8／5依赖的来源与原字节鲜核一致、0missing、模拟数量全同。Crowman 三阶段 RGBA 完全相同，1.6秒停拖后2.8秒零粒／零投影；siege两阶段 RGBA 相同，已修中央层仍在。Bear冰蓝烟与雪点、Pox纹理转向保留；均已实际看新原PNG，不仅判有像素。Pox／Nurgle部分投影数随正确外观Alpha门槛改变，不伪称所有像素不变。证据 `official-trail-breadth-v1/validation-summary-v1.json`。
+- 最终2607的12组正常尺寸压力例及同轮旧版4组控制均实际执行；另四组 Comet 后期2.06～3.043秒、原画质1／4×／876×750、原BoundsFocus且Zoom0.3的近景／转镜对照。相机、阶段和模拟数量双方精确一致，没有改寿命、质量、数量或步长。含模拟、提交及同步读回／等候，12组最高P95 **11.6103ms**、最高单帧 **12.7658ms**；近景最高P95 **9.2643ms**、单帧 **9.8901ms**。近景有蓝烟／石块及约半屏主体，底部裁切已明示，不称完整全屏压力；默认自动烟雾取景太远而0draw的样本单列负对照，另有真正888粒子的近景压力。不是GPU时间戳、普通窗口FPS或所有VFX流畅承诺。见 `performance/complex-effects-ab-v1/final2607-series-v1/summary-v1.json`、`performance/comet-dense-close-v1/summary-v1.json`。
+- 最终正常App Debug构建退出0（883条现有警告／0错误），Core／native／中文资源 SHA 与上文一致；受影响Editor测试重建退出0（4条现有警告／0错误）。最终自动批次分别为：50个已审阅纯CPU夹具 **883通过／0失败／0跳过**；渲染协议与原官方DDS的1×／4×、全／半／跨实例／倒序、MAX Alpha、精确旧回退、分数LOD等 **21通过／0失败／0跳过**；延迟相机与实际中文加载 **7通过／0失败／0跳过**。先前局部200项等与这些批次有交集，不相加。没有开启全部旧合成纹理GPU套件，未跑全解决方案、Release、CI或GUI；精确筛选与TRX在 `parent-validation/safe-filter-v1.*`、`final-cpu-regression-v1/`、`final-2607-protocol-v1/`、`final-editor-localization-v1/`。两条旧中文诊断改为实际条件说明，完整资源经真实 LocalizationManager 与 SoftwareOnly 文字离屏验证，并核正常输出同字节。
+
+### 保留的失败与下一步边界
+
+- 4B候选的新增shader实例保护错误地向 `VS/PSGetShader` 传必需的 null 输出指针，导致首个混合用例 native AV、完成测试0项；不是21个断言失败。独立D3D getter以SEH实际复现0xC0000005后改用ComPtr，6F及最终2607均通过原控制；失败DLL／PDB、SDK合同、日志和全部红灯保留，见 `native-half-scene-v1/crash4b-before/`。早期正交夹具误触旧回退、Alpha union破坏既有Alpha等已据真实原因修正，未放宽逆序或像素断言。
+- Nurgle 完整原件仍有细紫直线折角与分开的烟团，不能判为已经原生。最强候选 `generic_trail` 原字段为velocity_v2、Alignment1、stretch10、窄尺寸、固定细纹理UV；没有同条件原生／隔层控制，不能仅从字段或名字断言那条线本来正确。该原件还有 GradientIndex3 的 noxious 层及未显式声明通道的颜色层，所以不是只去掉 distortion 整组判断就能让完整原件使用MBOIT；不放开未经证实的渐变／折射组合。具体源、七层及实际包字段见 `official-trail-breadth-v1/nurgle-mixed-route-readonly-v1.json`。
+- FULL原生正可见q0捕获、任意min/max表／Bezier Alpha／非零偏移、源颜色表最后精度、复杂渐变／折射混合、全部持续弯曲与普通Debug冷启动／长时帧稳定仍未整体验收。用户随后反馈本次版本“目前基本可用”，仅记录其实际测试范围；不宣称所有trail／烟雾已达游戏级。保留已确认正确的模型、旋转、播放和原始依赖，按上方交付授权完成 Git 交付后等待下一步指示。
+
+## R114 弯曲 Trail 与密集混合特效（2026-10-27，进行中）
+
+- 用户提供 `D:\WH3WOR~2\codex-clipboard-9255e7a9-81ef-4c32-bf53-b2ebf4ea85d5.png`，明确反馈弯曲拖动仍为独立矩形段、急弯裂口／黑边，复杂花哨特效播放和转镜仍卡；登记为本次未通过验收，不用历史单粒原生方片或2499个自动通过解释掉整链问题。用户重新确认现在可用、不使用键鼠；沿当前 `codex/vfx-preview-native-parity-r97`／HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，不提交、推送或清理。
+- 本节除明确旧路径外，证据相对 `artifacts/vfx-continuous-trail-dense-effects-r114/`。初始112个已有路径逐SHA对照R113快照无漂移、暂存空；见 `parent-validation/workspace-before.json`，原源码、文档及native文件在 `source-before/` 保留。
+- 已确认并修复引用作用域：同一个引用里的两个官方吹管层原分别抽到S=.941983879与.909741044，段长／运动／颜色因此错位；原生两层CB共用S，且两套不同Tint范围反算同一颜色权重。转换保留每次引用出现位置的token，模拟按实例共享六个随机权重，逐层应用各自覆盖范围；不同引用、嵌套分支和每次事件触发隔离，各层仍消费原六次随机数。源件、寿命、数量和1/120不改。新夹具先2通过／5失败后全绿，并新增两层B401实测首粒浮点位守恒；9项全绿。红记录实际保存在旧 `artifacts/vfx-trail-shape-framepacing-r113/trail-continuity-audit-v1/`，不搬动或冒充旧验证；本轮绿记录见 `trajectory-audit/reference-green-summary-v1.json`。
+- 共享参数链补齐：旧转换只映射Kind1的 `ParticleCullDistances`，Kind0吹管完全漏读。现在Kind0显式距离按当前发射器正均匀根／继承缩放计算，保留原生近／远端 `1e-6` 和上界；非均匀、反射、剪切回退原显示并诊断，Kind1／2隔离。标准普通面片按原生全局默认 `.01` 实现两个严格 `threshold < Alpha` 关口，先Tint×距离再最终顶点Alpha，不把贴图Alpha提前裁剪；自定义网格材质／模型／贴花不扩大。Bounds明确绕过假相机距离和显示阈值，保护短距离与极淡几何的初始取景。该参数修复阶段Core为 `28AF9D43C95ADC6FCCC848259B9C1658F1D9741246A53D36AC7C66FAF1A20C3F`；后续仅投影缓冲/稳定排序复用后的最终Core见下文。
+- 新gate／Bounds21项真实红灯为11过10败，修后与Cull21、Ref9、模型距离9合计单次 **60通过／0失败／0跳过**，官方manifest已提供，见 `production-appearance-v1/gate-bounds-green-summary-v2.json`。首次编译因只改源码未build Core而失败、首轮安全控制误写成模型的未缩放距离结果均保留，不算产品红灯或放宽断言。
+- 本次真实producer核对 `production-appearance-v2/current-28AF-appearance-v1.json`：源XML／贴图仍官方原件，仅诊断引用固定为原生捕获的S和Tint。当前根实际512/0/512、scale=.8478706仅乘一次，独立断言通过；实际Frame箭头Alpha旧D449 `.1829174`→最终 `.031103391`，距离因子 `.17004064` 与原生float相同。弱步枪低于阈值不再提交，simulation仍2粒，寿命不变。原生捕获箭头 `.031561363`，剩 **约1.45%** 未修：原RDC最小DebugVS 206步新核生命表 `.7158203125`／初始表 `.39990234375`，最终与捕获只差7.45e-9，定位到普通Alpha i/128表及half采样精度，未猜改产品。见 `production-appearance-v1/native-alpha-debugvs-v1/result.json`。旧用原生postVS Colour喂AE的结果仅证明shader，不能证明旧CPU producer透明度正确。
+- 原B401/81AD正常窗口基线 `live/baseline-v1/curved-motion-v1/`：20秒828原PNG，G模态内通过文档API在29个屏幕点移动指针，27次实际黄框位置变化；三处网格／方向球patch全828帧逐字节相同，未见摄像机变化。这次实际形成近两圈弯路，12／20／22／40／44帧亲看仍有分离宽片、裂口／交叉与黑边；56仍有极淡残片，60已消退。不是旧数字三端点，也不是真人连续输入，工具green=0为检测阴性。原始联系图及测量记录同目录；不能判为修好。
+- 官方图集只读审计：吹管三档、圆形路径9阶段的400个实际packet均固定原格7，没有原件中的随机换格／动画／UV翻转字段；格7原RGB确有黑区、Alpha大部分255。不能换格或把黑色直接当透明遮掩。详见 `materials/atlas-pixels-v1/`，原格与邻格的字面图保留；整路径裂口没有因此闭环。
+- 密集样本已按本轮D449实际CPU活动与正Alpha选择：完整 `wh_main_heavens_comet_of_casandora_impact.xml` q1在.5／1／2秒有600／767／691个正Alpha packet；1秒含658普通面片、110模型、2贴花及事件。玉龙墙只作早期混材控制，4秒只剩6粒，晚期298FPS不算性能通过。死亡之风／传送门本次分别最多15／2粒，不作密集面片主样本。所有原件依赖missing为空，见 `materials/heavy-roots-cpu-v1/`。
+- 保序批量绘制已落产品native `1CD92BB9BD8B2AE07788B5A63810DF1C98B6235A320586C65F9F5BA04518B4C9`，正常native Debug构建退出0。原18份材质DXBC／18exports不变，32项独立CPU状态控制全绿；新增两个bulk头、改Bridge／SpriteUploadCache／CompileMaterials／CMake，CoverageMaterial与本轮前备份同SHA。原C/E图元及half RGB写入次序保留，RGB双源批＋Alpha-only MAX批；相邻兼容段合批，模型／贴花／折射及短段走原队列，作用域结束恢复并失效所有实际状态缓存。
+- 冻结D449、只切81AD/1CD的完整官方烟雾与彗星q1反事实：**210次配对执行（含smoke静止重复，不是210个唯一状态）、21对PNG** 的包、计数、RGBA全部相同；彗星另3帧全部4×MSAA RGBA half bits逐位相同，真实GPU clear正控非空、NaN0，官方依赖missing空。两进程raw读回各36MiB、未存全raw，全部原件与失败保留。具名汇总 `performance/ordered-sprite-bulk-validation-final-v1.json`。
+- 独立timing的完整EndScene＋staging等待两均值之和：smoke876静止14.332→10.812ms、转镜14.629→11.615ms；Comet876转镜11.431→8.259ms、1080静止13.459→11.022ms。EndScene CPU本身约降38–44%；不是纯GPU时间或窗口FPS。实际draw计数是最后非空pass，smoke普通颜色约1776→2，Comet颜色790–914→65–86，晚阶段805–848→112–130；不能写整场总draw。彗星全览主体约140–230px宽，近景填充与最终窗口稳定度仍须另验。
+- 最终完整Core VFX首跑为2546通过／4失败／14跳过；4项均是旧测试要求零／极低Alpha继续产生绘制包。三处测试保留原数值和像素严格断言，增加显式负阈值诊断查看裁剪前值及默认门口裁剪控制，零Alpha应0draw；没有放宽误差或删除用例。修改测试重建后Core28AF全套为2550过／0败／14跳；首跑失败/TRX保留。最终投影复用Core25CC又重建并完整复跑 **2555过／0败／14跳**（2569项，2分21秒），见 `parent-validation/full-core-vfx-final-v3/`。共享Effect测试亦重新构建、开启离屏复跑 **55过／0败／0跳**（39秒），见 `parent-validation/effect-headless-final-v2/`。14项缺指定原版导出/旁存来源，不计通过；专项与全套重叠，不相加。没有运行整个解决方案、Release或CI。
+
+
+- 进一步确认并修复每帧投影/排序大分配：`VfxPreviewParticle`为152B，旧List、LINQ稳定排序和ToArray令官方smoke热帧约401–404KB、Comet约284–360KB分配。Preview改用实例私有List，模拟Fill保留原计算；复用12B排序key，Layer升序、float距离降序、原索引升序，并按置换环一次搬动大struct。公开Frame/ProjectedFrame仍返回独立快照；私有ground-depth筛除保持原顺序。新红门禁1过2败，修后相关30/30绿；真实五阶段每阶段12预热+64调用的packet SHA与旧28AF全部相同，smoke热分配0B、Comet3.24–11.232KB（残余小分配未逐项归因）。源码只两产品文件+新 `VfxProjectedFrameBufferTests.cs`。独立实测为1060中间Core，随后唯一改动是public List预留容量（Fill原已有EnsureCapacity），最终25CC复用该Fill测量理由已记录，没有伪装成25CC重采。见 `performance/projected-frame-reuse-v1/projection-allocation-validation-final-v1.json`。
+- 最终正常App已构建退出0／883个既有警告／0错误，Core=`25CCAC1FAD6F94640A4EF128CCA081B5BE8364BF716A6616FC0573342D3E4FF6`，native仍1CD；没有更改画质、粒子数量、寿命、1/120或Kitbash交互。25CC尚未登记普通窗口视觉复测：之前真实窗口是28AF/1CD；相等的粒子数据和自动像素不伪装成新窗口验收。
+- 28AF/1CD真实 `live/final-v1/curved-motion-v1/` 20秒824PNG、0错误、27次黄框位移，两圈弯路，三个网格/方向球patch全部帧恒定且与B401基线初始哈希相同。亲看12/24/31/40/45仍有独立宽矩形、直端和裂口；62极淡残尾，65及823已消退。不能因修正透明度或green检测器0就称形状通过。不是真人连续输入；WGC约41.2采样/秒不是窗口FPS。
+- 复杂彗星q1普通窗口实际看了暂停.85秒大面积近景、播放3.43/6.58秒及KP3过渡，截图HUD约73–86仅作观察；该首次90秒诊断选项超出有效20–30秒范围，未生成记录，此错误已明确保留。之后30秒host1只覆盖q0全览初始/混合（冷Render最大2034.8ms）；host2覆盖q1暂停1.99秒全览，Render中位5.76ms／p95 6.29ms，冷Seek仍1057.8ms。F4短按未采到、wheel实际拉远，不能把host2写成近景高填充定量通过。见 `live/final-perf-v1/host-frame-statistics-review-v1.json`。冷加载/Seek和全场景稳定帧率尚未闭环，旧HUD或离屏收益不能代替。
+- 工具控制的Terry两轴尝试仍未得到有效拐弯视觉：短笔约.09秒且两笔相隔8.7秒，录像只包含第一笔，原件/797PNG保留，见 `native-curved-reference-v1/native-turn-attempt-summary-v1.json`。随后已实际找到Place（平移下拉的箭头+指针）模式，绿框内一笔斜拖使X/Z同时改变，Y仅浮点残差，原件不改。用户已明确同意真人15秒XZ折线，当前正在等待正式开始：RD采样实例PID47420／Main HWND119277448／ident38920，已鲜核原版、q1、Bloom关闭、Place；全窗原PNG在 `native-curved-reference-v2/preparation/terry-place-ready-original-v1.png`。独立60秒WGC工具已编好但未启动；被动RD控制器62656只等capture-ready文件（8秒后取2帧，600秒超时），ready尚未创建、未抓帧。新回合开始前必须鲜核控制器存活/剩余超时，必要时保留旧失败后建新会话，不能写入旧会话覆盖记录。原生FOV为60°，AECN普通窗口45°；拟以实际Native View/Projection60配AECN离屏，尚未执行，不冒充窗口已同视角。
+
+- **用户本次 Terry 人工拖动已完成并重新审片**：`native-curved-reference-v2/manual-live-v1/` 共1152原PNG，开头两张之间缺29.656秒，不能称60秒连续有效录像。已亲看15张原图，确有真实青绿纹理尾迹及自然缩短；有效强阳性主要近直线，部分位置在一帧内跳变，尚不能验证紧弯接头。不是仅绿色选框，也不把该采样现象归咎用户。原生q1／泛光关闭已核，FOV60与AECN普通窗口45不同；原件、失败控制和图像均保留。
+- 新 `capture-manual-v2/terry_frame134793.rdc` 实际31个输入、10个有限PostVS及461个改变像素；下一134794实际indirect/bin计数0，不从黑图猜粒子。`replay-v1/positive-134793-exact-input-v1.json` 留31原记录／当前根／S／相机／CB。Core25CC同输入重新计算，31个裁剪决定全同、UV全同、最大世界四角误差.002719m／全视口.2312像素；剩宽度／Alpha约数个百分点仍属于普通曲线half表边界，未盲目缩窄或调暗。该片段近直线，不能借此证明弯折正确。详见 `production-appearance-v3/comparison-summary-v1.json`。
+- **转弯的共用发射节奏差异已复现并实施**：原C75 `6c1a60` 算术／控制循环在自有隔离内存执行，外部常量getter／零区域／writer明确为诊断hook，不是完整游戏模拟。原生active分派一次消费当前端点，负start/catch-up另有循环；同节奏调用AECN与原kernel基本一致。生产路径按1/120细分同一输入后，60Hz弧线／急转会改变出生中心、速度方向和时钟；与Pivot补偿无关，原生位置wrapper及31记录均反证半段补偿，不添加美化接缝。证据 `trajectory-audit/native-turn-kernel-v1/`、`native-pivot-compensation-hypothesis-v1.json`。
+- 仅交互continuous、非负开始且已准入的原生距离trail改按实际挂点更新端点发射；`VfxAttachmentHistory.NextSampleTime` 将转折端点传给共享模拟，回放／倒放保留记录路径，三参入口转发兼容既有调用。原全局1/120、普通Seek、负start准备、其他发射路径不变。受限无力无阻尼出生按原birth clock与速度求位置，避免回溯重复积分；过Life不显示，不延寿。零端点但非零Bezier阻尼真实红灯后，Force／Deceleration含Bezier时仅新路线回退，未改全局曲线含义。原12门禁4过8败→12全过；补回放／停止／容量后19全过；新增Bezier正负2红后最终742D **新21＋旧continuous13共34通过／0失败／0跳过**，精度未放宽。源码／失败／TRX均保留。
+- native剩余MSAA深度CS及WeightedDistortion VS/PS移至构建期，`SceneUtilityShaderSources.h`为唯一源；3份DXBC逐字节相同，原8Float／18材质／3bulk不变、18exports及ABI正负控制通过。native34C正常Debug构建0；Core25CC＋native34C实际加载的14项GPU门禁 **14通过／0失败／0跳过**。原三份运行期编译共约6.7ms，不能解释秒级卡顿。正常App后续v3构建0警告0错误并复制34C；该次窗口仅25CC，尚不是742D实机。
+- 正常Debug PID35776的真实q0冷加载EventPipe位于 `performance/cold-reload-eventpipe-v1/cold-comet-q1-v2/`（目录名含q1但实际首载是q0，q1切换已超20秒窗口）；0eventsLost，UI线程命中转换、BC7解码、Bounds及后续Seek，样本数不冒充精确阶段毫秒。Converter局部一次层列表快照，完整官方彗星／烟雾q0/q1四组定义、曲线、事件和原资源字节SHA保持；彗星暖转换每次少约56.3MB分配，部分首次时延未改善，见 `performance/converter-layer-snapshot-v1/comparison-summary-v1.json`。当前还在独立核验死亡粒子的稳定批量压缩，不把这些收益称全部稳定流畅。
+- 本次 `live/current-25CC-34C-v1/` 保存q1／暂停2.06秒的普通窗口原图；启动诊断误填60秒，而该入口只接受20～30秒，实际没有帧时文件，不能报告本次FPS／QueryWait／每帧分配对比。Terry人工拖动场景保存前副本保留，已保存人工变换后正常退出；Debug未编辑源件、正常退出。用户随后明确要求先离屏修改、最后统一实机，此边界生效；弯折长方块与复杂近景流畅度在最终实机前仍未验收。
+
+- **最终兼容与完整专项**：整体回归曾在DFD1复现5个本轮兼容失败（4个旧五参Spawn诊断入口、1个无采样回调的连续播放器入口），均在产品层保留转发修复，未改旧断言；失败TRX保留。随后3633完整VFX专项2576通过／0失败／14跳过。最终轻量转换Core **8B1EE84033EF2DC94DEFF979B8D1E5D0E0AAEF70DC1C1CF4423612C6BC330FE3** 已正常App引用构建（887既有警告／0错误）、测试重建（3既有警告／0错误），重新完整VFX专项 **2576通过／0失败／14跳过**；编辑器选择／交互／历史采样 **50通过／0失败／6跳过**。见 `parent-validation/final-lightweight-*`。未跑全解决方案、Release或CI。原14弱Alpha样本与6项线框GPU opt-in跳过不作通过；旧25CC的55项共享Effect结果仅为前阶段复用，不冒称8B1E重跑。
+- **最终转换优化与未采用候选**：Converter只读取层标识、类型与原始XElement，不再构造无用途的编辑字段；路径、顺序、缺省id/type、根选择、引用覆盖及原数据保持。完整彗星／烟雾q0/q1四配置的定义、曲线、事件和原模型贴图字节全图SHA完全同，58/58/3/3官方依赖无缺失。相对3633，彗星每次暖转换再少约28.1MB分配（11.46%），烟雾少约10.13%；这是局部转换收益，不等于冷峰或全帧率已解决。见 `performance/converter-lightweight-layers-v1/comparison-summary-v1.json`。过期粒子压缩候选E979→4579的1924帧包／私有粒子／事件Random／Bounds全同，但暖时延没有改善、分配相同，产品保留原RemoveAt；候选源码、DLL及全部对照保留于 `performance/expiry-compaction-v1/`，不计优化收益。
+- **完整官方曲线运动离屏与外观限制**：`performance/official-trail-cadence-v1/` 固定q1原根、资源、相机、输入端点、阶段与暗亮背景，25CC→DFD1有18对原PNG／自产CPU包／实际shader包。实际源引用启用2根，库遍历总30／源未启用28，不是自行删除28层，也不能笼统称质量漏层。停止后6对为零；阳性阶段局部排布随正确cadence改变，但弧线晚段仍有短矩形及灰暗边。最终3633抽阳性与停止×两背景4对，包和像素逐字节同DFD1；8B1E只改转换层投影，四完整官方配置全图SHA另核。该离屏不冒充与Terry同seed／同轨迹的整段视觉验收，不能以停止归零或测试数量判外观全通过。
+- **最终原生合成原值补证**：134793 moment1337／colour1462实际VS／PS指纹匹配，GS／HS／DS全为ResourceId::0，本次两draw没有额外几何／细分连段，不外推所有原生trail。原31数据对应的halfColour／halfB0、实际final5输入、fullB0及最终前后像素在 `native-curved-reference-v2/replay-v1/raw-composition-crop-v2/`、`raw-composition-crop-v3/` 保留小块raw；最终PS为nofilter、无depth输入，不能笼统归因深度引导上采样。真实fullB0复算T约.801954～1，合成RGB平均残差3.79e-5／最大.0009765625，非bit exact；最终目标A被Zero/Zero混合写0，不是T。最终CB范围守卫失败及v1 API失败保留，复算明确复用同RDC此前已读screen_size1707×1067，未假称1544重新读取成功。
+- **最后实窗边界与当前分工**：3633普通Debug PID44252实际播放完整官方彗星，确认q1及暂停2.06秒全览（主体约190px），未构成完整密集近景／持续绕转验收。30秒记录6669回调无丢样，冷峰Render约2.049秒、当次托管分配约689MiB、Query约2.07ms；后半样本为轻负荷，不当FPS或最终8B1E测量。误命名图片 `comet-q1-close-2s-original.png` 实际53.03秒，保留并排除阶段判断；`comet-q1-2p06-overview-confirmed.jpg` 才是已确认2.06秒。CUA显示图与返回JPEG纵向比例不一致，校正后暂停／定位才命中，无用户键鼠冲突。Debug已正常退出，未保存或改原XML。用户此后明确改为只离屏、人工核验；当前8B1E不再自行实窗，自动／离屏与用户验收分开。
+
+- **简单光照的最终共用修复（2026-10-28）**：同原生31输入的初次无天气DIAG，顶点RGB基本等同但最终L内点RGB比约1.57/.60/.31。实际DebugPixel单像素228步证明纹理返回中性灰，偏色来自原PS的simple lighting；nativeAmbientTop=(.54747492075,4.0172457695,9.4761180878)、E=.7001953125的gain=(.65440905094,1.69466257095,3.33125829697)，与调试寄存器逐bit相同。旧大L差多数是天气条件未配齐，不能记为DDS通道或Alpha故障。但产品也有真实漏映射：weatherLighting原只准alignment0/3，带simple标记的alignment1因此选天气也无效。Converter仅在simple=true时补alignment1，复杂法线组合仍受原限制；默认天气、贴图、源XML、数量及寿命均不改。新10项先5过5败，修后10全过，含legacy/v2、0/3控制、alignment1复杂负控及官方吹管三档，见 `production-transmittance-weather-v2/` 与 `performance/simple-velocity-lighting-v1/` 的实际记录。
+- 当前正常Core为 **EC3C898C816F04FBBB456ABFC0A6DCA42F6BD8967C2DDD70783696711173CD34**、native仍34C；正常App引用构建0错误（863既有警告），Core测试重建0警告0错误。同环境最终2次GPU严格自动映射Mode1，使用实测原生AmbientTop的显式诊断天气，不覆盖产品默认值；固定332内点的新/原生RGB能量比约1.02457/1.01989/1.02332。31项原有颜色、Alpha、寿命和几何输入不动；旧/新T均差约8.79e-5，half写入及生产曲线精度残差保留。亲看原黑白图仍有矩形分节和部分灰边，2%左右总能量差不代表逐像素或整段形状通过。证据 `production-transmittance-weather-v2/gpu-final-v1/same-environment-absorption-emission-validation-final-v1.json`；完整半分辨率、匹配原DSV、原生曲线half精度及持续弯曲的最终外观仍未全部验收。最新分工继续只离屏，用户人工核验。
+
+- **EC3C最终自动结果与交付状态**：`parent-validation/final-simple-lighting-core-vfx-v1/` 在重建后的真实EC3C／34C执行，完整VFX专项 **2586通过／0失败／14跳过**（2600项）；`final-simple-lighting-editor-tests-v1/` 为 **50通过／0失败／6跳过**。不与前阶段重复结果相加。正常可测试入口仍是 `AssetEditor/bin/Debug/net10.0-windows/AssetEditor.CN.exe`；最终版未再实窗，按用户最新分工留待人工核验。源数据／原始寿命／数量／画质／全局1/120保持；当前分支和HEAD不变、暂存空，源码、正常Debug、备份、离屏包、RDC／录像、失败和未采用候选全部保留。不提交、不推送、不清理，完整保护盘点见 `parent-validation/workspace-after-frame-lighting-v1.json`。
+
+## R113 Trail 形状、转镜与绘制性能（2026-10-27）
+
+- 用户明确要求 trail 外观与性能一起修，后续追加“转动视角时尤其卡顿、trail 不连续和长方块”。正常 Debug 与必要 Terry／采样授权持续有效；仅官方完整原件，不改原始寿命、数量、质量、全局 `1/120`，不操作 Git 交付或清理。
+- 现场沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存为空。最初 108 个已有路径逐 SHA 对照 R112 final-v3 无漂移；见 `artifacts/vfx-trail-shape-framepacing-r113/parent-validation/workspace-before-v1.json`。本节以下路径均相对此 R113 目录；原源码／DLL／PDB／失败记录分别备份保留。
+- 普通 Kind0 的 InitialScale／InitialAlpha 使用实际出生时刻及独立 `ParticleInitialParamLoopAnim`；原生 writer 的 float 转换、减开始时刻、fmod／除时长已核。Life／Speed／其他 CPU 出生参数、随机消耗、段长、数量不变；Kind1／2 保留候选。新增 33 项含其它 loop 的不扩展控制，最初 29 项旧 Core 为 1 通过／28 失败，最终均绿。完整官方吹管、AmberSpear、Starfire、Balefire、JadeDragon、Pox、Crowman、Bear 的 CPU 范围审计仅证明参数范围和控制边界，不是视觉验收；49 个实际依赖来源与另 48 个只读发现 XML 分开记录。
+- 显式 HALFRES 普通面片的最小像素尺寸原误用 full viewport，已按所在通道的 half viewport 计算；仍保留 HalfResolutionUnsupported，因为普通颜色目标及 MBOIT／重建未因此实现。真实原生两粒、四角／UV 与 full／hires／无视口控制 6 项，旧版 5 通过／1 失败，修后全绿。不改已核 .4S／.6S 轨迹段长。
+- 普通 legacy mode2 的近乎平行视角原错误借用 cameraRight，造成轴向突变；现直接归一化非零叉积，零或 float 下溢不造面片，mode5／模型／水平约束不动。7 个新输入旧版 1 通过／6 失败，修后全绿，旧 mode5 控制保留。最终托管 Core=`B4012D46F2F081F5F864A270BFC7DB6ABECA56B686D08FD5714BC3AED94481A4`，`near-parallel-green-v1/` 本次 CPU 专项 **120 通过／0 失败／0 跳过**。此前 113 项的 3 个官方 q0/q1/q2 跳过已另补三项通过，不冒称同一次全量。
+- 原生桥先实现 actual VS used-byte 上传复用，再在自有 cached-sprite 作用域复用 VS 绑定。2253 Debug 版本实际两帧计数：886 粒、1772 DrawIndexed 不变，已预热 VS 上传 1772→0、VS 绑定 1772→1，PS 上传／绑定仍各 1772；首中末 actual used bytes／PS 全量／shader 均一致。`performance-audit/binding-camera-ab-v2/` 在同 Core8A 下 90 个唯一相同官方状态、9 对 PNG 与绘制计数严格一致。持续转镜总均 17.407→16.690ms，p95 仍 18.287ms，**没有稳定 60 帧**。初始 C97 的 210 状态对照属于更早阶段，不能与此重复相加宣称最终全量。
+- 正常 Debug `normal-debug-build-v3.log` 实际退出0／0警告／0错误，加载 CoreB401/native2253 的 PID43616 已实际打开完整官方吹管 q1、G/X 往返及视角预设；20秒 834 帧保存在 `live/aecn-geometry-v2/endpoint-motion-v1/`，随后正常退出。是端点运动，不能冒称持续鼠标拖动；新的最小尺寸与近平行修复不等于长方块已全部解决。前一版 Core8A 的 807 帧明确出现阶梯亮矩形／暗矩形，见 `live/aecn-final-v1/endpoint-motion-v1/endpoint-literal-crops-contact-v1.png`，其消退正常与形状失败必须分开。
+- 正常 Core8A/nativeC97 的烟雾 q0、667×631、稳定区总均16.376ms／p95 17.666／最大25.996，实际 Render均15.691；见 `live/aecn-final-v1/normal-host-analysis-v1.json`。不是新 CoreB401／最终 native 的性能，也不是无采样干扰的整机游戏结论。没有再现旧98／150ms峰，不等于找到了其原因。
+- 新鲜官方 Terry q1、泛光关闭已在窗口核实，PID1776 自有场景保存后正常退出。两帧55179／55180原件与独立副本保留：55179真实2粒寿命内，角点有效，moment／颜色各贡献27像素；55180两通道间接实例数0，为正常空帧。`native-visible-burnin-v1/replay-v1/` 含实际相机、GPU输入与原像素图；只闭合有效原生参考，**不把不同相机／阶段的窗口截图直接判成功**。Terry仅是原生参考，不等同游戏最终显示。
+- MBOIT 实际 shader／CB／混合语义已核，自己的数学移植在55179单个真实 fragment 上以 GPU 校准7矩、T、u及实际 HalfRGBA 存储逐值一致；原 BC7 base payload 与官方 Pack DDS payload SHA一致。见 `mboit-kernel-sameinput-v1/`。只是单像素数学 DIAG，未接入产品，不能宣称完整 MBOIT／half-res 已支持。同输入材质6draw DIAG 的未照明 RGB约偏 .63～.82%、alpha约偏 -.053%，没有出现 alpha 整块读成1的证据；天气／雾与最终颜色不能混算成材质错误。
+- 最终 native=`81ADC70AC6F02FC8172E3965A3B0A1AF4D314393912B2D8A4301FDE7D7F40A36`，基于自有进程实际栈定位每批重复材质状态／纹理引用收集，限定 pure cached File0 的单次同步绘制作用域复用原 pinned 入口生成的状态，全部15个材质值和 node/basic 动态值逐批刷新，条件变化走原入口，队列仍引用的状态延迟安全清除。32项实际 pinned 入口独立 oracle 从旧31通过／1失败到新32全绿；固定 CoreB401 的90个官方同状态、9对PNG与180个绘制数逐项相同，先完成画面验证再独立计时。持续相机API转镜的 EndScene均12.2407→10.2982ms，总均16.7797→14.8114、p95 17.6413→15.6515；静态烟雾最大仍21.236ms。见 `performance-audit/collector-state-ab-v1/`，不等同真实鼠标／WPF输入负载或全部稳定60帧。
+- 最终正常 Debug `normal-debug-build-v4.log` 为退出0／0警告／0错误，主程序输出确认 CoreB401/native81AD。`parent-validation/core-vfx-final-v1/` 先重建实际测试项目，随后完整 Core VFX 专项本次 **2499通过／0失败／14跳过，共2513项**；14项仍缺官方 poison-trail 原件及来源旁存记录，不计通过。测试前核对两份最终模块散列；首个宽泛文件名后缀 guard 误匹配 Test.GameWorld.Core.dll 的准备错误在GPU前终止并保留，不隐藏。没有重跑整个解决方案、Release或CI，也不把此前UI／META结果相加冒称本次全量。
+- 最终普通窗口 PID25976 实际载入 B401/81AD，完整官方烟雾q0、无Terry／录像／GPU helper并发的30秒宿主诊断中，单独取10.001～26.561秒的1085个同667×631且无重建回调：总均14.1576ms、p95 15.1965、最大21.5636；Render均13.4468。此前8A/C97同尺寸稳定区总均16.3764／p95 17.666，实际普通窗口收益约13.55%；随后窗口尺寸变化的样本另列，不混作同尺寸比较。见 `live/aecn-state-final-v3/normal-host-analysis-v1.json`。这仍是回调耗时，不是GPU时间戳、游戏FPS或持续真人绕转的验收。
+- 新近景 Terry `native-closeview-v1/` 保留20秒777帧、两个原RDC及副本、泛光关闭的窗口证据和实际q1。27352中只有arrow真正有限可见（age .171051＜life .360121，原quad约.508575×.20802 world，vertex alpha .03156136）；rifle虽寿命未到但实际PostVS NaN被剔除，27353两pass均0实例，均作为负控制。原生真实显示自身存在宽绿色矩形及阶梯边，不能由此推断全部用户异常都属于正常。实际GPU FOV为60°，不是准备scene.user中45°，且shader仍有极微量雾；没有将它与AECN默认视角截图直接判为同条件成功。自有Terry场景恢复原Fog开启、保存后正常退出。
+- `material-audit/native-closeview-material-sameinput-v1/` 固定27352实际四角、UV、Colour、相机和180×327目标，以完整官方DDS做黑白6draw：中心真实原生a=.0315613634884，AECN解出的a=.031561375，差约1.15e-8；关联未光照RGB约偏+.20%～.39%，没有整片alpha读成1的证据。原生MBOIT偏置后的u=.0325613617897与a分列。AECN禁用深度的intrinsic DIAG有310像素，原生B0／colour186像素；补读lower(92,168)两pass明确depthTestFailed且非shaderDiscard／scissor／backface，scene depth .793962955＜particle depth .800521851，不能把禁用深度的轮廓差当材质错误，也没有据此盲改虚拟地面。只精确归因这一点，不外推全部差点；新RDC最小读回与6draw虽和正常App并发，但只用独立缓冲的像素，不采用其计时作性能结论。
+- 实机工具在PID25976的工具选择器发生AX／截图目标错配，停止了输入，保留原记录；用户确认正常关闭后实际核实进程消失，没有强制结束、丢弃内容或改动源XML。剩余边界仍包括完整MBOIT／half-res重建、同视角同阶段整段连续拖动与真实持续绕转的完整验收；不能宣称全部trail／烟雾或所有长方块均已正常。全部源码、正常Debug、旧DLL／PDB、原件／副本、小工具、备份与失败均保留，不清理或搬盘。
+- 随后新开PID7736，实际载入最终B401/81AD，正常窗口打开完整官方吹管q1；`live/aecn-trail-final-v4/endpoint-motion-v1/` 20秒817帧实际录到三簇端点运动的绿色宽面片及自然消退，原检测器green=0为检测阴性，不能冒称无trail。KP3切换与短寿命末段重叠，只能确认有真实相机过渡及少量残留，不能作为活粒子全视角验收；播放器已连续到13.05秒，超过8秒显示区间，不回绕重置。不是持续真人拖动或同阶段Terry窗口对照。录像工具与Debug最终均正常退出，未保存／改写原XML；最终变化与保留盘点见 `parent-validation/workspace-after.json`、`final-audit.json`。
+
+## R112 吹管真实拖动取证、负时间预热与绘制提交性能（2026-10-27）
+
+### 现场与实现
+
+- 沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存为空；本轮初始 98 个已有改动／未跟踪路径及散列见 `artifacts/vfx-trail-live-framepacing-r112/parent-validation/workspace-before.json`。不创建替代分支／worktree，不暂存、收起、提交、推送、PR、合并或清理。没有改原 XML、DDS、模型、粒子寿命／数量／画质或全局 `1/120`；R111 的距离 trail、铁龙运动和隐藏暂停保留。
+- 本轮先测正常 Debug，确认首次 Reload 在 Render 中阻塞约 10.958 秒，下一回调追算又耗约 5.431 秒，普通 8 秒循环还会同步负时间预热约 4.724 秒；该例没有重复呈现或隐藏场景工作。完整官方 `wh_dlc03_enviro_large_siege_smoke.xml` 的 q0 是 `rising_ashes2`，原开始时间为 **-100 秒**，不能混同旧 -25 夹具或将该档位称为完整灰烟层。
+- 独立 VFX 显式启用受限后台预热：完整保留范围估算、零时刻模拟、原随机序列和原步长，交接整个模拟实例；默认同步、共享 Effect、模型、事件与运动 trail 路线不启用。首份保持原 `CycleDuration→Seek` 顺序，继任者保持原自然重播顺序；初次等待先初始化真实挂点历史，变化的 key 拒用旧结果。全局最多一份准备任务，四核以上首次两份独立 CPU 工作并行，全部完成才释放；每实例仅预备一份继任者，关闭／重载取消。等待及回交不追算墙钟，多份重资源来不及准备时仍可能暂留末帧。
+- 托管提交缓冲按播放实例复用容量，保持独立快照、有效数量及排序。曲线只复用相同上下界通道的计算与真正单关键点值，保留特殊浮点值和原算式。真实单 PID 托管采样又查明预热中的重复 Force 与世界根计算：只缓存严格单关键点且有限的原力取样，World2 复用不变出生根及力基判断；原件的动态阻尼不是单关键点，保持逐步取样和积分，没有按常量缓存。
+- 普通面片的原生材质模板仅在一次绘制内按层复用，始终写回原统一 scratch 地址，逐批更新全部动态参数；保持覆盖／发光交错、原 batch 条件、shader、ABI、模型、贴花和扭曲分支。没有把所有覆盖重排到发光之前。888 粒左右的该烟雾仍产生约 1776 次颜色绘制，模板复用没有消除这个后续瓶颈。
+
+- 后半新增普通固定面片的保守视锥剔除：保持原 C／E 交错与整批条件，只在原四角全部位于同一 XY 裁面外时省略无像素贡献的整批原生提交；近面交叉、异常变换及其他未准入类型保持原路径。全览的三原点预判仅作 **keep-only** 快速保留门，不增加剔除。模拟、出生／粒子数量、寿命、步长、排序、量化、材质和 shader 均未改变。
+
+### 本次构建、回归与精确对照
+
+- 后半视锥修复的最终正常 `dotnet build AssetEditor/AssetEditor.csproj --configuration Debug --no-restore` **退出 0／0 警告／0 错误，6.65 秒**，见 `performance/sprite-frustum-v1/normal-debug-build-v1.log`。正常 Core 保持 `83E33682208F149FD24B55AEE777DC13DD10AB911D67B9CDF7A664B1724E14E3`，最终 native=`7E35AD78BCBF8E57EE6B816DB0576390A960A9A8CB10176F7CF1C14F7F2B4114`；普通窗口实际载入路径／散列见 `live/aecn-frustum-final-v1/loaded-modules.json`。R112 前半 `83E…＋A8C…` 的 883 警告构建及窗口证据仍保留；原生构建均为正常 Debug，没有使用 Release 或替代应用运行库。
+- 后半最终完整 Core VFX **2453 通过／0 失败／14 跳过，共 2467 项**，显式 DX11 离屏及官方 data 开关，见 `parent-validation/core-vfx-frustum-final-v1/result-summary.json`；14 项仍缺具名官方 poison-trail 原件及来源旁存记录，不计通过。其中 19 个视锥用例在此完整专项实际载入 `7E35…`，全部通过，见同目录 `frustum-in-full-suite.json`。R112 前半的 UI／播放器／选择／隐藏及架构 **128 通过／0 失败／8 跳过**、共享 Effect **55 通过／0 失败**是此前实际结果，本次没有重跑或与新专项相加；8 跳过仍为 6 个 GPU opt-in 未开及 2 个本地样本路径未配置。未跑整个解决方案、Release 或 CI。
+- 新行为门禁保留真实红测及失败夹具：曲线重复计算 5 红→7 全绿；初份与继任者顺序 6 红→13 全绿，初次历史交接另 1 红→16 全绿；World2／严格 Force 缓存经纠正新夹具的历史协议后旧版 10 红／10 控制通过→20 全绿。另以完整同步 17 阶段范围对照验证并行调度；调度候选没有冒称新的行为红测。原夹具错误、编译失败和中间日志均保留，没有放宽物理或亮度断言。 普通面片视锥测试在旧 `A8C…` 真实红测为 **11 通过／8 失败**，修后 19 全绿，最终 `7E35…` 已在上述完整专项重新通过全部 19 项；原红测／中间构建和夹具失败仍保留在 `performance/sprite-frustum-culling-v1/`。
+- 提交缓冲先在独立冻结的 `5C8B…` 上与初始 `A588…` 实跑 360 帧相同官方根／参数／RGBA 对照；这是本轮早期结果，不伪装成最终 Core 又重跑该套。曲线独立进程比较 4972 行浮点位／异常结果全同。随后材质模板在 `4EC3…` 上用完整吹管、铁龙及 DLC 烟雾、384²／1920×1080、实际 MSAA4 对比旧 `8510…` 与新 `A8C…`：180 个参数／RGBA 对、18 对 PNG、240 次绘制计数比较全同，15 个官方资源同来源同散列、无缺失。
+- Force 缓存及最终调度分别用两份完整官方烟雾、两种根条件、首轮及两次回绕的 **48 个相同状态**核对 CPU 出生／随机／位置速度、提交包、RGBA、PNG、诊断和时钟，全部相同；三路执行 144 帧并不等于 144 个独立状态。最终调度另 48 状态与 F090 同步基线全同。显式载入 Core／native、实际 RTX 5070 Laptop／MSAA4 及官方 manifest 均记录，不能用此证明 Terry／游戏视觉已经等价。
+
+- 后半在同一 `83E…` Core、相同官方原件／相位／相机／画质／MSAA4 下，对旧 `A8C…` 与最终 `7E35…` 取得 **270 个唯一同状态对**（正式近景三类 180＋默认全览负控 90），参数包／粒子数／RGBA 全同，**27 对 PNG 精确相同**；不能再把旧 3BC 候选重复相加。来源、缺失为空、实际模块与完整结果见 `performance/sprite-frustum-v1/formal-paired-comparison-7E35-v1.json`、`autoframe-paired-comparison-7E35-v1.json`。
+
+### 普通 Debug 性能：有改善及剩余
+
+- 以下首次准备／循环数据属于 **R112 前半 `83E…＋A8C…` 冻结阶段**：三次中间及前半最终采样均为实际正常 Debug、完整官方 DLC 根 q0，内部稳定目标 876×750，没有并行构建／GPU 测试／WGC 录像干扰该受控采样。空白准备与可见区分别统计，不能用初载空场景约 300FPS 的 HUD 或全部回调平均宣称效果提速。
+- 前半首份异步准备的等待由中间 `4EC…` 的 **10.398 秒**，经 `F090…＋A8C…` 降到 **5.616 秒**，前半冻结 `83E…＋A8C…` 为 **3.099 秒**。该阶段可见区 1427 回调 Render 均值 **15.411ms／p95 16.462ms／p99 17.361ms／最大 20.071ms**；完整回调均值 16.409ms／p95 17.692ms，最大回调间隔仍有 **42.067ms**。30 秒内实测三次 8 秒循环，边界 Render 约 15.388／15.071／14.859ms，没有原多秒峰；这些不是后半 `7E35…` 的新复测数字。
+- 前半并行首载相较 F090 缩短等待约 44.8%，但稳态均值／p95 略慢约 1.2%／1.9%，不能说并行又提高了稳态 FPS；初次 Reload 仍约 **209ms**。该采样截止时另有 1 个 Render 正在执行，仅观察 9.324ms，最终耗时未知。保留首次准备收益及尾部限制，不宣称所有复杂组合完全稳定。
+- 原生分段 A/B 仅模板缓存带来约 7%～10% 绘制提交均值收益，主要在 native EndScene；384² 新版出现一次更慢的最大帧，原始记录未隐藏。单 PID EventPipe 仅有托管栈，External 边界不能归为某个原生函数内部 CPU 时间。全部证据见 `performance/live-host-parallel-decision-v3.json`、`live-host-three-way-comparison-v2.json`、`official-counterfactual-phase-split/`。
+
+- 后半 `7E35…` 近景烟雾的“提交＋同步读回等待”均值由 **384²：15.414→9.465ms（-38.6%）**、**1920×1080：18.946→15.060ms（-20.5%）**，同状态粒子数和像素保持；这是相机条件使整批位于屏幕外时的提交节省，不是所有场景 FPS 结论。默认全览负控保留原绘制数量；随后唯一 876×750、A8→7E35→A8 的 3×30 帧 ABA 对照，候选相对前后基线均值 **慢 0.093ms（+0.572%）**，尾部 p95 更差，见 `performance/sprite-frustum-v1/drift876-aba-comparison-v1.json`。冻结 A8 正式／全览基线早于本次 Terry，新 7E 正式采样时最小化 Terry 仍有 CPU 消耗；不能把时段差异隐藏后宣称全部提速。
+- 后半普通窗口 host2 为实际 876×750，Render 均值约 **15.640ms／最大 98.439ms**；该时段有一次 CUA 截图且最小化 Terry 仍耗 CPU，均未证明是长帧原因。正常保存并退出 Terry 后，host3 实际目标变为 **667×631**，Render 均值 **15.697ms／p95 16.466ms／最大 150.528ms**。最大帧不在循环边界，原始记录没有该帧 GC／resize／DPI 重建，原因仍未知；两种目标尺寸不同，不能硬算窗口提速。见 `live/aecn-frustum-final-v1/host2-readonly-analysis-v2.json`、`host3-readonly-analysis-v1.json` 及原始邻域记录。
+
+### 吹管录像、原生参考与待验边界
+
+- **AECN 用户协助的真实连续拖动已经完成并审查，原“待用户拖动”已失效**：`live/aecn-q1-manual-triggered-v3/` 为 **20 秒／392 原 PNG／0 截图错误**，人工录像冻结版本为 Core `83E…`／native `A8C…`。全 392 帧已做颜色测量，亲看 13 张原图及派生导航图；371 帧检测到独立纹理尾迹，113 个按选框屏幕位移定义的转向样本均有尾迹，未见每次转向整体清空。**227～245 帧挂点／尾迹出视野，不能当作已停下清尾或渲染掉帧**；末段仍在移动，没有最后停 5 秒至完全归零的证据。完整边界见 `live/aecn-q1-manual-triggered-v3-visual-review-final-v1.json`。PNG 采样频率不等于渲染 FPS，该人工结果不冒充最终 7E35 又录了一次。
+- Terry 的用户真实连续拖动保留在 `live/terry-q1-manual-triggered-v2/`：等真实移动 49.017 秒后开始，完整 **20 秒／739 原 PNG／0 截图错误**。1.784～19.987 秒可见青绿色纹理长尾及反向移动，8.674～8.800 秒短暂停留可见缩短、变暗；末帧仍有尾迹，未录到最终归零。相机中途平移，轨迹、速度、出生相位及背景没有与 AECN 对齐，不能据颜色／宽度差异盲改材质。初次错过输入、早期未触发、等待超时及不完整截图记录全部保留。
+- 官方 q1 来源为完整 `wh2_dlc17_weapon_trail_blowpipe_hero.xml` 及原始依赖；按原始 EXE／DLL 字节守卫读取 Terry 当前 raw2→XML q1，已知 loose 路径检查无同名覆盖。当前三维视图泛光复选框实际未勾选，WGC 原图含该设置。新参考场景正常保存后仍把 FOV45／near.01／far25000 回写为 **60／1／12000**；鲜 GPU 实际 VP 再证 FOV60°，AECN 普通相机仍为 45°，没有改全局相机，也不能把准备文件的 45°当实际生效。
+- 本轮鲜原生捕获 `native-match/endpoint-v2/` **2 帧**及 `endpoint-v3/` **4 帧**均成功且保留源／校验副本，分别约 202MiB／405MiB，未重启或注入 v3。v2 的 0.1 单位端点在两帧均实际 draw/bin 为零；v3 同一 CUA 批次的三个 1 单位属性端点使前两帧实际选中 **5／3 个粒子状态**，两个 pass 共 **16 条 selected 记录全部回读**，所有 PostVS 顶点被剔除、RGBA 为零、实际目标前后无变化，后两帧归零。鲜测 S≈0.84787，已跨约 0.339／0.509 的原段长，不能继续只归因位移太小；未按旧跨时钟 age 推断剔除原因。这些只有相机／原始参数和阴性结果，**没有可见有效原生 quad，不能称为 Terry 严格对齐验收**。具名结果 `native-match/endpoint-v2/readback-v1/fresh-native-replay-validation-v1.json`、`endpoint-v3/readback-v1/fresh-positive-endpoint-replay-validation-v1.json` 保留完整 VP／视口、预算与原记录，不安排更多盲原生捕获。
+- 烟雾前半历史录像 `live/aecn-final-siege-loops-v2/` 为 F090＋A8C 的 20 秒／192 PNG，不能把首图观察扩成完整视觉验收。后半最终 7E35 普通窗口 `live/aecn-frustum-smoke-final-v1/` 为 **20 秒／210 原 PNG／3 次播放器回绕**；已亲看 14 张原图，灰烬云持续运动，未见整片清空、大硬边或回绕平面硬截。该全览不覆盖所有镜头边缘／材质组合，见 `visual-review-final-v1.json`。另最终版 `live/aecn-frustum-smoke-close-v1/` 的 **20 秒／268 PNG／0 错误**已完成，亲看 0／80／160／267 四张原图，未见明显矩形截断、整层缺失或白色实体片，透明细点仍透出网格；见该目录 `visual-review-final-v1.json`。录制前滚轮上 600、期间上 360 是缩放操作，没有中键 orbit／连续绕转，不能扩称全镜头路径验收；捕获节奏均不作为 GUI FPS。
+- Terry 当前试验场景已另存至 `E:\Steam\steamapps\common\Total War WARHAMMER III\assembly_kit\working_data\AssetEditor.CN\TerryPreview\r112-native-capture-preserved-20261027`，原 `r112-matched-camera-blowpipe-20261027` 保留；正常保存后退出确切 PID55420，已核进程退出、未改官方 VFX，见 `native-match/terry-preserved-and-normal-close-v1.json`。
+- **最终 7E35 吹管窗口补测已完成限定正对照**：选择器筛选未更新的尝试保留，随后通过 `docs/asseteditor-ipc.md` 已有公共 `open` 正常入口请求打开完整官方吹管；客户端 5 秒超时是等待正常工具选择器的阶段，没有把超时写成 API 成功响应。CUA 选 VFX 后正常打开 q1，黄框及原两条引用保留，没有删源层或改原文件，见 `parent-validation/final-native-blowpipe-ipc-open-v1.json`；已找到正常入口，不据先前尝试确诊选择器产品缺陷。
+- `live/aecn-frustum-blowpipe-endpoints-final-v1/` 为最终 7E35 的 **20 秒／394 原 PNG／0 错误**：亲看 0／170／172／174／177／180／393，记录中的三次端点跳变约 **8.543／8.656／8.763 秒**，170 及 172～179 有纹理尾迹；174 返向时旧尾仍在，177 已变窄、变淡，180（约 **9.076 秒**）无可见尾迹，393 末帧仍无。最后端点至已无尾迹约 **0.313 秒只是录像观察间隔**，不是新 Life、粒子年龄推算或产品寿命修改。原两条引用及源文件不变。此为端点跳变＋停止，**不是重新录了连续鼠标手拖**；旧 A8 的 392 帧人工记录仍独立，严格 Terry 对照、所有 trail 外观及连续手拖后的最终清尾未因此验收。见同目录 `visual-review-final-v1.json`。
+- **补充长帧采样本次确已执行一次**：同 PID19984 的 host5、完整官方 DLC 烟雾 q0、实际 667×631，30 秒记录中可见 1516 回调，Render **均值 15.8003ms／p95 16.7845ms／p99 18.1084ms／最大 26.9601ms**；回调间隔均值 **17.7745ms／p95 19.1784ms／p99 21.0201ms／最大 29.4921ms**，初次 Reload 至完整提交约 **2.71331 秒**。新 EventPipe 实际 **20.00455 秒／20,639,306B／118868 样本／EventsLost=0／exit0**。collector manifest 在 host5＋20.532 秒、且早于连接／会话建立，只约 **9.46886 秒交集**，不能写 20 秒全部逐帧对齐；manifest 起点后的 527 个可见回调最大 21.5506ms。整份 host5 可见段无 >40ms，26.9601ms 最大帧还在 trace 之前，**未捕获旧 98／150ms 孤立峰，不能说已修好或归咎 native／驱动**。原 `host3-spike-path-readonly-v2.json` 的 Render 包含设目标、Update＋Draw 边界仍有效；新采样不拿旧聚合托管 profile 解释未录到的峰，也不重复盲采。具名结果为 `performance/eventpipe-frustum-isolated-v1/host5-overlap-and-no-long-frame-v1.json`。
+- 自动／离屏、AECN 普通窗口、Terry 和游戏最终验收分别记录；不宣称全部 trail／烟雾已原生还原或所有场景流畅。全部原件、负例、备份及正常 Debug 保留，没有提交、推送或清理。
+
+## R111 吹管距离轨迹、铁龙模型动画与预览性能（2026-10-27）
+
+### 现场与共享实现
+
+- 沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存为空。初始 91 个已有改动／未跟踪路径逐项 SHA 与 R110 最终快照一致；基线及原件小备份在 `artifacts/vfx-trail-model-performance-r111/`。没有新分支、worktree、暂存、收起、提交、推送、PR、合并或清理。全部旧源码、Debug、原件、备份、工具、失败与采样保留；全局 `1/120`、官方原 XML、原 Life／Alpha 和画质保持。
+- 完整官方 `wh2_dlc17_weapon_trail_blowpipe_hero.xml` 的两层是普通速度朝向面片，不能按 rigid 模型或固定发射方向处理。原生 `6c2330→6c17e0→6c1a60` 距离 trail 分支表明：正 SpawnSpacing 选择入口，实际段长为原始速度×速度拉伸×初始 Y 尺寸首值×Y 尺寸首值×根缩放；方向取当前点到上次已消费点的弦。出生位置／时间插值，余弦及未消费时钟保留；停留后瞬移会产生过期出生，不刷新年龄或延长寿命。共享模拟已按该规则实现，普通非 trail 的距离发射保留原行为。只准入独立 World、Kind0、恒速／恒定 Y 尺寸、无力／阻尼／旋转／事件／地形及正均匀根缩放等已核组合，动态 Y、模型及复杂组合仍沿用旧候选路径，详见 `docs/vfx-editor.md`。
+- 完整官方 `wh3_main_cth_iron_dragon_downward_strike_meshes` 的剑是空骨架 RMVv7；缺少的不是骨骼动画，而是动态 EmitterPosition／Orientation 及 OnSpawn 子图。新增 `VfxModelNativeMotion` 按原生 FullLocal 当前／前次发射器变换运输已有粒子位置和速度；128 点位置曲线与既有原生四元数采样并行，子特效挂到实际模型当前位置／姿态。去掉“有事件即禁用原生朝向”的过宽条件。准入严格限制单位根／继承 EventScale，非单位缩放保持旧候选结果并给 `EmitterPosition/RootScale/InheritedScale` 诊断。普通模型自旋、Crowman、Bear、Pox 和既有阻尼入口没有改套面片算法。
+- `Bridge.cpp` 只复用批内 MaterialRenderData 容量，并在完整校验后预留各阶段包容量；shader、ABI、顺序、合成及旧错误隔离不变。另查明 CachedTabControl 隐藏场景仍 Update／Draw／Blit／等待 GPU：新增默认关闭的 `D3D11Host.SuspendWhenHidden`，仅 VFX 和 SuperView 显式启用，隐藏时在资源重建和渲染前返回，恢复首帧 elapsed=0，保留资源／选择／时间／文档。Kitbash 没有启用或改动；原 resize／DPI／front-buffer 重建条件保留。绝对 TotalGameTime 材质时钟不冻结，不扩大为全局着色器暂停契约。
+
+### 本次构建、自动与离屏结果
+
+- 正常 native Debug 构建退出 0；正常 `dotnet build AssetEditor/AssetEditor.csproj --configuration Debug --no-restore` 最终增量退出 0、98 个现有警告、0 错误（本轮此前首次 App 构建为 1901 警告）。最终正常 Core=`A58831BECA9061660227AB63DD45E7B610676E2B01BE579D251B28EFD3D33BA2`，Meta=`D200A81A72F38AC1AA39646C975C1AF83C6BECC3EAE523B18CF0E29DCD24A78B`，VFX=`BA568671E7A1D8E3CB83DE60AFB44CB3FDEE4441244EC6A61C85E5681FE7CB89`，native=`8510B7D4548CC563F65B05CE51B0D53965B88D64F0AEA5A60DEBC6425A97F126`。
+- 模型／trail 冻结 Core `7FE089FCFB81AE0C05C94F2EECECDCF430C8FE642F0ECE2F47ADC629B8385CBC` 上完整 Core VFX **2383 通过／0 失败／14 跳过**，共享 Effect **55 通过／0 失败／0 跳过**，命令退出均 0，见 `parent-validation/frozen-v2-regression-summary.json`。14 项缺指定原版 poison-trail 导出及旁存来源 manifest，不计通过。随后只增加 Host 调度及两处 opt-in，模拟／转换／native 源码不变，复用该套语义结果，不写成 A588 又重跑全量。最终 Host／VFX UI／输入／播放器／Kitbash 隔离 **122 通过／0 失败／8 跳过**（含新 Host 9 项）；Meta 相关 **153 通过／0 失败／0 跳过**。8 跳过为 6 个 GPU marker opt-in 未开及 2 个本地样本路径未配置。各套与早先专项有重叠，不相加；未跑整个解决方案、Release 或 CI。
+- 新模型 14 项、距离 trail 16 项均已先红后绿；模型非单位缩放守卫也有 4 项独立红测。trail 覆盖转向、停留、回放、普通距离发射隔离、动态尺寸退回、容量 1 的过期批后再次连续可见及 1.006 秒停止边界，保留严格 Life／Alpha／后续随机字段断言。原生 DLL 新核 SHA=`C75D40A30CE938958F445AE59EB256E4C23F51201984D1F3EA5CB25319F763B8`；24 组 SSE FullLocal 非交换变换控制最大位置误差约 6.9e-6、速度约 1.75e-6，见 `model/native-position-transport-oracle-v1.json`。
+- 原生提交旧／新 DLL 对照使用同一完整官方吹管、铁龙和攻城烟雾、q0、384²／1920×1080、实际 4×MSAA：180 帧包／粒子／RGBA 完全一致，18 对 PNG 字节一致，无缺依赖。1920×1080 CPU 提交均值分别 **1.925→1.672、4.276→3.539、22.180→15.753ms**。GPU 加 staging 等待单列，不能当纯 GPU 时间或 GUI FPS。该对照 Core B971 尚是旧 trail producer，不能用它证明旧轨迹分布正确；最终 7FE0 吹管另补 60 帧／6 对 PNG 的旧新 DLL 相等对照。最终语义段长改变造成 166～168 粒，相比旧 222～224 是原生分段修正，不是性能减粒子。见 `performance/counterfactual-comparison-msaa4-v4.json`、`counterfactual-comparison-blowpipe-final-msaa4-v5.json`。零 MSAA 中间版本与失败样本均留存，不并入最终统计。
+
+### 普通窗口与 Terry：已看见和未完成的边界
+
+- 本轮确实操作正常 Debug 与 Terry；没有使用 Mod 特效或依赖。最终普通 Debug PID38792、正常 EXE 路径和载入模块 SHA 已核实，只读 All Game Packs，无 Mod 工程。完整官方铁龙在最终 A588 观察到 0.40 秒横向展开、1.47 秒改变姿态、2.34／2.35 秒转下劈并有跟随子特效、9 秒自然结束；同一默认相机／q0，没有编辑原件。窗口缩小再最大化后保留暂停 1.47 秒场景，最终留在 2.34 秒。早先 B971 的完整播放也观察到 1.51→3.72 秒下降，按中间版本另记，不伪装成最终复测。
+- 最终攻城烟雾窗口实际观察灰烟／火星动态和暂停控制，HUD 约 49～56FPS 仅是窗口观察，不是受控帧率测试。保持官方预热与完整依赖，首次解析／上传仍有成本。四个缓存 VFX 标签中，吹管连续时间不再被 8 秒重置；从 168.87 秒截图后切走，隐藏墙钟 24.145 秒再返回为 176.73 秒（前次截图至点击之间还有可见运行时间），没有把隐藏 24 秒追赶进模拟，选择标记和预览变换保留。先前烟雾 2.97→8.00 秒的短周期切页有操作延迟歧义，不作暂停成功／失败证明。
+- 最终吹管确实在窗口中选中并多次往返移动，连续播放超过 8 秒、选择／转向操作正常；但 Sky 停止拖动后才返回截图，原 .19／.36 秒寿命内的轨迹动态未被稳定捕获，**不登记持续拖动外观通过**。离屏完整原件运动帧已实际查看：修前鱼骨状分布变为顺运动的连续绿色段；这证明当前渲染结果，不冒充同阶段 Terry 或游戏最终外观。原生长时间静止后的过期出生不意味着永久不可见；后续连续跨段推进时钟，容量 1 专项已证明再次可见。正常鼠标持续拖动的窗口外观仍应补齐。
+- Terry 本轮新场景载入未经修改的完整吹管，位置 512/0/512、原旋转和缩放；Bloom 实际未勾选，图形质量只读 raw2→XML q1 连续两次稳定，camera24°/26°／距24，见 `terry-trail/terry-runtime-quality-v1.json`。v1 只框选没有实际位移，明确是失败；v2 actor X512→520 捕获 frame48115 中 38 条实际被选绘制记录，方向、段长与当前原生指令吻合。该批经过长 idle，全部年龄超原寿命并被 PostVS 裁掉，**不能声称可见 trail 同阶段视觉对照通过**。原生场景诊断副本只保存 actor 移动，VFX 原 XML／贴图不改，Terry 正常关闭，无强退或丢弃用户内容。
+- 当前只证明上述样本和受限组合；复杂 trail、非单位模型缩放、全部材质／透明合成、天气与完整游戏后处理仍未全覆盖。未做最终 SuperView 普通窗口 Effect 回放、真实 DPI 切换或设备丢失测试；这部分只有对应自动门禁及既有结果，不伪装成新窗口验收。
+
+### 留存、文档与下一步
+
+- 既有 `docs/vfx-editor.md`、`docs/architecture.md`、`docs/superview.md` 已同步稳定契约；本轮不改 AGENTS，不新增流程文件。最终 Host patch 为 `performance/hidden-page-fix/product-diff-v2.patch`，保留 v1 旧证据而不当最终源码。
+- 新产物全部保留；盘点时约 0.744GiB，其中四份独立 RDC 的旁存重复副本约 333MiB 仅列为可再生产物，没有删除、搬盘或打包；原件／独有捕获／TRX／运行库备份与 Debug 保留。最终 GUI 与工作区记录为 `parent-validation/normal-debug-gui-final-v1.json`、`workspace-after.json`；原 91 路径均存在，非本轮路径逐项 SHA 核对，分支／HEAD／暂存边界不变。
+- 下一步优先补正常连续拖动与同阶段 Terry 可见轨迹对照，再根据实际异常扩展共用参数组合；不要再从“有像素”、HUD、测试数或原生过期 teleport 记录推出全部视觉正确，也不要为得到截图调长寿命。
+
+## R110 首次冷启动卡顿与妙影贴花出生扇区（2026-10-27）
+
+### 现场、原因与共享修复
+
+- 原地沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存为空；初始87个已有改动／未跟踪路径逐项SHA与R109最终快照一致。基线、受影响原件和正常运行库小备份在 `artifacts/vfx-cold-start-direction-r110/`；没有切分支、worktree、暂存、收起、回滚、提交、推送、PR、合并或清理。保留全部旧成果、失败、工具和正常Debug，全局 `1/120`、原粒子数量／寿命／画质不变。
+- 冷启动原3.94秒主要落在 `BeginScene→FloatSceneTarget::Prepare`，该调用同步 `D3DCompile` 八份场景着色器；隔离CPU原源码／原flags编译仍累计约4477ms，证明不能归咎于GPU粒子量。新 `FloatSceneShaderSources.h` 是单一HLSL来源，`CompileSceneShaders.cpp` 在正常native构建时沿用原入口、profile、flags=0编译生成头；CMake显式依赖源码、生成器、生成头和桥。运行时只从内置字节码创建DX11 shader，无预热、外置缓存、减画质或把耗时搬到资源Reload。八份完整bytecode与原运行期编译结果逐字节完全相同，见 `cold/bytecode-equivalence-v1.json`、`cold/normal-build-bytecode-equivalence-v1.json`。
+- R109 径向速度规则本身有原生依据，但出生区域仍整圈均匀铺开，令速度跟着错误出生点向四周散射。重新核实官方 `warscape.modder.x64.dll`（SHA仍 `C75D40A30CE938958F445AE59EB256E4C23F51201984D1F3EA5CB25319F763B8`），实际隔离执行原 `6c0380` 出生函数、`6c08f0` false方向函数及 `6ca8d0` 角度函数。`SpawnAngle=a` 为仰角、`SpawnArc=b` 为方位，出生偏移 `r*(cos(a)cos(b),sin(a),-cos(a)sin(b))`，r线性取原上下界；出生位置、速度方向与朝向法线独立。证据 `native/native-spawn-contract-fresh-v1.json`、`native/native-angle-helper-samples-v2.json`、`native/native-birth-position-samples-v1.json`。
+- 共享转换／模型／模拟增加独立 `SpawnAreaAngle/SpawnAreaArc`。只在已有受限径向入口且显式SpawnArc，或严格限定的 `continuous_mesh + DISTORTION` 字面false、世界／仅位置局部、恒定发射器位置、零发射器旋转／出生盒、非负半径、无间距／继承速度／表面法线／事件、上轴／缺省出生方向时应用；数字0、无Arc、模型、FullLocal及其他组合不扩展。保留此前随机数调用数量、后续Life／Alpha／尺寸／旋转随机字段；不宣称原生种子或完整随机调用序列已一致。
+- 原版arc90 white的Angle缺省0、Arc±5°、半径.5，因此局部+X十度窄扇区；distortion出生(.5,.1,0)，其中Y=.1来自原EmitterPosition，既有+X速度50及Life=.8保持。未按名字打补丁、钳制Y、旋转整组、修改原XML/META、拉长寿命或调亮。
+
+### 本次重新执行的构建、自动与离屏验证
+
+- 正常native Debug增量构建退出0；正常 `dotnet build AssetEditor/AssetEditor.csproj --configuration Debug --no-restore` 的最终 `parent-validation/app-build-v2.log` 退出0，1901警告／0错误。CoreTest和MetaTest均按Debug重新构建。最终正常Core=`3EA03CEAFED5694028605B7B474D160A8F3BF9C60AFA9820980414A200FCBD09`，Meta=`6A3BDD7ABD3373CE7007AADDF9CE02486C30CE5A26368A1EF393F23D7277F864`，Editors.Shared.Core=`4FA0EE6877D640A437E46724FA61791BE95A54266E2D8E8E6695BBB69D3992C4`，native=`20BF86970ED0F0F15AF1DB3015613E809DF22B1707E12F894697D970FCF90E7B`，见 `parent-validation/runtime-v2.json`。
+- 最终完整Core VFX **2353通过／0失败／14跳过，共2367项**，`core-vfx-final-v2/core-vfx-final.trx`；最终共享Effect **55通过／0失败／0跳过**，`meta-effects-final-v1/meta-effects-final.trx`，命令退出均0。14跳过仍缺指定官方poison-trail导出及来源夹具，不能计通过。使用显式headless与实际官方data路径；没有执行整个解决方案、Release或CI。专项结果是全量子集，不重复相加。
+- 新出生区域专项先在旧正常Core跑出11失败／1数字0控制通过；distortion额外两项在中间Core仍失败，修后通过。完整首跑一项失败是新测试误将原EmitterPosition.Y=.1写成0，按官方XML修正预期为(.5,.1,0)，原1e-6容差与速度／寿命严格断言保持；对应红测、首跑TRX、日志均保留，没有为过测放宽断言。
+- 同源性能对照 `cold/cold-and-pixel-comparison-v1.json`：两个独立冷进程使用相同完整官方Storm2 META／clip／骨架／依赖、384×384、同画质／视角／30Hz输入，只更换实际载入native模块路径，未交换正常App文件。274帧时钟、粒子数及PNG像素SHA全部相同；首次Begin **5622.3141→1.7865ms**、Draw **5655.1155→32.9724ms**，readback单列。最大Reload **1194.7451→1214.3321ms**、总Reload **1666.5467→1651.7953ms**，没有把编译卡顿转移过去。该对照Core为同轮中间B9FF版本，最终额外修正distortion出生位置不涉及native着色器；不冒称最终Core又完整跑了相同counterfactual。资源首次解析／解码／上传仍可能约.4～1.2秒，不宣称冷启动零延迟或这些毫秒就是GUI实际FPS。
+- 最终完整官方妙影human5四圈离屏 `direction/human-direction-final-v2.json`：原META／3.10秒clip／骨架／原件SHA及字段不变，24阶段Birth／Life／数量、Alpha多重集和后续随机字段与R109相等；20独立模拟只用五套资源。white实际出生角[-4.62850°,4.86955°]，速度方向误差<3.81e-8；distortion原位置／速度／寿命严格通过。沿用R109窄相机时部分正确前方运动离开画面，低像素不作视觉成败判据，实际Debug另拉远覆盖完整轨迹。
+
+### 本次普通Debug与实际原生参考
+
+- 最终正常Debug PID12292、正常输出精确路径核实。唯一只读All Game Packs、无Mod工程；正常UI载入原 `cth_storm_dragon_human`、`humanoid01e`、`hu1e_mage_storm_dragon.bin/JUMPING_ATTACK_1` 与原五项Effect。多圈实际播放看到起跳、落地、充能和两道有方向贴花；暂停检查1.61／2.05秒，均为按各自META朝向展开的扇区，未再整圈四散。关闭循环看到3.10秒模型末帧、原短寿命地面效果已消退，未写源文件；相机只拉远，不以不同视角比较像素。见工具窗口截图及 `parent-validation/normal-debug-gui-final-v1.json`。这是普通窗口行为观察，不代替独立帧计时或全部原生外观验收。
+- Terry PID25868保留，未强退或丢弃用户内容。先前Prefab没有真实接收地面，不能作为贴花视觉证据；本次通过Terry UI新建1×1 Battle Tile，实际Height全0，原地形文件备份并复制到独立receiver，原VFX资源不改。Bloom实际未勾选，原生当前图形质量只读核实raw2→XML quality1，文件 `native/terry-runtime-quality-read-v1.json`；保存High标签不单独作为实际画质证明。
+- Autoplay属性重输不能可靠重播已结束实例，v2/v3捕获实际draw0，均保留为失败；选择后CtrlC/CtrlV新增同位置、原rot0/scale1的完整官方arc90，v4实际捕获成功。`native/capture-v4/terry_frame216063.rdc`、`native/arc90-readback-v4/readback/clock-camera.json` 及 `native/arc90-export-v4/images/event-2108-tone-viewport.png`。实际查看原生白弧在真实地面向前形成窄扇区；GPU出生／速度角[-4.48654°,3.30568°]、white Y=0、distortion沿+X且Y为原.1×根缩放，原寿命范围保持。实际阶段约.1399536135秒、相机24°/26°、距离18、FOV60°、有效viewport360×655均从GPU读回核对，不以触发延迟或预设相机冒充对齐。原生第一大步另有七条预测出生记录，不用于阶段／固定步长粒子数比较。保存诊断场景有两个同位actor重叠提示，属于此次原样重播副本，未部署或构建游戏内容；源场景及失败全部保留。
+- 同条件AECN补图已完成：`direction/native-camera-match/q1-stage014-v1/results.json` 和 `aecn-arc90-q1-native-camera-viewport.png`，完整官方arc90、q1、阶段.13995361，复用实际GPU相机与360×655视口，独立投影代数最大误差.000153像素。两图实际查看为同侧窄扇弧，不再整圈四散；AECN白4粒、原生白11粒（含七条预测），原引用随机尺度也不同，原生纹理更密、右端形状和亮度仍有差异，不能写成逐像素或完整原生外观通过。背景／天气未完全配平，故此对照用于形状方向，不能用其亮度指导调色。质量依据明确来自当前引擎只读raw2→XML1，最初误写UI证明的results小备份保留并更正。`Shared.Core.dll` 与 `Editors.Shared.Core.dll` 为两个不同程序集，散列分别记录，不误判漂移。
+- 原生根引用自身有.90～1.00随机缩放，本次实际.99810177；不能修改GUI尺度或源字段来凑画面。照明、首次大步、随机种子、预测粒子及完整游戏后处理仍有差异；方向/出生规则的当前证据不等于完整形状／透明合成／游戏最终显示逐像素一致。
+
+### 留存与后续边界
+
+- 实现、自动／离屏及上述窗口验收完成后，最后尝试恢复正常Debug窗口时，Computer Use明确返回 `user input was detected in this window`；立即停止桌面输入，没有按工具提示重试或抢焦点。当前只维护文档及只读Git核对，未关闭用户程序。见 `parent-validation/desktop-input-stop-final-v1.json`；此前实际观察不伪装成冲突后重新验证。随后用户明确恢复桌面授权，重新绑定Debug窗口；缓存坐标导致一次文件树分隔条误拖，已恢复约350px原宽度。最终仍为原件JUMPING_ATTACK_1、暂停0.00秒，定位尝试没有成功，不写成已留在1.6秒或新增视觉验收；原XML/META未保存。续记 `parent-validation/desktop-resume-final-v1.json`。
+- 本次证据根 `artifacts/vfx-cold-start-direction-r110/`，包含原件／运行库小备份、源码与函数证据、失败、TRX、工具和有界单帧捕获；没有打包搬盘或删除。长期稳定契约更新既有 `docs/vfx-editor.md`，没有新增设计／流程文件或改AGENTS。最终 `parent-validation/workspace-after.json` 核对初始87项中仅7项本轮相关文件变化、80项SHA不变，新增进入改动清单4个路径（其中CMake为原跟踪文件，另三份为新源码／测试），共91项；分支／HEAD不变、暂存为空。产物盘点见 `parent-validation/artifact-inventory-v1.json`，全部保留，未执行固定范围清理。
+- 保留R108/R109已验证的循环资源复用、自然尾段、有限根停止和既有原生旋转。模型FullLocal、材质／透明合成、全部trail／烟雾、无限事件子图和龙形另一owner-stop语义不在本轮修复结论中。首次资源上传成本仍是独立性能边界；不要再把本轮的同步着色器编译停顿与资源加载混为一项。
+
+## R109 妙影人形跳跃贴花与循环加载卡顿（2026-10-27）
+
+### 现场与本轮修复
+
+- 原地沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，接手 84 个已有改动／未跟踪路径，逐项散列核对 R108 `workspace-after.json` 一致，暂存为空。本轮基线、受影响源码及旧正常运行库小备份位于 `artifacts/vfx-superview-jump-perf-r109/parent-validation/`；新增三份测试文件，其余已有成果保留。无分支／worktree、暂存、收起、提交、推送、PR、合并或清理。
+- 用户实际场景是 `cth_storm_dragon_human.variantmeshdefinition`、`humanoid01e`、`hu1e_mage_storm_dragon.bin` 的 `JUMPING_ATTACK_1`，完整原动画 3.10 秒及 `hu1e_storm_dragon_jump_attack_01.anm.meta` 原五项 Effect，不能误用龙形同名动作代替。META／clip／骨架来自当前官方 `anim2.pack`，全部 VFX／模型／DDS 按 manifest 核实官方来源，没有 Mod 覆盖。
+- 两条 arc90 的 `Arc_white` 是 `continuous_mesh + DEFERRED_DECAL`，原粒子寿命约 0.4～0.5 秒。修前在 1.60／2.05 秒仍有活粒子、有效 Alpha 与绘制包，却因为错误的向上初速度使投影体离开地面。原 `SpreadMethod="false"` 的径向入口只接普通面片，漏掉该贴花和动态速度组合；修复按原生出生点减发射器中心求径向，速度曲线仍每次出生采样，法线独立。不钉死 Y、不改 Alpha／Life／META／原 XML，不把贴花延长到整段动画结束。受限条件与未标定 SpawnArc 分布见 `docs/vfx-editor.md`。
+- 原生方向依据是既有 R104 的 false 分支和本轮核对的出生调用链：`6c0b82..6c0c4f` 位移归一化，零保持零；`6c2080` 每次出生取得速度标量并写入独立速度，不能把 Up 法线当速度。当前官方 `warscape.modder.x64.dll` 新核 SHA256 仍为 `C75D40A30CE938958F445AE59EB256E4C23F51201984D1F3EA5CB25319F763B8`。这是当前原生二进制身份与历史指令证据的复核，本轮没有新的 Terry 同条件视觉通过。
+- 卡顿实测来自每轮／定位重新转换、DDS 解码和资源上传。`IVfxPreview.CreatePlaybackInstance` 与 `EffekseerVfxPreview.PlaybackResources` 复用完成的只读转换和上传结果；各播放代保持独立模拟、时钟、发射截止、诊断，最后一个资源使用者释放 native handle。`VfxPreviewSceneNode` 自然循环及定位复用资源，源／依赖失效仍明确重载并丢弃过期尾段；保留循环边界待处理的失效，空尾段不能阻止有效实例开启共享合成。没有按特效名建立全局缓存，也没有改全局 `1/120`、画质或粒子数量。
+- 对照抓到本轮中间实现的真实问题：新 clone 首次显隐查询调用 `IsDrained`，在真实骨骼挂点和历史传入前以单位矩阵初始化，Storm 第二圈有 46 帧相差 1～2 粒。新增节点门禁先跑出 2 失败、1 通过，再用 `_currentPrepared` 保证首次真实 Seek 后才查询排空；修后两组完整原件每帧粒子与旧基线均完全一致。Persistent 非零 Start 的无限点触发跨轮也不再在 0..Start 闪隐；有限与非 Persistent 开始边界不变。
+
+### 本次最终验证
+
+- 正常 `dotnet build AssetEditor/AssetEditor.csproj --configuration Debug --no-restore` 最终 `app-build-v4.log` 退出 0，1901 警告、0 错误。两测试项目重新构建后执行；最终 Core `882F965ECB00DFB24DDF445F886B6690157521D17CF1650BD91F2D9144148B26`、Meta `45D7FF06804E907FEC3A961AA2CF107646ABAEAFE2455F0003801B0CE51FC7E5`、Shared `7E55251CE2AF24133AB43408BADB2355C3EED6D1BA67FA28B74056CD34C396C5`。native `A816B5EDAA773FADB7BB32C38C3BF84464B713FAC11BE4D44C71C2CFD7787E36` 未改；完整散列见 `parent-validation/runtime-final-v4.json`。
+- **最终 Core VFX：2339 通过、0 失败、14 跳过／2353 项**，`core-vfx-final-v2/core-vfx-final.trx`；14 项仍缺少既有带来源证明的官方 poison-trail 导出夹具，未计通过。**最终共享 Effect：55 通过、0 失败、0 跳过**，`meta-effects-final-v3/meta-effects-final.trx`。GPU 环境显式启用 headless，只读官方游戏 data；未跑整个解决方案、Release、CI。新资源／径向／首次挂点及六项共享 handle 像素检查均包含其中，不重复相加。R108 其他播放器／动画结果仍属历史复用，不伪装成本次重跑。
+- 初次筛选名无匹配、新循环资源测试未提供 owner 真实 clip 时长的夹具错误、独立工具构建把备份 `.cs` 纳入默认编译等失败日志全部保留。资源测试提供真实一秒 clip 后仍严格断言原 `.5` 截止及新旧独立时钟；没有放宽断言。human v1 观察器调用 Frame／IsDrained 也会提前初始化待播放 clone，已在独立工具修正；正式 v3 只观察已初始化实例，并按出生身份／Alpha 多重集核对，不把空间变化导致的深度排序当作 Alpha 改变。
+- **同源性能最终对照**：完整 Bear13 的 705 帧、Storm2 的 274 帧，其每个播放时钟和每帧粒子数与旧正常 Debug 基线完全相等。后续循环 Reload 帧分别 24→0、5→0；Prepare 峰值 497.1848→3.0317 ms、775.5544→1.2235 ms；单帧分配峰值 291,188,856→2,114,856 字节、640,987,648→697,232 字节。52／8 个独立播放实例分别只需最多 13／2 套真实只读资源；实际 Reload 总数 39→13、7→2，仅首次加载。相同 384×384、画质、相机、原件、30Hz 播放输入，计时段没有并行 GPU 测试或 GUI 播放；读回等待单列，不把 CPU Prepare 当实际 FPS。见 `performance/after-comparison-v2.json`。初次冷 draw 仍约四秒，尚未标定其具体驱动／材质初始化占比，本轮未消除。
+- **完整官方 human5 最终离屏**：`official/human-final-acceptance-v3.json`，24 个同相位阶段覆盖四圈。原 META／clip／骨架／依赖散列、META 字段、Life／Birth／MotionOrigin 与原 Alpha 保留；四圈出生数据完全一致。第一 arc 在 1.45／1.60／1.75 秒分别 4151／21831／22216 像素，第二在 1.90／2.05／2.20 为 5947／6766／0，四圈同阶段完全相同；修前 1.60／2.05 均为零。Y 保留原 META `-.3203122`，XZ 按原径向速度运动；2.20 秒按原曲线淡出，不强行维持可见。20 个独立模拟分属五项 Effect，每项四代只复用一套资源／转换／native handle。完整原始包、参数和阶段图在 `official/human-final-validation/human-jump-final-v3/`。像素数仅是丢失／复现核对，未冒充游戏外观等价。
+- **最终普通 Debug 实机**：PID 47372，准确路径为本仓库正常 `AssetEditor/bin/Debug/net10.0-windows/AssetEditor.CN.exe`。唯一只读 All Game Packs、无 Mod 工程；通过正常 UI 载入上述人形模型／骨架／战斗 bin／JUMPING_ATTACK_1，原五条全部保留，Persistent 原为空。实际多轮播放看到原起跳／落地、烟雾与手部充能，定位 1.60 和 2.05 秒均有贴地扩散；正常播放 1.73 秒仍有第一道贴花，2.75 秒已退场，跨轮恢复新动作与充能。关闭循环后模型保持 3.10 秒末帧、地面效果已自然结束；暂停与定位正常，未见此前周期性加载停顿。显示 FPS 仅作为窗口观察，不代替上述帧计时。只拉远相机覆盖完整轨迹，不拿不同视角作像素成功比较。最终留在暂停约 1.59 秒、循环选项恢复；未保存源文件、强退程序或发生用户输入冲突，Terry 原窗口保留未操作。窗口记录在工具截图及 `parent-validation/normal-debug-gui-final-v1.json`。
+
+### 留存与边界
+
+- 稳定契约已补入既有 `docs/superview.md`、`docs/architecture.md`、`docs/vfx-editor.md`；本轮日志、源件、备份、失败、工具与小型阶段图全部保留，没有清理或搬盘。最终工作区盘点见 `parent-validation/workspace-after.json`；初始 84 项中仅更新本轮相关的 10 项源码／测试／文档，其余 74 项散列不变，另新增三份专项测试，暂存为空。
+- 本次修好人形妙影这组贴花离地及重复加载问题，未完成全部贴花、SpawnArc 出生分布、全局透明合成、全部 trail／烟雾或游戏最终视觉验收。首次冷加载约四秒仍待修；R108 无限事件子层停止及 600 秒定位边界保留。
+- 另发现龙形官方 storm jumping 的原片段合法引用 iron clip，不能按文件名前缀判错；其另一短范围 rock impact 的迟发根层可能被 META 截止，属于不同的 owner Stop 语义，尚未获得足够原生证据，本轮未改。不要将它当成人形原五条复测已通过，也不要延长 META End 掩盖。
+
+## R108 超级视图 Effect／地面贴花的停止发射与自然尾段（2026-10-27）
+
+### 现场及共享修复
+
+- 原地沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，接手 75 个已有改动／未跟踪路径，暂存为空。基线和受影响源码／正常运行库小备份位于 `artifacts/vfx-meta-tail-fix-r108/parent-validation/`；保留全部旧成果与失败记录，无分支／worktree、暂存、提交、推送、PR、合并或清理。全局 `1/120`、原粒子寿命与原始资源参数不变。
+- 前一轮 R107 为只读诊断：普通范围的 META End 隐藏整项，地面贴花随父节点一同消失；主动画循环回零后低时间 Seek 又清掉旧模拟。完整官方 Bear13 的两条贴花在 4.60 秒及 7.49 秒仍能实际绘制，却被父显隐门控隐藏，证据在 `artifacts/vfx-meta-tail-r107/compositing/decal-tail-audit-v1.json`。这些是修前证据，不算 R108 修后通过。
+- `IVfxPreview`／模拟新增实例局部 `EmissionEndTimeSeconds` 和真实 `IsDrained`。范围 META 在 End-Start 截止根发射；只裁剪跨 End 的最后部分 Tick，保留完整 Tick 原有累计规则，出生时刻／出生挂点不超 End。既有普通粒子、模型、贴花继续原 Life、Alpha、图集和已触发事件链；根 MeshLoop 在截止后沿原有限停止规则退出，不改 Life。默认 null 仍走原播放路径。
+- `AnimationPlayer.PlaybackTime` 提供片段时间、连续时间、修订与循环号。超级视图显式启用末帧后的尾段时钟，`SceneObject` 仅向可选的 `IMetaDataPlaybackInstance` 分发；其他元数据与普通未启用的播放器保留原逻辑。真实共享 VM 自然循环走去重的 `RestartForLoop`，不再用用户定位命令模拟循环。用户定位、回第一帧、停止或换动画明确重置；暂停冻结并可恢复尾段。
+- `EffectMetaInstance` 不再按 META End 或 `CycleDuration` 隐藏活粒子。共享节点保存上一轮独立运行时，新一轮重新触发，旧轮在实际排空后释放；范围 End 与轮次 End 取较早截止，不恢复已停止的根发射。出生历史用当前片段姿态恢复根变换，再按各轮原动画采样，避免末帧／回绕时把旧世界空间粒子搬回新起点。Persistent 点触发中实际无限根继续同一实例，不强行每轮重建；历史按实际循环起点换算，不能直接对片段长度取余，因为主模型会丢弃循环越界时间而连续时钟保留该时间。
+
+### 本次重新执行的验证
+
+- 正常主程序 Debug 构建 `app-build-v2.log` 退出 0，1881 警告、0 错误；最终挂点修正后的增量 `app-build-v3.log` 退出 0，96 警告、0 错误。本轮未改原生源，没有无故重编原生桥。受影响测试项目全部重新构建。最终正常 Core 为 `EC7FBC640B072FF7161F590FFB54139E623A8C199B6F2C3D7EFA7C93222056BD`；Shared 为 `7C1881FC48BB21658903FA800E5B9ECDCB9C3FCBB7AF25AC3387A307227FF293`；Meta 为 `7EC68D09ABE69D1A8B4BCE4116E7BD6D7E70E8D4B77A73312A89695AF3A68E2D`。native 仍为 `A816B5EDAA773FADB7BB32C38C3BF84464B713FAC11BE4D44C71C2CFD7787E36`。
+- **完整 Core VFX：2315 通过、0 失败、14 跳过／共 2329 项**，`core-vfx-final-v1.trx`。14 项均缺少要求带 manifest 来源证明的既有官方 poison-trail 导出原件，不计为通过。新发射截止专项 24／24、相关既有 CPU 78／78 是全量子集，不相加。**共享 Effect 最终 48／48**，`meta-effects-final-v4/`；**共享播放器 16／16**，`shared-playback-v2/`；**Core 动画／骨架解析 35／35**，`animation-core-v1/`。最终只再改 Meta 的持续历史采样，Core／Shared 散列不变，复用本轮对应通过，不冒称再次全量执行。未执行整个解决方案全量、Release 或 CI。
+- 新专项先对旧正常 Core 稳定复现；首个实现的一处完整 Tick 重算舍入导致 End 前少发一粒，已修为仅裁剪最后部分 Tick。两处测试准备错误分别是沿用了已确认归零的 OnDeath 延迟、240/s 样本最后不足一粒却要求出现 End 后子粒子；按原生延迟规则和独立计数公式纠正样本，最终 480/s、End=.253 精确为 122 根粒子，保留严格 Birth／Root／事件 Start 断言。旧四项宿主断言要求八秒预估到点隐藏，与本次需求冲突，改为明确测试运行时仍活应显示、实际排空才隐藏。原失败及原因在 `emission-audit-v1.json`、对应旧 TRX／日志中，没有改原生夹具或放宽像素／时间容差。
+- 最终编码检查只为新 Core 测试补齐 `.editorconfig` 要求的 UTF-8 BOM，内容语义与运行源码不变；重新构建 CoreTest 并再次执行 24 项全部通过，见 `emission-tail-final-encoding/`。完整 2315 项结果复用本轮同一 Core／native、同语义测试，不伪装成编码整理后的另一次全量。
+- 完整官方离屏：Bear ATTACK4 原 13 条与 StormDragon 攻击原 2 条，均加载原动画和真实骨架，通过实际 `Player.Update → SceneObject.Update`、正常可见场景树和共享合成绘制。各覆盖循环及非循环四跑：META End 后不再出生根粒子、旧尾段仍有实际画面；Bear 跨循环保留旧对象，原件真实首次新出生后与新代并存；关闭循环后模型分别保持 7.5／2.7 秒，特效继续自然排空。Bear／Storm 最终分别 13／2 项全部 `IsDrained=true`；空当前运行时保留到场景释放，不是历史代无限累积。见 `validation/official-lifecycle-summary-v1.json`。资源仅来自当前 manifest 官方 Pack，原 META 字节／字段未变，Missing 为空；没有强制打开隐藏父节点冒充验收。
+- 独立工具最初一次 Moq 反射入口失败，第二次在原贴花尚未首发的 .1 秒过早要求新旧粒子并存，均保留并标为工具失败；修正为在原有效发射窗口内观察真实首次出生，不改产品或原件参数。首轮正式 Bear loop-v3／drain-v1、Storm loop-v1／drain-v1 通过；最终 Meta 再对 Bear loop-v4／drain-v2、Storm loop-v2／drain-v2 全部重跑通过，汇总 `validation/final-summary-v2.json`。这四组为非 Persistent 回归；持续分支另用旧 Meta DLL 稳定跑红：新循环真实 clip=0 时旧取模将出生挂点采到 X=2，最终严格映射至 X=0，并检查历史旧轮及越界空隙。该新项包含在最终 48 项中。本次离屏未绘制角色模型，没有匹配天气／Terry，不把非空像素或生命周期通过当作完整原生视觉等价。
+- **普通 Debug 本次实际窗口观察**：首轮 PID 50412；最终挂点修正后正常关闭该只读实例，无保存提示，重新启动最终正常 App PID 38300。均为唯一只读 All Game Packs、无 Mod 工程。原 `ksl_elemental_bear.variantmeshdefinition`、`bear01` 骨架、`be1_wh3_elemental_bear.bin` 的 ATTACK_4，同时保留原 Animation／Persistent META。首轮循环实际观察到 6.80→下一轮 2.64→1.06 秒；最终 Meta 再观察到 3.14、跨轮 2.62／.76、4.47 秒，旧冰面仍在，持续烟雪跟随原身体／头部。最终关闭循环后再看到 4.01→7.50 秒保持末帧，冰面继续变为零散残片，再完全消退，Persistent 原身体烟雪继续原行为。暂停／回第一帧操作有效，未保存源文件或检测到输入冲突。仅拉远相机看全轮廓，不做不同视角的像素成功比较。最终实例留在暂停的 Bear 末帧页，没有关闭 Terry 或其他用户程序。Storm 的本次新验证为完整官方离屏，未补其角色窗口；没有本次 Terry／游戏最终画面验收。
+
+### 仍保留的边界
+
+- 未跟踪父寿命的无限事件子层，在 owner Stop 后如何停止发射尚无足够原生证据；现保留其原事件链、如实返回未排空，不按固定秒数或数量强制删尾。上述两个完整官方组合未覆盖该无限事件图，不能据其运行时数证明所有组合长期内存有界。普通 Seek 的 600 秒上限仍保留。
+- R107 另外发现的父引用倍率与事件尾段周期估算不一致，本轮宿主已不依赖该估算清尾，但没有修改或宣称完成原生倍率全组合标定。R106 的其他材质、透明合成、ribbon 和性能边界继续保留。
+- 本轮产物约 98 MiB，包含必要源码／旧运行库小备份、CPU／GPU 日志、独立工具与阶段图，全部保留，没有打包搬盘或清理。长期播放契约已更新现有 `docs/superview.md`、`docs/architecture.md`，没有新建流程文档。
+
+## R106 共享问题批量修复（2026-10-26）
+
+### 现场与共用实现
+
+- 原地沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存为空。接手 60 个已有改动／未跟踪路径的散列与 R105 快照一致；本轮前后盘点位于 `artifacts/vfx-shared-batch-r106/parent-validation/`。没有切分支、创建 worktree、暂存、收起、回滚、提交、推送、PR、合并或清理，保留正常 Debug 和全部旧证据；全局 `1/120` 不变。
+- `RenderEngineComponent` 的 Normal/Solid 路径将同场景 `VfxPreviewSceneNode` 经显式 `BeginScene/DrawInScene/EndScene` 分组：全组不透明接收体、各实例覆盖／发光、全组折射方向、全组透射率、一次折射解析及显示输出。修复逐实例曝光截断和各自折射复制背景的问题；实例身份、时间、挂点与模拟不合并。独立 `Draw` 保持兼容。入队复制粒子数据并保留运行时／深度资源，拒绝坏提交，未结束的客户端作用域销毁时取消；浮点中间目标捕获／解绑／恢复 RTV、DSV、UAV 及计数器。未宣称 MBOIT、全局透明排序、半分辨率或游戏完整透明合成已经实现。
+- 九类使用 `mesh0`／`meshRender` 契约的滚动模型材质补齐绝对 `SV_Position` 整图深度采样，修复偏移／缩小视口的软边差异；保留 R105 投影贴花修复及专用 Tidecall 等独立路径，不全局替换材质 UV。
+- 普通粒子的独立 ForceA 不再因未实现的 Wind 参数被整体省略，Wind 仍明确诊断；普通 `Kind=0` 线性负阻尼保留 `exp(-lambda*sourceDt)` 的原始符号，模型与贴花原有规则不变。原始开始时间支持 `[-600,600]`，完整引用净时间用运行时浮点运算检查有限性与预算，只停用超界层并清除事件悬挂引用；原版 Ash 的 -100 秒预热恢复，没有截短原寿命。
+- `.wsmodel` 先匹配明确 LOD／部件；仅唯一未索引材质、实际单 LOD／单部件时接受省略索引。原版 `wh_main_ability_melee_slash_circle` 的 `3D_ring` 因此读取真实 `wh_vfx_mesh` 六槽材质，不再误读 rigid 内的 `no_texture.dds`；不补白图、不放宽真实缺纹理守卫。该问题属于 Bear，不是 Gyro。
+- 扩大回归定位到 R104 继承问题：径向发射把数字 `SpreadMethod="0"` 与原生已标定字面 `false` 混同，零半径时丢失旧控制的初速度。现将该受限入口收紧到实际字面 `false`；数字 0 保留既有原生轨迹支持路径。新增同源半径 0／1 对照，旧原生夹具、轨迹容差和完整官方 RockImpact 控制均保留；不据此声称已反编译完整 XML Boolean 解析。
+
+### 本次重新执行的验证
+
+- 原生 Debug 构建成功，随后 Core 测试及 Meta 测试项目 Debug 构建成功；最终测试条件为 `ASSETEDITOR_VFX_HEADLESS_TEST=1`、`ASSETEDITOR_VFX_GAME_DATA=E:\Steam\steamapps\common\Total War WARHAMMER III\data`。最后两项仅测试代码修正通过 `BuildProjectReferences=false` 构建，未改写运行中的正常 App。完整命令、退出结果、早期失败均保留在 `parent-validation/*build*.log` 及对应测试日志中。
+- **最终完整 `GameWorld.Core.Test.Vfx`：2291 通过、0 失败、14 跳过／共 2305 项**，见 `core-vfx-final-v6/`。14 项因缺少指定的已导出官方 poison-trail 原件及来源记录而跳过，不计像素通过。**最终 `EffectVfxPreviewTests`：43 通过、0 失败、0 跳过**，见 `meta-effects-final-v5/`。未运行整个解决方案全量测试。新增共享深度、跨实例颜色／折射、状态恢复、力、负阻尼、预热与材质选择用例均在完整专项中重跑。
+- 先前完整专项有 114 项失败，使用 R105 的 F92 Core／8AC9 native 和同一测试程序集成对核验：旧轨迹、旧 GPU 控制均有相同失败。收紧径向入口恢复旧轨迹及烟雾控制；两条 Wind 断言同步独立 ForceA 契约。剩余测试分别纠正接收面未计已标定软边偏移、线性与显示颜色混淆、不可分辨取景；保留原误差、面积、颜色强度要求并增加正控制，未为通过测试调亮产品或修改原生夹具。早期有一次构建失败后误启旧测试程序集，已停止并标为 `shared-batch-green-v1-invalid.json`，不计入结果。
+- 最终 CPU 清单 **40 个完整官方根／50 画质条件、194 项原始资源来源与 SHA、零转换异常**，见 `coverage/coverage-summary-final-v3.json` 与 `matrix-final-v3/`。这是转换覆盖，不是 40 个视觉通过。13 个实际官方 Pack 索引之外，另精确核对完整 manifest 的 271 个 Pack；补入真实 `models_other.pack` 恢复的一层属于验证索引补齐，不能全部算产品修复。
+- 最终共享生产绘制离屏使用完整原版 StormDragon 2、Bear 13、Gyro Persistent 3 条 Effect 组合及真实原动画／骨骼，3 组共 10 个阶段／20 张对照图，含 Bear 5.10 秒的冲击环。最终 Core 的粒子数据及 PNG 与已逐图审查的本轮 v3/v4 完全相同，记录 `compositing/official-multi-meta-audit-v5.json`；全部实读依赖没有 Missing。共享与独立合成的对照使用同一当前 Core，只改变作用域，不改原 META 或粒子。此离屏没有绘制角色模型，使用受控参考曝光，不能当作 Terry 或游戏最终画面。
+- **普通 Debug 窗口本次实际观察**：Bear ATTACK_4 使用官方原模型、动画、Animation/Persistent META，查看 3.49、5.08、6.10／6.71 秒及连续播放；冰面边缘保持不规则，5.08 秒能见完整冲击环，后期瞬态按寿命消失。该窗口观察在本轮径向入口收紧前进行，最终同源离屏字节完全相同；不写成最终 Core 再开 Bear 的窗口复测。最终 Core 另查看完整 siege smoke 的原始 -100 秒 Ash（q0/q1）、`wh_dlc03_large_smoke_loop`（q0/q1），以及 Amber Spear 全六层 trail（q0/q1）播放拖动；轨迹在 34／59／106 秒后仍可继续生成，停止运动后按原寿命消失。均从唯一只读 All Game Packs 加载，代码与本次日志核实使用实际官方 manifest，不载入 Mod 工程。没有保存或改写原 XML；最终 Debug 留在暂停的原版 Amber 页面。
+
+### 当前边界与下一项共因
+
+- 本轮没有完成新的同画质、同视角、同原生出生阶段的 Terry 对照；R105 首个大步时钟、随机、照明和最终分辨率限制仍有效，不能宣称全部 VFX 原生一致。完整材质／透明通道、深层静态引用、真正 `continuous_ribbon`、模型力及旋转／地形力组合、Wind 等仍有诊断范围。
+- 清单仍有 3 个画质条件缺原始依赖：四条纹理原路径经完整 271 包索引确认不存在，其中 Doomdiver 只有其他目录的同名文件。没有猜测替换路径或伪造贴图。剩余 ForceA 的 21 条诊断按缺依赖、模型、发射器方向、地形跟随分类，见 `coverage/remaining-force-clusters-final-v2.json`。
+- 实机发现重预热 Ash 页在暂停后仍持续绘制，出现搜索延迟、UIA 读取超时；关闭本任务无编辑页面后搜索立即完成。源码排除“同时间每帧重新预热”，但每帧重算／绘制且 UI 同步等待 GPU；纯加色精度拆批可能放大成本，CPU／GPU 占比及绘制批数尚未采集。没有擅自改共享 Host、全局步长、原透明／亮度或其他编辑器。此性能与 UI 响应问题仍未修，不能写成全部窗口已正常。
+- 最终正常输出：Core `95E02D151A6E0F77C22196C32F5C8FCA82E23DC79BDCB0AFE161B0576F425511`，native `A816B5EDAA773FADB7BB32C38C3BF84464B713FAC11BE4D44C71C2CFD7787E36`。相关长期契约已同步现有 `docs/vfx-editor.md`、`docs/architecture.md`、`docs/superview.md`；正常产物、工具、源件、旧备份、失败记录与有效证据全部保留，无清理。
+
+## R105 投影贴花深度坐标与原生对照（2026-10-26）
+
+### 现场与实际修复
+
+- 原地沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存为空；接手58项路径及SHA与R104 `workspace-after-v2.json` 完全一致。新证据根 `artifacts/vfx-native-reference-r105/`，基线及原A0C1 native小副本在 `parent-validation/`。没有切分支／建worktree、暂存、提交、推送、PR、合并或清理，未改全局 `1/120`。
+- 确认共用缺陷：`CompileMaterials.cpp` 的普通覆盖材质识别要求第二uniform为ambientPX，而投影贴花第二项为decalInfo，漏走绝对深度取样修正。`CaptureDepth` 复制整张DSV，旧贴花却用局部视口UV取整图深度；缩小或偏移视口时错误重建接收点。现在单独识别投影贴花，仅将接收距离和柔边的深度输入改为 `SV_Position` 整像素Load／clamp，保留局部UV用于NDC／体积重建。无ABI、CPU参数、颜色、透明度、粒子时序或朝向更改。
+- 原生普通贴花另有按G-buffer有方向法线判断U反转的规则；当前屏幕导数法线的符号受投影反射影响，不能直接套该条件，本轮未实现。Tidecall参数104floats／12纹理及其独立绝对深度路径已核，未发现可证明的Alpha乘法bug，不用普通贴花修复冒充泡沫大白片已解决。见 `projected-decal-viewport-facing-contract-v1.json`、`tidecall-contract-readonly-v1.json`。
+
+### 本次构建、自动、官方离屏及正常窗口
+
+- 新 `VfxProjectedDecalViewportTests` 先红2失败／1通过：完整128×96控制通过，256×192目标内较小及偏移(64,32)视口失败；native修正后3全过，`.002`像素断言未放宽。native Debug构建退出0，受影响CoreTest重新构建退出0／0警告0错误，包含正常App输出更新；正常Core仍为R104 `F92ED3C0…F3BC1F4`，新native为 `8AC9C17959384BCB12195B458A402684817FD1D0F02388C9C42B8C2D64FE8407`，nativebin与正常Debug相同。
+- 本次相关材质／贴花／深度回归先142通过、9因未设置游戏资源环境跳过；补齐原游戏路径后9项官方柔边测试重新执行全部通过。合计151个不同用例通过、0遗留失败／跳过；新3项已包含在142，不另加。日志、筛选、TRX在 `parent-validation/`。没有全解决方案、Release、CI或输入测试套件。
+- 完整官方 `wh3_main_entity_elemental_bear_frost_trail` 与 `wh3_main_entity_bear_ice_breath_impact_decal`，q0各3阶段，原根／库／两DDS共5项来源SHA及manifest重新读取，缺失0，无Mod索引。真实水平面写DSV，受控挂点前1秒移动5米后停止；不改XML。完整128×96与256×192中偏移视口6对PNG，稳定像素最大RGB差约1.27e-5，`.002`以上差异0；已查看中段及消退图。frost本为无限发射，10.5秒是旧粒子老化与持续出生，不能称整根已结束。v1/v2缺terrain高度及静止距离发射、v3构图／时点有限的失败全部保留，只有v4用于有效比较。见 `official-decal-gpu-v4-audit.json`。
+- 正常Debug PID46600／窗口12978950，原版冰熊VMD、bear01骨架、`be1_wh3_elemental_bear.bin`、ATTACK_4及原完整META；实际连续播放见2.48秒，暂停查看3.50／5.28／4.08／6.53。冰面为不规则碎状散边，3.50／4.08无此前大方块；5.28／6.53临时冰面与喷射已退，持久烟雪仍有。缩远只为看完整轮廓，不作为同相机前后像素对照。完整组合仍显示335条候选／未支持警告，不称全部字段已支持。无源编辑／保存、无输入冲突，保留干净页暂停6.53。记录 `parent-validation/normal-debug-bear-gui-v1.json`。
+
+### 有效原生帧及严格边界
+
+- 使用R104自建但原资源未改的Monster场景，正常启动Terry PID25868，现场确认Bloom未勾选。仅一次Autoplay关→开未重启特效，捕获frame16829读回两pass均0实例；否定证据保留，未把它当出生期通过。随后仅再试一次实际Open／OK动作，成功返回后才写action-issued信号；新单帧助手不冒称scene-ready，.6秒延迟不当特效年龄。frame49082源件与副本各53,227,689字节，SHA `8c6f2218d96209fddd4fc9af7f145fe4e2fa4552bfcf023017d69cc33bfb16bb`，两pass同28粒子，不相加；原始GPU记录及只读回放完整。
+- 本轮新RDC和回放目录因保留工具路径守卫位于 `artifacts/vfx-acceptance-r100/monster-r105-*`，是R105新证据，不能混写成旧R100复测。R104+R105 Monster所有源件／副本合计319,005,934字节，工具固定1帧、复制前核500MB预算；未清理任何源件或失败，所有隐藏采样／回放助手均正常退出。
+- 官方两层寿命零bias；所有档位dust上限≤2秒，含life3.489646673的槽因此独立确认是giant_ring。该槽另有1.208563447<q0下限1.5，且3.489646673>q2上限3，唯一符合q1。字段为原生80字节粒子velocity.w的寿命，不靠数量／槽序／纹理顺序猜画质；只确认此帧此根q1，不建立通用HIGH→XML映射。实际相机(512,4.52618265,502.93692017)，RH／反射投影转换用世界轴点证明；AECN完整原根q1图及审计已生成。
+- **本帧是加载首大Tick**：previousElapsedRaw29=0、sourceDtRaw7≈.403。6条未钳制birthUnary得到约.402999879阶段，但ring后续born phase已夹1；原生先更新发射、最后推进elapsed的现有指令支持在大dt内越过.1时长。AECN固定步长7个ring与该帧27个的差异不能直接归因Infinite错误。ring源本无InfiniteLife，删除父引用if也无效；保留当前有限及缺省规则，不按27调发射率／寿命／步长。raw29 CPU上传writer本轮未完全重建，后续须用正常小dt阶段进一步比较。见 `monster-reference-startup-delta-readonly-v1.json`。
+- 原生内部粒子视口180×327，最终颜色阶段360×655，SwapBuffer1707×1067；受限资源链未闭合，未导出或裁剪SwapBuffer冒充独立最终场景。AECN对齐图只匹配内部视口／q1／相机／阶段；随机Scale／seed、模拟步进历史、背景、照明和最终分辨率不同，**未完成同条件完整原生视觉验收**。见 `monster-q1-frame-proof-v1.json`、`monster-q1-camera-v1.json`、`monster-q1-comparison-audit-v1.json` 与 `monster-final-target-export-v1/native-final-target.json`。
+- 下一项仍需共用材质／透明合成与正常小dt原生参考；Kraken泡沫、G-buffer法线／光照、半分辨率、跨实例合成、复杂ForceBasis及专用ribbon边界仍保留。不能回到原生格线反复调参或宣称全部trail／烟雾已正确。源码保护及本轮产物盘点见 `parent-validation/workspace-after.json`／`final-audit.json`；这不是任务清理或全部完成声明。
+
+## R104 四类反馈的共用修复（2026-10-26）
+
+### 现场与实现
+
+- 沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存为空。接手48项源码／文档散列与R103最终快照相同，基线及原Core/native小副本位于 `artifacts/vfx-four-issues-r104/parent-validation/`。以下证据路径均相对该R104目录。没有创建分支／worktree、暂存、提交、推送、PR、合并或清理，未改全局 `1/120`。
+- 用户补充纹理trail与纯粒子区别后，实际按官方modifier／几何分类，贴图、名字和enable_trail_mode均不作为分类依据。相机修复仅限普通Kind0、显式相机对齐Alignment3、反射投影下的Right回退／混合锚点。实际原生相机Right与AECN RH view符号不同，旧混合在近轴半权重时额外相消。世界、水平和刚体模型路径不变，原生ribbon未伪装为已支持，原生混合自身退化也未强行抹平。证据 `native-contract/trail-camera-classification-and-basis-v1.json`、`camera-near-axis-minimal-fix-scope-v1.json`。
+- 显式SpreadMethod=false的受限普通世界空间分支，初速度取出生点减发射器位置，非零归一化、零保持零，不再用旧角度公式将整圈变成单侧上升。速度与朝向独立，保留R103接收面Up及Bear/Crowman/模型旋转阻尼。predicate边界见长期VFX文档；真实producer第6/7参数证据为 `native-contract/radial-false-native-caller-v1.json`，没有重演R102手工串线。
+- SuperView仅对Persistent文档的点触发且运行时有非事件模板Infinite层的Effect，取消按预览循环时长提前隐藏。混合有限层仍按原寿命退场；普通Animation、有限特效、非点时间范围、显隐和600秒seek上限不扩大。通过共享预览能力传递，不按名字判断。
+- 官方Kraken完整升级组合暴露动画资源漏层：独立顶点上限误拒绝原合计预算内的几何，递归引用又重复烘焙占额。现托管/native统一 `72V+4I<=96,000,000` 字节，另保留600万索引和1800姿态校验；单次顶层转换内严格同路径/part/clip/speed/life/pivot几何跨引用及事件复用，通过已有ModelAlias上传，实例与粒子仍独立。层/引用/事件失败同步回滚新增缓存与预算，保留先前成功条目。不裁帧、降采样、改速度或姿态；配额不是进程峰值内存承诺。
+
+### 本次验证与实际范围
+
+- 本次真实红绿及失败日志保留：径向先4失败/2通过，后6全过；原4项相机1失败，补权重控制后6全过；Persistent先2失败/2通过，最终Meta回归57通过/0失败/0跳过；动画预算红9失败/8通过，相关绿50通过；缓存旧实现3失败/7通过，修复后10全过。最新核心相机/运动回归142通过、缓存/模型/Alpha/图集回归142通过，均0失败0跳过。筛选有重叠，不相加冒充一次全量；命令、构建和TRX在 `parent-validation/`。未跑全解决方案、Release、CI或输入测试套件。
+- native Debug编译退出0；正常主程序及最新包含App的Meta构建退出0，后者0警告0错误。正常Core为 `F92ED3C0D2D2C45CF9D12229900087AAD07A2E685490A0F07DDB6096CF3BC1F4`、native为 `A0C1DA3341A95AAD157CD0AFDE96185D4A9F3A145B64B59373DBEF66A4F2ED90`。中途发生过运行Debug锁住复制的构建失败，后核对干净源页并正常退出确切实例再构建；旧失败日志未删，无强杀或丢弃。
+- 径向：完整原版Monster Dust的q0/1/2、.3/.6/1秒共9对冻结GPU图，只有dust_giant_ring运动改变，另一个dust及全部数量保持；完整Storm Dragon impact亦核对原件。Rockdust原pebbles DDS真实缺失，不能当完整验收。最终正常Debug复看Monster q0的.29/.63/1.33及实际播放淡出，低平软边云团后段消失，原色/Alpha未调。见 `parent-validation/radial-monster-controlled-diff-v1.json`、`radial-normal-debug-gui-v2.json`。
+- 动画：完整官方Kraken普通/升级两根，q1各6阶段，前后各12PNG，原依赖SHA一致且无缺失；升级映射26→29，3条动画预算漏层消失，4种原clip只上传4份，重复引用别名复用。普通版4模型的0/中/末姿态SHA保持，另有本轮径向/相机普通面片预期差异。对比只换基线Core、共用新native，不是整套旧runtime。见 `kraken-animation-budget-gpu-v2-audit.json`；初期亮条仍可能出构图，不宣称原生正确。正常Debug连续播放并看7.01/9.94/13.94/21.08/28.50/32.05：触手弯曲、水花运动，28.50水环已退，32.05全退，记录 `parent-validation/kraken-normal-debug-gui-v1.json`。
+- META：原版dwf_gyrocopter VMD、wm_gyrocopter01.bin的STAND #01真实31.7秒，gyrocopter01骨架匹配，Persistent原3条Effect为engine、rotor×2，两个根均含Infinite且依赖无缺失。正常Debug实播及8.88/14.87/29.97仍有火花/旋翼特效随模型；原生格线未反复调。源SHA/路径见 `native-contract/persistent-long-official-ui-context-v1.json`，窗口记录 `parent-validation/persistent-normal-debug-gui-v1.json`，不能外推全部META字段。
+- trail/Alpha：最终Debug完整原版Amber Spear q1六层，实际两次拖动，时钟连续越过8秒到28.10。短寿命粒子在首张拖后图已结束，使用真实运动历史4.83固定比较透视/侧视/正视，发光/烟/余烬保持可见，5.41衰减、5.88消失。未新改Alpha公式或重复乘Tint；相关原始浮点Alpha/纹理覆盖和图集时钟像素检查本轮已跑。见 `parent-validation/trail-normal-debug-gui-v1.json`。此原件普通纹理面片显式朝向相机，不能按贴图有无覆盖原modifier。
+
+### 原生对照与剩余工作
+
+- Terry自建原版Monster Dust参考场景实际核实Bloom未勾选、autoplay勾选及原actor变换。后续有界补原生采样前，保存三个原场景文件的小副本至 `native-contract/terry-scene-before-capture/`，在GUI正常保存并关闭干净PID55868，无丢弃；用已保留RenderDoc助手启动新的本任务PID42984，场景/原资源未改。因旧助手安全路径守卫，新增工作目录实际在 `artifacts/vfx-acceptance-r100/monster-r104-launch-v1`、`monster-r104-capture-v1/v2` 和 `monster-r104-readback-v1`，它们是本轮新证据，不能混作历史R100复测。首帧1875实际53,149,508字节（源件和独立副本均保留），离线读回成功，真实相机为(512,4.52618265,502.93692017)，但两个VFX绘制实例数均0，有限原件已结束，不能当有粒子的视觉通过。一次工具参数错误错过短时段，修正后重载补采样又在实际就绪前达到300秒超时；失败记录全部保留，未继续盲抓。主Terrain精确阶段和画质映射仍未闭环；原件三档的发射率/寿命/启用层确实不同，不能借同名根混比。见 `parent-validation/terry-reference-boundary-v1.json`（较早未抓帧时点）、`terry-reference-boundary-v2.json`（后续两尝试及当前现场）。**本轮没有完成Terry同条件或游戏最终视觉验收。**
+- 保留Kraken泡沫片以及其余朝向、ForceBasis、半分辨率、完整光照/MBOIT/跨实例合成和专用ribbon等剩余差异。只读复核证实早期亮条实际为无StartTime的END_light_beam_down，不能按END名字认定时段错误；泡沫原参数有白色/alpha强度10，当前Tidecall的104floats及12纹理链路已接，PBR/接收面与白片的因果仍未知，未因此改Alpha或调参。证据 `kraken-foam-beam-readonly-facts-v2.json`。原版依赖缺失不伪造兜底；下一项继续在可验证原生条件下查剩余材质/复杂组合，不能回到已确认原生格线反复调参。
+- 本轮工具、采样、失败、DLL基线、正常Debug和自建Terry场景仍需继续验证，全部保留；未打包搬盘或清理。最终源码/文档与原48项保护清单差异见 `parent-validation/workspace-after.json`。本节不是任务收尾或全部完成声明。
+
+## R103 冰熊地面方块：修正贴花出生法线串线（2026-10-26）
+
+### 本轮确认的错误与修复
+
+- 用户指出 R102 窗口中明显方块后继续原地修复，沿用 `codex/vfx-preview-native-parity-r97` 与 HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存为空。接手 47 项散列与 R102 最后快照完全一致，基线为 `artifacts/vfx-bear-rectangles-r103/parent-validation/workspace-before.json`；保留原 94DC Core／F83C native 小副本，没有复制整套运行库。
+- 先保留原13条 META、真实 bear01 骨架及 `be1_elemental_attack_04.anim`，只改变提交绘制的实例做诊断。3.26／4.10 秒的广阔浅蓝区域明确属于第4项 `wh3_main_entity_elemental_bear_frost_trail` 的唯一 `frost_decal_trail`；第12项 impact_decal 是独立灰白碎状 splat，不是该浅蓝方块主因。原 frost Alpha 是软散边，不能把当前方块称为原生贴图边界。
+- **R102 生产端语义推断错误已纠正**：实际官方 producer `6c1ec0` 分别写 Position到stack+60、速度方向到stack+70、朝向法线到stack+50。最后把stack+50作为 writer第7参数传递；普通writer `6c10c0` 的 `[rbp+6f]` 经 Win64 栈偏移核实就是该参数，并复制 XYZ 后送 `6be290`。方向0／1时朝向法线独立初始化为 Up，方向2才查询地形；当前水平接收面仍为 Up。径向向量只进入速度，不能串到出生朝向。此前实际执行两函数得到的数学结果真实，但手工串联不是真实调用链；R102 那24项集成 oracle 及此前审阅的相关语义放行无效，不能拿49绿灯为错误数据流背书。
+- `VfxTerrainDecalOrientation.BirthBasis` 现在只接收显式接收面法线；受限世界空间贴地 Kind2 的调用明确传 `Vector3.Up`。出生点／根旋转不再使地面贴花倾斜。`qz*qy*qx`、位置世界XZ／投地Y、META Scale2.5、原粒子数量／寿命／Alpha／贴图、速度、Kind0 Pox及Kind1 Crowman分支保持；不按效果名字调参，不改全局 `1/120` 或 native 材质。只在内存中反向移除这次 Sim单行修改，SHA精确恢复本轮接手值，见 `prior-simulation-protection-v1.json`。
+- 生产链的新鲜官方 DLL 散列与指令、实现及红绿记录实际位于第二个保留目录 `artifacts/vfx-superview-projection-r103/`（命名不同，不搬运或删除）。入口为 `native-contract/terrain-orientation-normal-actual-caller-v1.json`、`parent-validation/terrain-orientation-implementation-v1.json`。低级24函数 fixture 原字节不动，只降为显式输入法线的数学控制；24模拟集成改用独立实际生产 Up oracle，`1e-5` 未放宽，新fixture为 `NativeTerrainOrientationProduction.json`。
+
+### 本次构建、测试和同条件画面对照
+
+- 实际先红 **16失败／33通过／0跳过**，修复后49专项全过；随后核心相关回归 **229通过／0失败／0跳过**、Meta相关回归 **73通过／0失败／0跳过**，302个不同用例。49已包含在229，不能另行相加。日志／TRX为主R103目录的 `parent-validation/core-regression-v1/`、`meta-regression-v1/`；测试代码改后均重新构建。
+- Core及完整CoreTest Debug构建均退出0，分别保留1018／889条既有跨模块警告；正常主程序和Meta测试项目最后构建均退出0、0警告0错误。正常 Core 为 `00C59F007DB4A80B5F7E6B3EFE9C09B5A8FD84BDAA67BF237F588D79504B083D`，native保持 `F83C4BE9B69DDF36AA7E4C2F1EC444321B48CEC33030CE453750A28E44DC54B4`，本轮未改C++／着色器，不无故重编native。筛选及opt-in沿用R102相关类，仅离屏GPU，未运行输入测试、全解决方案、Release或CI。
+- 主R103目录 `effect-isolation-v1/` 与 `effect-isolation-after-v1/` 各28PNG：同一个冻结工具二进制、同原13实例／真实clip／骨架、同384正交相机、同3.26／4.10。另 `frost-perspective-before-v1/` 与 `frost-perspective-after-v1/` 各1张第4项3.26诊断，采用与GUI相同投影合同FOV45／near.01／far25000／X反射，但 view为固定诊断，不能冒充已捕获GUI镜头。合计29对，已实际查看目标、完整组合和透视对照，其余控制按原PNG字节核对，运行均退出0。
+- 前后31条真实官方资源来源／SHA、原META／动画／骨架、全部实例时间／骨／Scale／Attachment、层定义／Render及全部live/projected数量一致。所记录各层首3粒子除3×3朝向矩阵外，位置／Colour／UV／时钟／crush等float32位值一致；**这只是已记录首3，不是全粒子Frame摘要**。第4项透视原横条消失并恢复连续不规则散边；其余12项的24张隔离图逐字节相同。原密集浅蓝覆盖仍存在，不据此宣称密度、最终光照或透明度已原生验收。比较入口 `effect-isolation-comparison-v1.json`，没有改亮、延寿或重写原DDS／mip。
+
+### 普通 Debug 与当前边界
+
+- 先实际查看用户留下的正常Debug55420：完整冰熊ATTACK4暂停3.74秒，方块仍明显。源页无dirty，按正常Alt+F4退出，无保存提示；窗口和Win32进程均核实退出，没有强制结束或丢弃。随后启动正常新Debug窗口3082646，原版VMD／骨架已载入；点击动画库时工具明确报告 `user input was detected in this window`，立即停止全部桌面输入并报告，未按工具提示循环重试抢占。
+- 用户随后明确答复“现在可以恢复，我暂不使用键鼠”。在同一正常 Debug25068／窗口3082646恢复官方VMD、bear01骨架、`be1_wh3_elemental_bear.bin`的ATTACK4与原完整13条Effect META；实际播放并暂停检查2.47／7.45／0／3.30／3.75／4.10／6.66／2.31／5.27秒。3.30／3.75／4.10的冰面呈不规则散边，所报直边方块和横向网格条纹未再重现；3.75及4.10缩远后完整地面轮廓可见，喷射／冰屑／雪雾与角色动画共同显示，5.27与播放中的6.66临时冰面／吐息已退场，持久雪雾继续。保留用户原相机方向，仅调视距，不能把本轮不同视距GUI截图当严格前后像素对照；同条件证据仍来自冻结相机的离屏29对。恢复后未再检测到输入冲突，没有编辑或保存源文件；正常Debug保持开启、干净源页暂停3.75秒。证据 `parent-validation/normal-debug-gui-v2.json`，此前冲突中断记录v1仍保留。
+- 本次恢复只补普通窗口验收及记录，产品源码、运行库和测试未变，复用上一阶段实际执行的302项通过，不冒充本次重跑；48项工作文件与恢复前快照散列核对一致。最终现场见 `parent-validation/workspace-after-gui-v2.json`／`final-audit-gui-v2.json`。未做Terry或游戏验收。
+- 同一PS另有反面U翻转和非零子视口深度取样边界，本轮未混入修复；它们未被证明是本图方块主因。完整G-buffer／法线贴图／光照、随机／时钟及跨实例透明合成仍有边界，不能宣称全部VFX正常。现有 `docs/vfx-editor.md` 的生产法线合同已同步纠正，保留R102旧数学证据及全部失败；无提交、推送、PR、合并或清理。
+
+## R102 超级视图 META 漏显与地面贴花（2026-10-26）
+
+> **R103 更正**：本节“出生点径向法线”和手工串联函数的生产语义结论已被实际 caller 数据流否定；旧图与测试仅作历史，不作为当前正确性依据。见上方 R103。
+
+### 现场、官方样本与共用原因
+
+- 沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存区为空。接手 32 项修改／未跟踪文件与 R101 最后快照散列完全一致；证据根为 `artifacts/vfx-superview-completeness-r102/`，下列相对路径均在该目录内。保护旧源码、原贴图、测试、正常 Debug、独有 Core/native 基线及全部失败记录，不提交、推送、创建分支／worktree 或清理。
+- 自行从官方 Pack 固定抽取 13 份完整 META、143 条 Effect、46 个不同 VFX 根；逐条资源去重只用于审计，运行时仍按每条 Effect 的身份独立创建。另有界检查 757 份 META，发现版本 11／12 的 Effect，没有据此声称扫完全部 67,524 条候选。原始 META、根／库、模型、材质和 DDS 均按实际 Pack 与 SHA 核对，检查同名非 manifest 资源覆盖；不使用 Mod 或改亮、延寿的资源。首次完全零转换的是官方 `wh3_main_entity_elemental_bear_frost_trail`，不是固定只支持两条或 META 总数上限。
+- 外层 `atlas_number_of_cells_x/y` 的原生独立零轴按 1 处理；旧转换器最小值 1 守卫误拒绝官方 0／0，整层缺失。私有映射执行实际原生算术后加入 9 项源合同与严格转换／像素检查；只归一化外层精确零轴，内图集、负数、小数、范围及 cell 越界仍诊断。
+- 超级视图此前没有为共享 VFX 提供接收面。共享节点仍默认无地面，超级视图明确使用现有网格世界 Y=0，调用者已有地面优先。显式 SuperView 地面在每个 Effect 绘制前预写深度，避免地下粒子的显隐取决于实例顺序；独立 VFX 编辑器保留原条件式地面深度。普通不透明表面仍参与原有遮挡。
+- 世界空间、贴地出生的普通 Kind2 贴花，在受限静止发射器及正等比根变换下，保留出生分布的世界 XZ，再按原生替换为地面 Y；尺寸沿 META Scale。方向缺省经实际全局默认表／typed cache 证实为 1，不能把构造器的 0 当缺省。实际出生函数使用局部出生点及根旋转选择方向，零法线保持原生 +X 回退；原始角构造为 `qz*qy*qx`。允许显式 `SpreadMethod=false` 的方向 0／1，方向 2 保持平面上轴；其他分布、非零发射器偏移／速度／力／旋转、该分支非零 spin、非等比／镜像／剪切等仍受原守卫约束。没有套用模型粒子规则或改全局 `1/120`。
+
+### 普通贴花材质与实机反馈后的追加修复
+
+- 官方常规 `DEFERRED_DECAL` 使用自己的 G-buffer 覆盖输出及 `ONE/INV_SRC_ALPHA` 混合，不拆预乘贴图残余 RGB 发光。原 frost DDS 中大量透明 texel 保留蓝 RGB，旧通用分层会画出矩形发光底图。现保留完整浮点粒子 RGBA、原始 Alpha，接通普通贴花 `ps_alpha_crush`，依原生顺序执行贴图 Alpha 转换、旧覆盖、裁切、预乘修正、输出饱和及等价混合；不拿字节顶点色隐藏 HDR／弱透明误差。发光贴花模式 3／4 的独立加法与 2500 辐射公式保持。
+- 第一轮普通输出修复后，真实完整 Bear 3.28／4.10 秒仍有浅蓝直边，未当作通过。复核同一官方 PS 证实漏掉接收面夹角：`u=min(abs(dot(normalize(projectorZ),receiverNormal))*2.5,1)`，`F=u*u*(3-2*u)`，`F<.1` 丢弃，RGB／Alpha 在输出饱和前同乘 F。已有原生出生四元数反例对平地 F≈0，而旧路径仍绘制。补三组世界变换常量，经重建世界位置的 `ddx/ddy` 求几何法线；无 ABI 改动，只用于常规贴花。当前精确控制是平面，深度边界、法线贴图和原生 G-buffer 法线仍不同，不把该修复说成完整延迟光照还原。
+- 本轮只改共享转换／模拟、节点地面传递、SuperView 接线和相应 native 材质，没有按特效名字打补丁、改原 XML／纹理、曝光或寿命。原生证据入口为 `native-contract/outer-atlas-zero-native-contract-v1.json`、`default-direction-cache-contract-v1.json`、`default-direction-normal-counterexample-v1.json`、`ordinary-birth-quaternion-order-v1.json`、`regular-decal-coverage-contract-v1.json`、`bear-remaining-pale-edges-readonly-v1.json`。生产函数私有复制执行，不向用户应用注入或改原 DLL。
+
+### 本次构建和自动检查
+
+- 最终 Core **229 通过／0 失败／0 跳过**，Meta **73 通过／0 失败／0 跳过**，共 302 个不同相关用例，见 `parent-validation/core-final-v3/`、`meta-final-v3/` 及 `final-test-build-receipt-v1.json`。覆盖原生 outer-zero、贴地挂点／姿态、显式地面提交顺序、普通贴花输出与角度、旧图集／投影／发光贴花、R101 原始 Alpha33，以及完整官方 Bear13／Phoenix41／Gyro3 的实例、时间、资源、缩放和骨骼历史。受控多骨骼轨迹明确标记诊断；Bear 另使用完整原动画／骨架，原 META 的 bone40、Scale2.5、位置和四元数保持。
+- 所有 red、准备错误及中间失败均保留：外层零值、旋转地面和方向、普通贴花 8 项、夹角 6 项均实际抓到缺陷。夹角首绿 15／16 的 nonPM HDR16 误差来自硬件 sRGB 近似被放大；仅将新角度诊断的 nonPM 输入改为精确白，保留 `.00015` 断言，PM 的 RGB192/HDR16 仍覆盖饱和顺序。旧姿态测试的三项过期“必拒绝”改成对应原生投影、缩放及方向正断言；旧 16 实例绘图诊断明确关闭新增地面，因为原相机布局包含地下实例，仍保留全部 16 条和三阶段 `>6` 像素断言。新真实地面遮挡另有独立正反序测试。没有为绿灯放宽断言或取消旧原生控制。
+- 固定 Effekseer `170e` 提交仍为 `92fdeb349c0c7eab9dfaf152047f22dec2fa102d`。实际执行正常 `Build.ps1 -EffekseerSource .../artifacts/effekseer-source -VisualStudioDirectory D:/Software/VisualStudio/2026 -Configuration Debug`；本轮三次 native 增量均 5/5、退出 0。正常主程序最终 Debug 构建退出 0、0 警告／0 错误（`normal-debug-final-build-v3.log`）；测试项目均先重新构建，最终 Meta0警告0错误，Core夹角最终构建3条既有警告0错误。此前 nullable 警告和首轮缺 using 的准备失败也保留，没有顺手改范围外代码。
+- 使用 `dotnet test <相应csproj> --configuration Debug --no-build --no-restore --filter <最终TRX列出的类>`，显式 `ASSETEDITOR_VFX_HEADLESS_TEST=1`、官方 `ASSETEDITOR_VFX_GAME_DATA`。筛选范围无键鼠输入测试。最终 Core SHA `94DC05671DFEEEE43D7BFCCAC7810A376EFB4D7801AF695DD0E5DC16BB2326A0`，native SHA `F83C4BE9B69DDF36AA7E4C2F1EC444321B48CEC33030CE453750A28E44DC54B4`，正常／Core测试／Meta测试 native 逐字节一致。未运行完整解决方案、Release、CI、游戏或本轮 Terry。
+- 同一 Core 的最终 CPU 原件审计为 `final-current-core-meta-audit-v3-summary.json`：13／143／46 无未知 META、无根名缺失、无整根零转换／转换异常，原 META 与共同依赖 SHA 不变。此报告在夹角 native 最后重建前，CPU 逻辑及 Core 未变，复用该 CPU 结论，不冒充新 native 视觉通过。ground_impact3→4 仅是小审计工具补 `models4.pack`／`models4_dds.pack` 原依赖范围，**不是产品新增支持**。
+
+### 实际窗口、保留项与剩余问题
+
+- 实际通过 Computer Use 操作正常 Debug，按完整官方 VMD／骨架／动画库／动作加载。材质第一阶段的 Bear13 检查 2.48／3.52／2.72／3.28／4.10／6.24；Phoenix41（`bi1_eagle.bin`、`REBIRTH`、`bi1_rebirth_01.anm.meta`）检查 .57 的蓝橙火星／黑烟、1.51 的灰烟环／黑色上烟、4.64／4.74 的地面残留及 5.27 的后段爆发，非仅凭加载或像素数判断。记录为 `normal-debug-material-green-angle-red-v1.json`；该阶段不能冒充最终夹角修复后的窗口复测。
+- 最终 native 的实际正常 Debug PID55420、窗口7014924，重新加载完整 Bear13，实际播放并暂停回看 2.47／2.29／3.26／4.10／5.26。3.26／4.10 同时有吐息、飞雪、冰片及原地面贴花；近切向覆盖有所消退，5.26 临时吐息／冰面已退场，持久雪雾与动画模型继续。仍有部分浅蓝投影／纹理边界，尚不能逐像素归到 frost、impact_decal 或冰片层，也没有同画质、同视角、同阶段原生对照，**不宣称矩形边缘全部修好或完整外观正确**。
+- 最终第二个 Phoenix 窗口复测未补齐：模型浏览器搜索文本改变但资源树未筛选，扩大查询／Enter 仍未生效，取消后关闭空白页，没有丢弃源编辑或持续重启。保留第一阶段的真实 Phoenix 画面结论与最终 73 项自动结果，严格区分版本。最终 Debug 留在干净 Bear 源页、暂停 5.26，输入未检测到用户冲突；之前确切 Debug 均正常退出、无保存提示或强制结束。见 `parent-validation/normal-debug-final-gui-v1.json`。
+- 固定官方范围仍有 MaximumParticles 范围拒绝1项、缺资源诊断5项（涉及三条官方 Pack 索引也找不到的旧 DDS）、灯光通道6项、部分省略力的诊断45项；逐源／层详表已留存，不能以46个根非空说成每层都支持。原生完整透明合成、跨实例折射／排序、动态地形、G-buffer／模型照明及其他复杂曲线边界不随本轮消失。后续先补可重复的 Phoenix 入口与 Bear 投影同阶段原生对照，保留 R101／R100 已确认表现。
+- 相关稳定契约同步现有 `docs/vfx-editor.md`、`docs/superview.md` 和 `docs/architecture.md`；不新增流程规则，AGENTS／README 及旧 helper／原贴图未改。所有小工具、真实原件、旧 Core／native、失败日志、TRX、原纹理／mip PNG 和 native 缓存保留；本轮证据约 34 MiB，最终盘点以 `parent-validation/final-audit.json`／`workspace-after.json` 为准，不打包搬盘或清理。
+
+## R101 trail／烟雾的非预乘透明链路（2026-10-26）
+
+### 现场、原生合同与共享实现
+
+- 沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存区为空。接手 29 项修改／未跟踪文件与 R100 最后快照 **0 散列差异**，见 `artifacts/vfx-shared-trail-smoke-r101/parent-validation/workspace-before.json`。先备份唯一一份正常 Debug Core `DC7A2264…` 和原生桥 `026F432C…`；未复制整套运行库。下列相对证据路径均以该 R101 目录为根。
+- Fresh 官方 `fx/particle_vfx_library.hlsl` 为 57,075 字节、SHA `40070970…`，另有实际原生 PS 的独立指令交叉：`ps_texture` **先过滤／混合原图集帧，再无条件线性化 Alpha**，之后才读取渐变、乘原始粒子透明度并饱和。该 Alpha 转换不由预乘开关决定；CPU 预解码不能代替像素阶段的处理。此前普通非预乘面片既提前将粒子 Alpha 截到 1，又可能走缺少 Alpha 转换的内置材质，属于共用实现缺陷；Pox 原版初始 Alpha100、寿命曲线最高 1.2 的组合直接受影响，不是按该名字调参。
+- 普通 `Kind0` 保留非负原始 Alpha；已有模型规则保持。Bridge 对有贴图、无专用材质的普通面片统一加载／使用现有 Coverage 材质，包含原来 Alpha≤1 的路径，避免只在跨过 1 时改变 gamma；沿用指数分组、byte 归一化及 `particleInfo.x` 恢复，保留弱粒子与原提交顺序。没有重写纹理、曝光、寿命、角运动、全局 `1/120` 或 ABI。
+- 第二个共因是普通非预乘 `ps_alpha_crush` 被转换守卫跳过，影响 Pox 底层烟轨迹等出现／消失组合。独立原生 PS 重放证实：先得 `O=saturate(A*V)`，再得 `C=saturate(O-P)/(saturate(1-P)+.001)`，sharp 保留 `C>=P`，随后才软深度淡化。非预乘直通 RGB 在 O>0 时等价保持；**O=0、P<0 会恢复黑色覆盖，RGB 仍为零**。因此除了接通字段，还在 mode0 材质补该零旧覆盖的 RGB 守卫；不是仅删除“不支持”判断。模型、专用材质、预乘独立发光和 DISTORTION 各自路径保持。
+- 本轮产品仅改 `TotalWarVfxSimulation.cs`、`TotalWarVfxConverter.cs`、`Bridge.cpp`、`CoverageMaterial.h` 四处文件。把这轮增量仅在内存中移除后，两份此前已有大量成果的 C# 文件 SHA **精确恢复接手值**，见 `parent-validation/prior-source-protection-v1.json`。原生合同及独立审阅为 `native-contract/nonpremul-alpha-source-contract-v1.json`、`nonpremul-alpha-crush-contract-v1.json`、`four-file-product-alpha-review-v1.json`；长期行为同步现有 `docs/vfx-editor.md`。
+
+### 本次构建与自动检查，保留全部失败
+
+- 新增 `VfxOrdinaryRawAlphaTests.cs`。最初 21 项的 red-v1 为 20 失败／1 通过，其中四项是测试试图寻找原 DDS 中不存在的 A255 像素，**不是产品红灯**；改为明确标记的单变量上传对照，仅该 texel 的 Alpha 改255，原 DDS、RGB、其他 texel／mip 保持。red-v2 的三个剩余正常控制只差硬件 sRGB 采样近似；改用独立 MonoGame `ColorSRgb`／Opaque／PointClamp 采样作 RGB 参考，Alpha 仍按原生公式独立求值，**RGBA `1e-5` 从未放宽**。旧源码、准备错误及采样误差记录均保留，不能把这些算成修复产品的通过项。
+- 准备修正后的正式 red-v3 是 **16 失败／5 通过／0 跳过**，精确抓住 CPU 提前截断及 GPU 的普通／高／弱 Alpha。第一步接通后，追加 crush 参数与零旧覆盖反例，共 33 项，实际为 **5 失败／28 通过／0 跳过**；五项分别抓住未映射字段和负阈值错误着色，见 `parent-validation/crush-red-v1/`。
+- 固定 Effekseer `170e` 源码提交 `92fdeb349c0c7eab9dfaf152047f22dec2fa102d` 已由构建脚本核验；实际执行 `GameWorld/Vfx.Effekseer.Native/Build.ps1 -EffekseerSource .../artifacts/effekseer-source -VisualStudioDirectory D:/Software/VisualStudio/2026 -Configuration Debug`。首轮原生构建 85/85、补守卫后的增量 5/5，均退出 0，确实重新生成并嵌入材质；没有拿单纯 .NET 复制当作原生重建。
+- 正常 `dotnet build AssetEditor/AssetEditor.csproj --configuration Debug --no-restore` 最终退出 0、**0 警告／0 错误**。受影响测试项目重建退出 0，最终该日志记录 1881 条跨模块 nullable 等警告／0 错误；首轮正常构建也保留 1901 条警告日志，没有为此改范围外代码或隐藏日志。最终正常 Core 为 `F25E169BBDA579319E6902B1D209362E36EB231B1D52A991FB0E7CBE88046495`，原生桥为 `9F20AFF714969A22141B7693FD9591CA3B9EEBCEB4F1CC1B8E4D9AB57A007F4E`，测试使用方一致。
+- 最终新专项 **33 通过／0 失败／0 跳过**（`parent-validation/green-v1/`）；相关材质、覆盖、图集、柔边、扭曲、模型、尺寸及角运动回归 **260 通过／0 失败／14 跳过**（`regression-v1/`）。14 项仅缺指定官方原贴图目录，从 manifest 的 `vfx.pack` 有界导出所需一张原 DDS，SHA `047a461d…acc6` 一致后补跑为 **14 通过／0 失败／0 跳过**（`faint-v1/`）；三批分别报告，不重复累加或冒充全解决方案检查。没有放宽旧断言或改旧测试。
+- 对应命令为 `dotnet build Testing/GameWorld.Core.Test/Test.GameWorld.Core.csproj --configuration Debug --no-restore`，以及 `dotnet test ... --configuration Debug --no-build --no-restore --filter <日志中精确类筛选>`。GPU 显式开启 `ASSETEDITOR_VFX_HEADLESS_TEST=1`；真实资产另指定官方 data，faint 补测指定 `ASSETEDITOR_VFX_FAINT_ALPHA_ORIGINALS`。筛选代码核查无键鼠输入用例；未运行完整解决方案、Release、CI 或游戏。
+
+### 完整官方原件前后及正常窗口
+
+分类诊断读取十个完整官方根、按材质／render／参数组合盘点 59 个定义；实际正式 GPU 矩阵为下表七根，每根 .6／1.2 两阶段，14 对共 28 PNG。前后画质、相机、挂点轨迹、阶段及全部依赖来源／SHA 一致，0 缺资源、0 空图；75 条依赖与 26 个非 manifest Pack 另核对无同名覆盖。Aekold 缺少三条尚未纳入小解析器的 terrain 依赖只保留失败诊断，不归咎产品；Nightmaw 库只作参数边界，不冒充完整效果视觉验收。
+
+| 完整官方根 | q | 本次结论 |
+| --- | --- | --- |
+| `wh3_dlc29_pox_maggoth_trail` | 0 | head_main 恢复原始高 Alpha、渐变环／带状遮罩；base 进入原生 crush。运动／FullLocal 姿态保持。正常 Debug 实际播放、选择、两向拖动，观察黄色绿色环与细碎边缘、原黑色碎块，时间超过 133 秒仍连续；暂停 133.56，未见新增白实体片或矩形贴图边 |
+| `wh3_dlc25_ability_baleflame_amulet` | 0 | 非预乘普通层的 Alpha／采样修正，整根变化较细。正常窗口看 .07 初环、1.22 烟柱及 3.09／6.18 消退，47.69 仍有原长寿命地面残留；紫黑烟边和紫色地面材质保留，不夸大为完整材质已还原 |
+| `wh3_dlc25_sorcerer_of_nurgle_death_trail` | 0 | 预乘贴图 trail＋扭曲控制，两对完整 Frame／PNG 字节一致 |
+| `wh3_dlc24_cth_crowman_trail` | 1 | 模型溶解控制，两对完整 Frame／PNG 字节一致；本轮窗口未重做其 R100 生命周期观察 |
+| `wh3_main_entity_bear_ice_breath_trail` | 0 | 动态角阻尼控制，两对完整 Frame／PNG 字节一致；本轮未重新写成人工验收 |
+| `wh3_main_seige_smoke_large` | 0 | 尺寸曲线控制，两对完整 Frame／PNG 字节一致；正常窗口明确全选三层，2.67／1.59 秒有连贯的灰色上烟与软黑中央层，暂停 2.95，未重现中央缺层 |
+| `wh_dlc03_beasts_amber_spear_trail` | 1 | 预乘贴图轨迹控制，两对完整 Frame／PNG 字节一致 |
+
+- 所有目标及控制的 committed 角／非角状态、emitter 状态、flags，以及排除 Colour.A／AlphaCrush 后的完整 Frame 均逐字节一致。Pox 的旧“仅排除 Alpha”摘要因本轮合法新增 crush 而不同，如实保留；新增摘要先以旧 Core 重建 14 个 CPU 完整 Frame，并全部精确匹配已采 before FrameSHA，才用于更细比较，没有放宽运动断言。probe 仅新增审计输出分支，旧源及 source SHA 差异明确保留。
+- 全部 after14 图及 target before4 图已实际查看，control before10 图与 after 字节一致。主任务另复核 Pox .6 和 Baleflame1.2 的前后原图。Pox 原来缺失的头部环状覆盖恢复；Bale 变化较细。形状、方向和软边观察与参数证据分别记录，不用 draw 数或有像素代替正确。入口为 `official-comparison-v1.json`、`official-execution-v1.json`、`parent-validation/normal-debug-gui-v1.json`。
+- 既有计数显示 Pox drawcall .6 为206→319、1.2为200→315，来自逐粒子的裁切参数分组；没有新增 GPU 耗时测试或通用性能验收，不能据计数认定卡顿或性能已通过。不为此追加批处理扩展。
+- 窗口操作沿用持续授权，没有检测到用户键鼠冲突。构建前核对旧 Debug 的唯一 Crowman 源页无 dirty 后正常退出确切实例，无保存提示或强制结束；最终正常 Debug 保持打开，三份官方源页均无 dirty／未保存源修改。旧 Terry 场景及应用保留，本轮未操作或新捕获 Terry，没有冒称同画质／同阶段原生视觉对照。
+
+### 保留与剩余问题
+
+本轮关闭的是普通非预乘贴图 Alpha／原始粒子 Alpha／透明裁切的共用缺口，复杂组合仍按其余诊断边界处理。独立溶解模型审计证实原生 dissolve 使用 POSITION5.w、noise／emissiveA 使用 POSITION6.w、B／global 使用原生全局时钟且 B 另有实例 UV 偏移；生产这两个实例时钟的规则尚未闭环，**没有把三路统一猜成 age／phase／global 来改**。完整 MBOIT、半分辨率、跨实例排序、其他复杂曲线／力参数、模型光照及精确随机／时钟仍有限制；R100 Crowman 同阶段 Terry 对照继续待验，不宣称全部 trail 或烟雾达到游戏级。
+
+保留所有旧成果、正常 Debug、唯一 Core／native 基线、28 张有界正式图、原生纯函数／指令证据、失败与准备误差记录、小工具及唯一补测原 DDS；新原生构建缓存也保留，不清理或搬盘。最终盘点和源码保护见 `parent-validation/final-audit.json`、`workspace-after.json`；未暂存、提交、推送、创建分支／worktree、PR 或合并。
+
+## R100 Crowman 实机与 Terry 配准（2026-10-26）
+
+### 现场保护与本次正常 Debug 观察
+
+- 沿用 `codex/vfx-preview-native-parity-r97`、HEAD `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存区为空。接手 29 项修改／未跟踪文件与 R99 最后快照散列全部一致，见 `artifacts/vfx-acceptance-r100/parent-validation/workspace-before.json`。本次不改产品、测试、原资源、材质或全局 `1/120`，没有构建或替换正常 Debug；复用的 R99 构建及 28／555 项检查均为历史结果，不写成本次重跑。
+- 实际操作正常 Debug 原有 `DC7A2264…` Core，加载完整官方 `vfx/wh3_dlc24_cth_crowman_trail.xml`、q1、唯一 `feathers` 层。八条根／模型／材质／贴图依赖 fresh 来源及 SHA 与 R99 一致；26 个非 manifest Pack 对这些依赖重新检查，0 同名覆盖。没有使用 Mod、资源别名或改亮／延寿样本。
+- 原件按距离发射（间距 1），粒子寿命 1 秒，出生约前 .05 淡入、.75 后淡出；源 emitter 的 .25 秒字段不能混作粒子寿命，`InfiniteLife=true` 也不能漏读。普通窗口相机不会跟随发射器，快速移出画幅或停止超过 1 秒会看不见羽毛，不据此判为材质缺失。
+- 本次实际看见播放中 291.49／291.58 秒两帧的黑色原模型羽毛，位置及旋转连续变化；暂停回看 291.12 秒约七片清晰羽毛，291.67 秒姿态／位置变化并淡出，291.95 秒只剩小尾片，292.77 秒全部消失。缩远相机后可以看完整羽片，没有改变粒子尺寸或源寿命。GUI 显示秒数是两位小数标签，不冒充精确内部时钟或精确旋转角度。记录为 `parent-validation/crowman-normal-debug-gui-v1.json`。
+
+### Terry 画质、实际相机与阶段边界
+
+- 正常关闭本任务旧 Terry 的清洁场景后，从设备创建前启用现有 RenderDoc 工具，重启确切官方 Terry（PID 2912）；未强制结束、丢弃或保存用户内容。重启后实际在三维设置核实“泛光”未勾选。仅使用本任务完整原名场景，旧场景三份小文件先留副本；官方源 XML、模型、DDS、Pack 和 exe 未修改。全部输入沿用持续授权，未检测到用户键鼠冲突。
+- 完整原版 siege 的实际帧 20368 提供独立画质指纹：三个 emitter slice 的 InitialAlpha min／max 为 `.7998046875／1`、InitialScale XYZ 为 1，与 fresh 原 XML 的 **q1** 唯一对应；不是按“高”字样或旧预设猜测。实际 view／projection／eye／viewport 与原生 tone PNG 同帧保存于 `siege-readback-v4/`、`siege-tone-export-v4/`。
+- 该烟雾帧的 base／central 原生 emitter 阶段约 52.388508 秒，end_fade 约 52.029507 秒，晚约 .359 秒；原始粒子 birthUnary／age／life 与 emitter 常量交叉一致。减原 StartTime=-25 仅得各自 AECN 根时间候选，**不能把三个时钟强行归为完整特效的同一播放阶段**，更不能用捕获墙钟差代替。
+- Crowman 场景保存的 FOV45 没有成为真实镜头：其实际 camera CB 测得 **FOV60、near1／far12000、viewport360×655**，eye 为 `[512,15.5237846,482.9981384]`；以原挂点 `[512,2,512]` 配准后的局部 eye 为 `[0,13.5237846,-29.0018616]`。证据为 `crowman-camera-v3/matched-camera-v1.json`。矩阵、镜头位置和运动挂点必须使用同一坐标平移，不能二次镜像或只改 view 而遗漏眼点。
+- 当前正常 Debug Core 另完成完整官方 Crowman q1 的 .6／1.2 秒同相机参考两图，实际看过黑羽毛、弯转轮廓及细小消退碎片；View／Projection／Eye 按 float32 位模式核对与上述实捕相机一致，八条官方依赖 SHA 一致、0 缺失。输出采用原视口 360×655 的 1:1 裁切等价，不冒充 1707×1067 全目标一致。其运动是明确的诊断方形轨迹，**没有匹配 Terry 的出生历史、年龄或材质时钟，不是同阶段原生验收**；见 `official-samples/crowman-same-camera-reference-result-v1.json` 与 `crowman-complete-root-camera-reference-v1/`。受控替换原生最终姿态模式没有运行。
+
+### Crowman 原生对照未通过，保留失败证据
+
+- Terry 确实加载完整原名 Crowman 并勾选 Autoplay。前两次捕获发生在选择工具，辅助轴不是可拖动手柄，挂点未移动，属于无效发射尝试。随后从“工具→基本操作→移动”进入真正移动模式，实际挂点 X 从 512 移至约 519.56，再在 Autoplay 关／开后移回 512；本任务测试场景保留 dirty 状态，没有丢弃或强制退出。
+- 四次 Crowman 实际帧为 34128／38096／44679／58082；最后两次已确认真实挂点移动，分别采用 .45／1.25 秒有界取帧。后面三帧的全部实际 draw 各为 39，均没有原模型的 204 索引绘制，也没有溶解模型主材质绘制；原生 PNG 也未看清羽毛。已经排除仅按材质名筛选漏检，**没有据“移动成功”“捕获成功”或黑图宣称原生表现正确**，停止重复同类时序重捕。
+- `enable_in_ted=false` 只是定位线索：已实际提交烟雾的 siege 原根同样为 false，不能把它单独定为 Crowman 不发射的根因，也没有删除该标记来制造“原版通过”。Terry 编辑器挂点变化是否向活特效节点提供了原生距离发射所需的运动，仍未闭环。
+- 有界原生字段检查只证实该标记的 XML 读取及 `EnableInTED` 属性注册，没有证明运行时创建守卫；两个候选 offset 比较属于其他类型，未当作支持证据。最后一次 1.25 秒延迟也不能单独排除时机问题：粒子只活 1 秒，而真实最后运动与捕获的间隔尚无活节点记录。不能把“换过延迟”写成已排除全部时序原因。
+- 模型 208 字节属于 CPU 粒子状态；GPU 只有最终 world／custom／材质时钟时，不能唯一反推 birth／life／播放阶段。原 Alpha 有长平台且淡入、淡出可同值。已准备的小型 current-Core 对照工具要求真实模型输入并校核全部 37 个原顶点、packed alpha 和实际相机；由于上述原生帧无模型提交，没有伪造输入或空跑受控回放。工具编译为本次实际执行，0 警告／0 错误，不等于产品重新构建或原生验收。
+- 早期设备创建后注入未取得有效捕获、等待超时及一次打开确认框期间误发 ready 的记录全部保留；误帧 18653 不作为验收。捕获、失败、源件小副本和工具均位于 `artifacts/vfx-acceptance-r100/`，没有清理或搬盘。本轮没有游戏测试，也没有重新验收 Bear／Pox；它们仍引用 R99 当时范围。
+
+本次关闭的是 Crowman 正常 Debug 清晰窗口观察缺口；同画质已有实际指纹，同视角有实际矩阵，但同阶段 Terry 模型对照仍未通过。接续先解决原生测试场景的运动／发射输入，取得真实羽毛模型帧，再执行既有受控对照；不要回头改原资源、模型角运动、寿命或材质来迎合当前空场景。
+
+## R99 攻城烟雾中央层的二次 Bezier 尺寸曲线（2026-10-26）
+
+### 本轮现场与实现
+
+- 沿用 `codex/vfx-preview-native-parity-r97`，HEAD 仍为 `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存区为空；开始时 24 项修改／未跟踪文件与 R98 的 `workspace-after.json` 全部散列一致。接手快照为 `artifacts/vfx-siege-scale-r99/parent-validation/workspace-before.json`。已有成果保留，不切分支、建 worktree、暂存、提交、推送或清理。
+- 缺失层是官方 `wh3_main_seige_smoke_large` 的 `smoke_central_pillar`，实际阻断为 `ParticleScale` 中的 `bezier_q`（原生模式 11）；不是删守卫即可处理的通用三次 Bezier。官方原 XML SHA 为 `b5ccb9b9…`，三档尺寸原文一致。源文件关键点存储为 0／1／约 .56，时间排序后的段为 0→11、11→8；原始字节与关键点存储顺序保持。
+- 新增 `VfxSpriteNativeScaleCurve`，只在普通平面 ParticleScale 存在实际 q 段时接入。保留旧曲线快照与元数据，其他非 q 路径逐字节保持；从 wrapper 移除本轮五处增量后，文件 SHA 精确等于接手快照 `106500E8…`。模型、初始尺寸、颜色／透明度与其他字段不借此开放 q。
+- 原生模式 11 在出端和入端均取左关键点 outgoing，按 float 0.6667 转换成两个三次控制点，再执行原生十次二分及扫描。四种独立执行过的端点组合为 0→11、11→0、11→11、11→8；右 incoming 改动不影响、左 outgoing 改动影响的反例及真实 half 输出一并保存。其他 q 混合、错误绑定、非法控制与溢出继续诊断。
+- 普通 GPU 尺寸上传按 float(i)/128 烘焙成 signed-half XYZ 上下两行，允许不同 min/max；每粒子使用同一 unary 在三个轴之间保持一致，采用 normalized linear-clamp 的可移植双线性采样。没有借用模型 i/127 表，也没有硬编码当前 RTX 的过滤舍入。普通绘制 scale.Z=1、R98 自旋／FullLocal、R96 模型、出生随机数消耗、原材质／原生桥／ABI 和全局 1/120 均保持。
+- 原生证据入口为 `native-contract/ordinary-quadratic-scale-contract-v2.json`；当前 GPU 87 次不同双表过滤观察与精确 half 表分别记录。未重新标定上游 life_unary 时钟或随机序列，不能据此宣称游戏同帧。以下相对证据路径均以 `artifacts/vfx-siege-scale-r99/` 为根。
+
+### 本次构建、测试与保留的失败
+
+- 修复前新 18 项专项为 **9 失败／9 通过／0 跳过**，确实抓住三档完整原 XML 转换、四组 CPU 尺寸与两组 GPU 映射缺失；见 `parent-validation/red-v1/red.trx`。未通过旧程序集冒充复现。
+- 接入初次构建漏掉新字段声明，4 个编译错误已补齐；中间版 `40FE85C4…` 又因接入脚本误漏原 empty-curve fallback，使纳垢组合的 `splash_mesh_base` 在缺省颜色时抛异常。这是**本轮接入错误，不是旧实现缺陷**；现已恢复原行，并补默认颜色回归。失败日志、CPU 定位和 2 张中间图保留，排除正式结果。
+- 一次测试构建遇到本任务 Debug PID 61844 的输出锁，退出失败；核对标签无 dirty 后正常退出确切实例，再完成构建。没有强制结束或丢弃内容。该失败保留于 `green-build-v1.log`。
+- 最终受影响测试项目 Debug 重建退出 0，2179 警告／0 错误（跨模块原有 nullable 等警告；新 helper／专项文件无警告）；正常主程序 Debug 构建退出 0，**0 警告／0 错误**，见 `green-build-v2.log`、`normal-debug-build-v3.log`。
+- 最终新专项 **28 通过／0 失败／0 跳过**，含精确原生 half、控制点反例、三档原件往返、CPU 到矩阵、两组同官方贴图的独立静态尺寸全 RGBA 对照，以及拒绝边界和空曲线默认值；见 `green-v2/green.trx`。另相关曲线、自旋／阻尼、FullLocal、模型与连续 trail 等回归 **555 通过／0 失败／0 跳过**，见 `regression-v1/regression.trx`；两批独立报告，未跑完整解决方案。
+- 实际执行 `dotnet build Testing/GameWorld.Core.Test/Test.GameWorld.Core.csproj --configuration Debug --no-restore`、`dotnet build AssetEditor/AssetEditor.csproj --configuration Debug --no-restore` 与对应 `dotnet test ... --configuration Debug --no-build --no-restore --filter ...`。GPU 开启 `ASSETEDITOR_VFX_HEADLESS_TEST=1`，官方回归另指定原版 data；没有桌面输入测试夹带。
+- 最终正常 Debug Core 为 `DC7A2264F54AB11455AEF7F14705F5A48167C8DE9A1E631FF14BFAF0D9EC6E35`，原生桥仍为 `026F432C…`，未重编 C++ 或材质。最终只读审查未发现越界或额外开放的 q 组合。
+
+### 完整官方原件离屏复测
+
+仅保留一份 R98 Core DLL 基线，未复制整套 runtime 或导出资源库。before／after-v2 和小 probe 构建均退出 0；六个完整原根、每根 .6／1.2 两阶段，共 12 对正式 PNG。画质、视角、投影、挂点轨迹、时段、manifest 与所有已有依赖来源／SHA 一致，无资源缺失。26 个非 manifest Pack 对 53 条实际依赖重新核对，0 同名覆盖。官方原 XML、模型、DDS 与旧 preview Pack 均未修改。
+
+| 完整官方原根 | 本次 q | 本次结果与限制 |
+| --- | --- | --- |
+| `wh3_main_seige_smoke_large` | 0 | 2→3 层，中央活粒子 36／33；黑色中央烟连接上灰烟，软边保留。原 smoke_base 数据完全一致；恢复中间层使 end_fade 取得原种子序列的下一个索引，不能把其差异误归为尺寸公式影响 |
+| `wh3_main_nur_siege_tower_destruct` | 0 | 13→14 层，原库中央层 40／48 粒子；原黄色爆散后出现棕绿烟柱。后续九根种子索引随新增层移动；-25 预热另造成约 1e-14 的累计时钟差，逐层记录，未改步长或种子压平。黄色模型的旧实体材质不能据此验收 |
+| `wh3_main_entity_bear_ice_breath_trail` | 0 | 两对 PNG、完整帧、全部角／非角状态逐字节一致 |
+| `wh3_dlc29_pox_maggoth_trail` | 0 | 两对完整图像与数据逐字节一致，保留 R98 FullLocal |
+| `wh3_dlc24_cth_crowman_trail` | 1 | 两对模型图像与数据逐字节一致，羽毛轮廓实际查看；模型姿态未改 |
+| `wh_main_seige_smoke_large` | 0 | 正常旧曲线烟雾控制两对图像与全部数据逐字节一致 |
+
+正式 after 全 12 图、两个目标 before 4 图已实际查看；其余 before 8 图与 after 字节一致。主任务另复核中央烟柱与 Crowman .6 图。结构和字节证据不代替游戏原生视觉验收。入口为 `official-sampling-execution-v1.json`、`official-sampling-comparison-v1.json`，失败 2 图单独保留，正式 24 图没有混入中间版。
+
+### 本次正常 Debug 与 Terry 实际观察
+
+- 最终 `DC7A2264…` 的正常 Debug 实际打开完整原版 siege，勾选全部三根；q0 观察到 7.03／3.07 秒、q1 1.83 秒的连续烟柱，中央软黑烟不再缺失。中间版另做过中央层单独显示诊断，不能把那次记录冒充最终版本。
+- Bear q0 实际选择、侧移、转向和停止，蓝白雾与细雪保留；播放至 21.06／34.18 秒仍连续。Pox q0 同样拖动与转向，绿雾环和原碎块可见，19.45／32.90 秒保留连续轨迹和停止后的尾部消退。没有本轮精确旋转角度验收结论。
+- Crowman q1 确实进行了选择、拖动、暂停和回看，但本轮正常窗口截图没有分辨出足够清晰的羽毛几何；**不把这一项写成实机视觉通过**。其 .6／1.2 原模型离屏图像及姿态数据已重新确认与 R98 完全一致。不要为截图延长原寿命或改亮度。
+- 纳垢完整组合 q0 实际观察 2.61／4.95／5.71 秒的烟柱，11.84 秒已无可见效果，回到 0 保留原预热；没有重现中间版的缺省颜色异常。原黄色模型材质限制继续保留。
+- Terry 加载本轮只引用原名的 siege 场景，确见持续变化的蓝色照明烟柱；实际复核泛光未勾选，预设“高”可见，开场前特效质量“高”可见。蓝色照明与 AECN 灰烟的视角／阶段／照明尚未对齐，**不用于调色或宣布同原生最终画面**。未执行游戏实测；未再盲找尚未证实的 Terry 精确 seek 控件。
+- 全部窗口操作沿用持续授权，未检测到用户键鼠冲突；所有源页无 dirty 标记，未保存原件。证据为 `parent-validation/normal-debug-gui-v1.json`。Terry 场景在 Assembly Kit 的 `working_data/AssetEditor.CN/TerryPreview/r99-original-siege-smoke-20261026/`，不覆盖旧场景或 Pack。
+
+### 保留与接续边界
+
+本轮只增加小型原生合同、一个原 XML／一张原 DDS 测试件、单 DLL 基线及有限截图；所有旧源码、正常 Debug、独有备份、工具和失败记录保留，不清理或搬盘。稳定尺寸契约已更新现有 `docs/vfx-editor.md`。本轮产物盘点、旧成果保护、最终状态与散列见 `parent-validation/final-audit.json`、`workspace-after.json`。
+
+本次中央烟层的尺寸曲线阻断已修。中央 ForceA／ForceUnsupported、原 mipmap 诊断、Bear 转动挂点的 ForceBasis、复杂 q 组合、全局随机／时钟、完整光照与透明合成仍有边界；Crowman 清晰窗口帧及 Terry 同条件原生对照仍未通过，不宣称所有攻城烟雾或全部 trail 已达到游戏级。
+
+
+## R98 动态角阻尼与 Pox FullLocal（2026-10-26）
+
+### 现场、来源与实现
+
+- 沿用 `codex/vfx-preview-native-parity-r97`，HEAD 仍为 `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`，暂存区为空；完整接手快照为 `artifacts/vfx-dynamic-local-r98/parent-validation/workspace-before.json`。既有 18 项修改／未跟踪成果全部保留，没有切分支、创建 worktree、暂存、提交、推送、PR、合并或清理。
+- 开测前用户明确回复“现在可用，我暂不使用键鼠”。实际操作仅本任务正常 Debug 和 Terry；未检测到键鼠冲突。正常 Debug 仅加载 manifest 原版 Pack，未打开其他工程／Mod；额外索引当前 26 个非 manifest Pack，R97 三根所需 21 项资源无同名覆盖。新离屏解析只使用 manifest 中核对过实际大小的官方 Pack，并记录完整依赖来源／SHA；没有安装或覆盖旧 preview Pack。
+- 新增 `VfxSpriteNativeSpinDamping`：严格 raw 0／1 的相同双表、绑定 0／1、已核实的非 Bezier 解析模式，按原生 `i/128` float 烘焙后用原 half 函数量化。可移植采样为 normalized linear-clamp，末端取最后实际 texel，不能补成源曲线的 1 端点。新负值／高值动态分支限独立出生、birth/spin XY 为零及既定普通材质边界；旧 0～5 world／position-only 动态规则保持。
+- 普通 GPU controller 的原算术执行 64 组及 CS 后缀独立解释 40 组，闭环 FullLocal 的节点增量：先世界 Z 阻尼／自身四元数步进，再以 `currentNode*conjugate(previousNode)` 同时运输姿态与世界角速度；Pox 恒定 Emitter X90 在原生增量中相消。新增普通 FullLocal 沿向量角状态路径，Tick 同时提交 q／omega／root，Frame 和暂停当前挂点计算副本；dt=0 仍运输节点。限定独立纯 Z 出生、恒定 Emitter，复用已消费的随机通道；不扩大动态 Emitter、relative／倾斜／XYZ 出生或事件。R97 既有常量 complex 与 R96 模型规则保持，全局 `1.0/120` 不变。
+- 原生 half 表逐值与过滤误差分开证明。新增 fixture 含 17×128 实际烘焙 half 值及独立 GPU 数据；当前 RTX 的 8-bit 权重／输出 half 舍入只是设备观察，产品没有硬编码，不承诺跨 GPU bit-exact。证据总入口：`native-contract/r98-native-angular-contract-v4.json`；本轮所有相对证据路径均以 `artifacts/vfx-dynamic-local-r98/` 为根。
+
+### 本次实际构建与自动检查
+
+- 新 FullLocal 与采样专项首次严格红灯：59 项中 **9 失败／50 通过／0 跳过**，见 `parent-validation/red/red.trx`。接入后 v2 的 75 项中 14 项只差 Backward 长度 0.5；新测试 Oracle 把普通平面的 Z 也乘了 1.5。当前及 HEAD 原实现均显式令普通面片 scale.Z=1，故只修正新 Oracle 的 Z 轴，没有改产品尺寸、角度公式、时段或 `1e-5` 断言；失败记录保留。
+- 最终受影响测试项目 Debug 构建 **3 警告／0 错误**；角运动专项及已有相关回归 **328 通过／0 失败／0 跳过**，见 `parent-validation/angular-v3/angular-v3.trx`。另按 R97 回归类排除本次已测类，补跑 **245 通过／0 失败／0 跳过**，见 `parent-validation/regression-extra/regression-extra.trx`；两批分别记录，不冒充一次全仓测试。
+- 两个新测试文件最后只整理为仓库要求的 BOM／CRLF，重新构建测试项目后，新增三类 **79 通过／0 失败／0 跳过**，见 `parent-validation/encoding-v4/encoding-v4.trx`；不与前两批重复累加。产品 Core 未变，其他已通过范围复用本次对应结果。
+- 实际命令包括 `dotnet build Testing/GameWorld.Core.Test/Test.GameWorld.Core.csproj --configuration Debug --no-restore`，以及 `dotnet test ... --configuration Debug --no-build --no-restore --filter <证据日志中的专项类筛选>`；GPU 项开启 `ASSETEDITOR_VFX_HEADLESS_TEST=1`，采用隐藏设备，不发送桌面输入。
+- 正常输出实际执行 `dotnet build AssetEditor/AssetEditor.csproj --configuration Debug --no-restore`，退出 0、**0 警告／0 错误**。正常 Debug Core 为 `EA90458BCDCA9857F7C3D92C53889DA87491AEA550A27B1552B2FDFE7CF8B0FA`；原生桥仍为 `026F432C…`，没有 C++／材质／ABI 修改或原生重建。初次测试构建的跨模块既有 nullable 等警告原样保留于日志；未运行完整解决方案测试。
+
+### 完整官方原件离屏复测
+
+R97 原 Core `97194345…` 仅备份一份 DLL，before／after 两进程使用同一 probe、参数、当前正常 Debug 其他依赖；未复制 runtime 或展开资源库。probe 构建与两次执行均退出 0，14 对共 28 张图全部可见。逐层非角状态、依赖 SHA、采样条件及已有 flags 前后一致；变化仅在 Bear `breath_snow_flecks` 和 Pox `pox_trail_head_main` 的角状态。另五根共 10 对 PNG 与帧数据完全一致。实际查看目标前后全 8 张及控制 after 10 张，主任务另复核两个目标的 1.2 秒前后共 4 张。
+
+| 完整官方根 | 本次 q／源阶段 | 实际覆盖与边界 |
+| --- | --- | --- |
+| `wh3_main_entity_bear_ice_breath_trail` | q0；.6／1.2；移动与转向 | 雪点负值→正值 exp3 自旋恢复；白雾、发射方向及密度控制保持。旋转挂点下 ForceBasis 两版仍提示，不能称全部力表现原生 |
+| `wh3_dlc29_pox_maggoth_trail` | q0；.6／1.2；移动与转向 | FullLocal 主层 50 阻尼、自旋与节点运输生效；整体拖尾保持，细节角姿变化较小 |
+| `wh3_dlc25_sorcerer_of_nurgle_death_trail` | q0；.6／1.2；距离发射 | 纹理 trail 的既有正值动态路径，两对完全一致 |
+| `wh3_main_seige_smoke_large` | q0；.6／1.2；原始负时间预热 | base／end_fade 两层完全一致；中央 `smoke_central_pillar` 两版都因 ParticleScale 的旧不支持插值被停用，并非完整三层已正确 |
+| `wh3_dlc24_cth_crowman_trail` | q1；.6／1.2；移动与转向 | R96 模型姿态与绘制两对完全一致 |
+| `wh3_main_abilities_ursuns_roar` | q0；3.80／3.95 | 本次 pulse 实际各有 1 粒子、glitter 各 9 粒子，补上 R97 .35／.8／1.6 未覆盖的 pulse；随机 BurstInterval／Length 仍有原诊断 |
+| `wh3_dlc25_ability_baleflame_amulet` | q0；.35／.8 | R97 高 20 阻尼控制两对完全一致 |
+
+执行及逐层／逐图记录：`official-sampling-execution-v1.json`、`official-sampling-comparison-v1.json`。没有以“全部非空”、自动数量或字节一致代替原生视觉验收。
+
+### 本次正常窗口观察与未完成的原生对照
+
+- R98 改产品前，用 R97 正常 Debug 实际打开完整 Ursun、Baleflame、Unclean Weapon，分别观察早晚阶段的冰枝、紫雾及绿雾；见 `parent-validation/r97-normal-debug-gui-observations.json`。这是本次新窗口观察，R97 原离屏记录仍是历史证据。
+- 修复后再次启动正常 Debug，官方 Pox 实际选择、连续拖动、发出 R/Y/90/确认的预览操作，播放超过 117 秒仍持续显示绿色云环与原始碎块；暂停后拖动，时间保持 117.02 秒并跟随挂点。GUI 没有独立读回数值角度，不据发键推定已精确转了 90°。官方 Bear 实际播放、选择与拖动，蓝白雾和细雪可见，连续播放至 51.54 秒；暂停后保留状态。两页均无文档 dirty 标记，未保存或修改原件。见 `parent-validation/normal-debug-gui-after.json`。
+- Terry 实际从“打开其他工程”加载只引用官方原名的 Ursun 场景，源 XML／贴图未改。三维视图设置中泛光原为勾选，本次实际取消并复核；Warscape 特效质量观察为“高”。一次滚轮误作用于预设，将“高”改为“极高”，已立即从下拉恢复“高”，没有点击应用。现有旧 preview Pack 保持原状。
+- **Terry 同相机／同播放阶段验收仍未完成。** 场景能见初始微光，之后并未建立准确播放秒数；未证实主 Terry 提供精确 VFX seek／暂停入口，不能把 Cindy 或通用 widget 的控件当成主 Terry 的能力。文件相机预设不是生效证明，也未将其与 AECN 自动取景冒称对齐。故本轮只能报告代码原生合同、离屏前后和正常窗口观察，不能报告完整 Terry／游戏最终一致。
+
+### 当前保留与接续边界
+
+保留正常 Debug、原 R97 及本轮全部失败／有效证据、工具和单 DLL 基线；本轮证据约 15 MiB，无运行库或资源库副本，不清理、不搬盘。长期技术边界已写回现有 `docs/vfx-editor.md`，未新增长期流程文档。最终保护／源码合同／测试及产物盘点见 `parent-validation/final-audit.json`。仍需解决 Terry 精确阶段与相机对齐、攻城中央烟 ParticleScale 插值、普通不同双表／Bezier／复杂出生及动态 Emitter 的未证路径；Bear 旋转挂点的力与完整材质／透明合成、随机时钟边界继续有效。受限 Bear／Pox 角运动已修，不宣称所有 trail 或全部 VFX 已正常。
+
+## R97 普通面片常量角阻尼：负值、高值与异常层隔离（2026-10-25）
+
+### 现场与最终实现
+
+- 接续用户“好的，继续吧”，保持 `codex/vfx-preview-native-parity-r97`，HEAD 仍为 `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`。开始时已有前置文档与测试候选全部保留，见 `artifacts/vfx-native-parity-r97/parent-validation/resume-before-v1.json`；不新增分支或 worktree，不暂存、收起、回滚、清理、提交、推送、PR 或合并。全局 `1.0 / 120`、材质／C++／ABI／UI／Kitbash 未改；用户继续自行实机测试。
+- 普通面片新增受限常量负阻尼与高阻尼，不再一概清零自转。只接受两个实存 raw 通道 `x_min/x_max`、各一个关键点、float 值相同、绑定 0／1、half 可表示的输入；world／position-only、无专用网格材质／MeshLoop／自带事件，保留原方向及出生限制。新 `VfxSpriteConstantSpinDamping` 先投影为原生 signed half 值，经 emitter 字段真正传入模拟；纯 Z 走离散更新，倾斜／相对上轴或多轴走世界 Z 阻尼，不衰减世界 X/Y。旧 0～5 及模型路径保持。
+- 新单层范围隔离防止 `exp`／角速度／四元数不可表示时把非有限矩阵送入原生桥。Tick 才提交失败状态；部分帧失败只隔离该次投影，不污染后续提交历史。回退／重播恢复范围后清除本分支追加的警告，不误删原转换或模型警告；不添加任意角速度上限。
+- 初期动态正向测试候选已在 `parent-validation/test-candidates-before-constant-scope/` 保留。发现真实普通 GPU 动态表规则与旧连续取样不同后，正式实现收窄为有完整证据的常量；动态、单通道、不同双表、错误绑定、多点、FullLocal 等继续保留明确拒绝断言。没有为通过而放宽容差，也未把少量成功样本扩为所有 trail 已修好。
+
+### 本次重新执行的原生与参数证据
+
+- fresh 官方 DLL／manifest 与 271 个官方 Pack 名称、大小核对一致。原生上传链 `69ce30 -> 586890 -> 585770 -> 804e40 -> 6d3a20` 证明阻尼以倍率 1 写入两个原始通道的 half 行，没有 0～5 或负值 clamp；既有捕获的实际绑定为 `R16G16B16A16_FLOAT`。证据为 `native-contract/ordinary-constant-upload-contract-v5.json` 及其指向的原始指令记录。
+- 直接执行官方纯函数取得 7 条诊断曲线、1792 个烘焙样本，原生 half 端口另经 103627 个 float32 输入逐位比较。用于产品回归的独立小 fixture 为 `Testing/GameWorld.Core.Test/Vfx/Fixtures/NativeSpriteHalf.json`，53 个实际原生输入／输出对，含负值、非整数、高值、次正规数、正负中点及溢出边界。原生中点向零：例如 `-1.00146484375 -> -1.0009765625`、`65520 -> 65504`，不能默认使用 `System.Half` 舍入。
+- 普通 GPU 动态表实际按 `i/128` 求值后 half 量化，再由纹理采样；模型 CPU 是 `i/127` float 表。缺 raw channel1 的独立执行返回 0，文本导入是否复制单通道仍未闭环；因此本次不猜单通道或任意链接，不复用模型表开放普通动态。相同常量双行不依赖尚未标定的时间／随机行过滤精度。普通 CS 只衰减世界 Z，再归一化离散四元数；模型仍为 XYZ。
+
+### 本次构建、自动测试与失败记录
+
+- 为取得当前 HEAD 的真实基线，先重编未改产品的源码，Core 为 `B7DBF01FDD125A637748C4C6F81A1889C945B43A67A881EF8603EB6F30163722`。它与旧 R96 冻结库的编译散列不同，正式 before 没有冒用 E 盘旧 `3F6A…`；仅额外保留一个约 1MiB 的 `parent-validation/baseline-core-v1/GameWorld.Core.dll`，没有复制整套运行库。
+- 初期候选红灯为 42 失败／55 通过／6 跳过，原记录保留；收窄并明确双通道结构后的正式红灯 `red-tests-v3/red.trx` 为 **34 失败／75 通过／8 跳过**。其时 converter 尚未开放新守卫，失败不是缺方法或旧程序集造成。
+- 首次绿灯 175 项中仅“复杂负阻尼、引用速度 2”超出 `1e-5`。独立纯 CPU double Rodrigues 诊断确认，原 oracle 忽略原生每步 float 时差、expf 和角速度存回，75 次增长放大误差；参考矩阵仍用独立 double Rodrigues，仅恢复原生标量精度，误差从约 `1.64e-5` 降至 `2.62e-7`。阶段和 `1e-5` 容差不变，未把产品改为 double 迎合测试。见 `parent-validation/complex-oracle-f32-audit-v2.json`；失败结果 `green-tests-v1` 保留。
+
+| 本次最终检查 | 真实结果 | 记录 |
+| --- | --- | --- |
+| 正常 `AssetEditor/AssetEditor.csproj` Debug 构建，`--no-restore` | 退出 0，0 警告／0 错误 | `parent-validation/normal-debug-build-v1.log` |
+| 受影响 Core 测试项目 Debug 重建 | 退出 0，3 警告／0 错误 | `parent-validation/green-build-v2.log` |
+| 普通动态／复杂自转与新 half 专项，含隐藏 GPU | 175 通过／0 失败／0 跳过，退出 0 | `parent-validation/green-tests-v2/green.trx` |
+| 既有出生角、连续 trail、图集、法线翻转及模型 signed／曲线／局部／动态方向等较广回归 | 319 通过／0 失败／0 跳过，退出 0 | `parent-validation/regression-v1/regression.trx` |
+
+两组最终测试分别执行，不冒充一次全解决方案验证；未运行全量测试、Release、产品窗口、Terry 或游戏。隐藏 GPU 显式设置 `ASSETEDITOR_VFX_HEADLESS_TEST=1`，无真实键鼠／焦点输入。主程序与测试输出 Core 同为 `971943455C27F0336FF821E894672239617EC16E12E82759E802B9E392EE85D7`；原生 DLL 保持 `026F432C…`，未改原生源因此未重编原生桥。
+
+### 本次完整官方原件离屏复测
+
+- 7 个完整根、21 对同条件阶段图，真实资源从 7 个官方 Pack 直接解析，根与依赖 SHA、画质、相机、投影、挂点和阶段全部一致，无 Mod 解析器。正式 before 为 `gpu-before-v1` 的 6 个完整根，加 `gpu-before-v2-crowman`；after 为 `gpu-after-v1`。两处 before Core 均为上述 B7DBF 基线，未混入修复后运行库。
+- 第一次 before 漏载官方 `warmachines_dds.pack`，Crowman 缺纹理而无粒子，失败 3 图保留但不计正式覆盖。补齐 Pack 后重读此前 37 个有效依赖，来源／SHA 0 差异、旧路径 0 覆盖，只补跑 Crowman 的 3 图。整个证据目录只生成 45 PNG，其中正式 42、失败 3；不导出资源、不复制运行库、不生成 raw32f。
+
+| 完整官方根 | 画质与阶段（秒） | 本次覆盖 |
+| --- | --- | --- |
+| `wh3_main_abilities_ursuns_roar` | q0；.35／.8／1.6 | `attack_buff` 负 -1 旋转恢复；.35 仅 1 个变化像素，视觉证据弱；`attack_buff_pulse` 转换诊断已恢复，但三阶段无活粒子，未验收其外观 |
+| `wh3_dlc25_ability_baleflame_amulet` | q0；.35／.8／1.6 | `after_smokey` 高 20，旋转恢复；与火焰／烟雾完整组合共同绘制，变化较细 |
+| `wh3_main_entity_great_unclean_one_weapon` | q0；.35／.8／1.6 | `weapon_mist_spherical` 高 20，黄绿小雾团旋转恢复；当前视距下细节判断有限 |
+| `wh3_dlc29_pox_maggoth_trail` | q0；.6／1.2／2.2，转弯停止 | FullLocal 高 50 **仍未修**，作为明确未改变的剩余问题控制 |
+| `wh2_dlc11_deep_spell_smoke_trails` | q0；.6／1.2／2.2，转弯停止 | 移动烟雾控制 |
+| `wh_dlc03_beasts_amber_spear_trail` | q1；.6／1.2／2.2，转弯停止 | 带贴图 trail 控制 |
+| `wh3_dlc24_cth_crowman_trail` | q1；.6／1.2／2.8，转弯及受控旋转 | 模型 trail 控制；2.8 已为空，不把空阶段计作可见性证明 |
+
+- 三目标共 9 对只改变对应层的角状态及投影／PNG；所有 21 对、所有层的非角状态摘要全部相同。四个控制共 12 对的 PNG 字节和投影 Frame SHA 全部相同；没有新增范围告警。目标仅移除 4 条相应的 `ForceUnsupported` 并增加 4 条 `SpinCandidate`，未改变其他诊断。
+- 本次确实查看了现有多阶段图：Ursun .8／1.6 的冰星枝条朝向变化可辨；Baleflame 扩散软烟／地面残留及小雾团保持颜色、密度和透明边缘，没有新增白实体片或矩形硬边。高阻尼烟雾变化细微，主要精确角度证据来自参数／独立姿态像素对照。控制中烟团扩张、Amber 弯折亮带／烟／火星与 Crowman 羽片继续可见。完整比较与逐图查看记录在 `official-final-comparison.json`；未与同条件 Terry 或游戏进行本次对照，不能称原生视觉验收。
+
+### 剩余与接续
+
+本次受限常量路径完成实现、正常 Debug、专项／较广回归和完整官方原件离屏复测；用户实机仍待验。动态负／高阻尼需要专属 `i/128` half 表及纹理过滤，不能继续使用旧连续曲线冒称原生；Pox FullLocal、Bear 动态负阻尼、投影贴花高阻尼等仍未由本轮解决，pulse 的其他阶段也未验收。既有 R96、材质／合成／天气／随机时钟边界继续有效。后续先按未闭环的共享采样／空间路径推进，勿回到已确认原生格线反复调材质。
+
+## R97 前置文档补齐与调查（历史阶段，2026-10-25）
+
+### 当前分支、交付与任务切换
+
+- 本轮按用户“在新的分支继续完善 VFX”指示，从已 fetch 核实的 `origin/master` 创建 `codex/vfx-preview-native-parity-r97`，基点 `9d2ff8caf62d343ace4b0517f7f31646d33cdd6d`。已核实该基点包含前轮 VFX 提交 `50bba3d8e683c28f4438c2fdf870c3822b67993d`；建立后工作区、暂存区均空。分支没有配置推送到 master 的 upstream，未创建 worktree。
+- 先开展了普通面片负值／高角阻尼的原生与官方样本调查；随后用户要求“先补上关于 VFX 的各项文档和更新 AGENTS.md，根据 ChatGPT 官方文档指导来写”，因此停止实现及扩样，先完成本节记载的文档工作。没有新的渲染修复可以宣称已交付。
+- `Testing/GameWorld.Core.Test/Vfx/VfxDynamicSpinDampingTests.cs` 保留本轮先前写下的 signed／高阻尼测试候选，产品实现尚未对应修改；该候选未构建、未运行，也未形成有效红灯／绿灯结论。复杂旋转、溢出与新 GPU 用例尚未编写。后续实施先核对候选差异，再按原生证据完成实现和实际验证，不能直接把测试改动视为支持能力。
+- 产品 C#／C++、材质、全局 `1.0 / 120` 和正常 Debug 未修改；未启动 AECN、Terry、游戏或任何可见测试窗口，无键鼠／焦点操作。未暂存、收起、回滚、清理、提交、推送、创建 PR 或合并。开始快照为 `artifacts/vfx-native-parity-r97/parent-validation/workspace-before.json`。
+
+### 本次补齐的文档及核验来源
+
+- 实际查阅 OpenAI 的 [AGENTS.md 指南](https://learn.chatgpt.com/docs/agent-configuration/agents-md)与 [Codex 工作建议](https://learn.chatgpt.com/docs/learn/best-practices)：根指令保留准确、可执行的长期约束，领域上下文按任务链接读取，阶段结果留在交接。这里引用的是文档组织指导，不是 VFX 着色器或游戏语义来源。
+- 新增 `docs/vfx-editor.md`，把原 `docs/architecture.md` 的 VFX 详细契约按文档／保存、共享预览、画质／曲线、引用／事件、播放器／连续 trail、发射／运动、角阻尼、力、图集、材质、深度、DISTORTION、天气分节；补上修改路由、正常 Debug 与分层验证、官方选样及未完成边界。总体架构保留原 VFX 和验证锚点及跨模块入口；迁移来源记录为 `parent-validation/document-migration.json`。
+- 同步根 `AGENTS.md`、主 `README.md`、`docs/README.md` 的 VFX 路由；`docs/ui-design-system.md` 明确专属 UI／交互和公共播放器；`docs/superview.md` 明确多实例、参数／资源归属、官方依赖和共享渲染限制。具体 UI 规范仍只在现有设计系统维护。
+- 核对当前转换器、模拟、共享预览、ViewModel／XAML 和测试源后修正过时表述：模型 CPU 四元数规则限实际进入对应分支的模型；普通面片仍有负／高／Bezier 守卫；DISTORTION 的 AlphaCrush 已独立接通；两个 VFX 布局用例使用 WPF 宿主离屏渲染，并非调用 `Window.Show`；超级视图已使用受控显示变换，曝光不再笼统称为“仅记录”。本次是源码核对，没有把这些已有用例写成本次执行。
+
+### 本次已执行的调查，尚未成为修复
+
+- **官方源结构**：仅扫描当前官方 manifest 中的 `vfx_desc.pack`，7470 个 VFX XML、14647 个源层；838 个材质 XML 明确排除，解析错误 0。普通 `continuous_mesh` 声明中带 spin 的负阻尼 4 层、超过 5 的 9 层，没有找到多关键点 Bezier 角阻尼段。计数包含库与禁用层，不是有效实例或失败数量，也不覆盖所有可能的描述文件位置。证据：`official-samples/source-coverage.json`。
+- **当前转换器实际复现**：10 个未经修改的完整官方根，q0，静止挂点，.25／.5／1／2 秒 CPU 取样；直接读取 manifest 验证的 6 个官方 Pack，逐根／依赖记录 SHA，0 缺失、0 异常。确认下表 8 层因负值／高角阻尼报告 `ForceUnsupported` 并清零旋转。没有 GPU 像素、动态挂点或实机验收。证据：`official-samples/converter-before-verified6packs.json` 与 `investigation-status.json`。
+
+| 完整官方根（均在 `vfx/`） | 层 | 原始角阻尼 |
+| --- | --- | --- |
+| `wh3_dlc25_ability_baleflame_amulet.xml` | `after_smokey` | 20 |
+| `wh3_dlc29_pox_maggoth_trail.xml` | `pox_trail_head_main` | 50 |
+| `wh3_main_cth_iron_dragon_breath_01.xml` | `breath_flame_gpu` | -1 |
+| `wh3_main_entity_bear_ice_breath_trail.xml` | `breath_snow_flecks` | 动态 -0.001559～2.272023 |
+| `wh3_main_entity_great_unclean_one_impact.xml` | `slime_stream` | 400 |
+| `wh3_main_entity_great_unclean_one_weapon.xml` | `weapon_mist_spherical` | 20 |
+| `wh3_main_abilities_ursuns_roar.xml` | `attack_buff`、`attack_buff_pulse` | 各 -1 |
+
+- `bone_giant_impact`、`cine_impact_sand` 与 `deep_spell_smoke_trails` 是未出现该特定阻尼诊断的控制根；最后一项静止挂点下全部 4 阶段粒子数为 0，需要运动才能调查，不能记为视觉正常。首次仅加载 5 个 Pack 的 `converter-before.json` 遗漏 `commontextures.pack`，保留为失败调查，已由上面的 6-Pack 结果替代，不作为正式依据。
+- **本次原生消费端核对**：fresh 官方 DLL、manifest 散列及 271 个官方 Pack 大小复核一致，重新读取的普通 simulation／spawn CS 与既有原始字节一致。普通 CS 本体仅对世界 Z 做 `exp(-lambda*sourceDt)` 再执行离散归一化四元数更新；模型 CPU 是 XYZ 衰减，不能套用。CS 消费端没有负／高 clamp，但 CPU 上传是否保留符号、纹理格式和准确采样坐标尚未闭环；恒定纯 Z 的旧解析积分也不等于该 CS 精确离散语义。证据：`native-contract/fresh-official-resources-v1.json`、`ordinary-cs-contract-v1.json`。未据此放开任何守卫。
+- 两个极小调查工具分别成功构建，官方样本工具退出 0、0 警告／0 错误；复用正常 Debug DLL，不复制运行库或展开完整资源。没有构建产品／测试项目，没有运行测试套件，也没有新原生桥构建。ForceA＋风、FullLocal、动态发射器朝向目前只是源参数覆盖统计，尚不能宣称均有实现错误。
+
+### 历史证据清理后的真实入口
+
+- 下方 R96 原文中的“全部保留”“满盘”等均是当时现场，后续用户已经授权清理。不能根据旧路径存在于交接就认定文件今天还在，也不能把被永久删除的整包声称为可恢复。
+- `artifacts/ARCHIVE-INDEX-20261025.json` 是清理后总入口；D 盘精确重复文件旧路径与现存相同字节代表文件见 `artifacts/cleanup-second-pass-20261025/duplicate-path-map-assets.json`、`duplicate-path-map-binaries.json`。这些映射只覆盖已核实的重复内容，不表示废弃独有输出或全部截图可恢复。保护清单和最终结果为同目录 `protected-evidence-index.json`、`final-audit.json`。
+- E 盘旧大 ZIP 已永久删除；仅保留 fixture 明确引用的原图及索引 `E:\AECN-artifacts-cleanup-20261025\essential-vfx-evidence\index.json`。独立正式 R96 证据 `E:\AECN-VFX-R96-evidence` 仍保留，本次已核对正式总审计及阶段板目录存在；其旧结果仍是历史验证。
+- 19 份临时扫描表最后按用户要求送入 D 盘回收站，没有在原位置保留，也没有再永久删除或清空回收站。逐项恢复记录见 `artifacts/cleanup-second-pass-20261025/scan-table-recycle-final.json`。后续取证先查上述小索引，避免重新复制整库、运行库或大规模连续截图。
+
+### 接续条件
+
+文档先行任务只验证文档内容、相对链接／锚点、迁移完整性及差异；未执行的构建、自动测试、离屏和用户验收均不能写成通过。后续 VFX 实施沿当前分支，首先闭环普通角阻尼上传／采样并核对测试候选，再修共享实现，验证异常层隔离及既有模型／面片控制组合；完整官方动画离屏与用户实机仍分别验收。未经新授权不提交、推送、清理或发布。
+
+本次文档验证：`parent-validation/verify-documentation.py` 退出 0，50 处本地链接／锚点无误；95 条原始来源全部有去向（其中 1 条去重），VFX 节之外的总体架构与 R96 及更早交接正文保持一致，9 个关键保留证据入口存在。`git diff --check` 退出 0；另行只读复核未发现迁移丢失或普通负阻尼被误写为已支持。详细结果为 `parent-validation/documentation-audit.json`；这不是产品构建、自动测试或视觉验收。
 
 ## R96 模型 trail：负阻尼、原生 Bezier 与动态发射器朝向
 

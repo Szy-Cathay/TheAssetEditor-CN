@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Xml.Linq;
 using Microsoft.Xna.Framework;
 using Shared.Core.PackFiles.Models;
@@ -29,28 +29,83 @@ internal sealed class VfxConversion
 // Only builds a preview projection. The source VfxDocument is never edited or used as a save result.
 internal static class TotalWarVfxConverter
 {
-    public static VfxConversion Convert(VfxPreviewSnapshot snapshot)
-        => ConvertNested(snapshot, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0, null, new());
+    private readonly record struct ModelCacheKey(string Path, int Part, string Animation, float Speed, float Life, Vector3 Pivot);
+    private readonly record struct ConversionCheckpoint((long Vertices, long Indices) Budget, HashSet<ModelCacheKey> Models);
 
-    private static VfxConversion ConvertNested(VfxPreviewSnapshot snapshot, HashSet<string> visited, int depth, XElement? overrides, VfxModelAnimationBudget animationBudget)
+    private sealed class ConversionContext
+    {
+        public VfxModelAnimationBudget AnimationBudget { get; } = new();
+        public Dictionary<ModelCacheKey, (VfxPreviewModel Model, string Texture, VfxScrollingMeshMaterial? Material, int PartCount)> Models { get; } = [];
+
+        public ConversionCheckpoint Capture() => new(AnimationBudget.Capture(), Models.Keys.ToHashSet());
+
+        public void Restore(ConversionCheckpoint checkpoint)
+        {
+            AnimationBudget.Restore(checkpoint.Budget);
+            foreach (var key in Models.Keys.Where(key => !checkpoint.Models.Contains(key)).ToArray()) Models.Remove(key);
+        }
+    }
+
+    public static VfxConversion Convert(VfxPreviewSnapshot snapshot)
+    {
+        var result = ConvertNested(snapshot, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0, null, new());
+        var rejected = new HashSet<VfxPreviewEmitter>();
+        foreach (var emitter in result.Emitters)
+        {
+            // Match runtime float arithmetic; a wider type could hide an intermediate overflow.
+            var startMin = Math.Min(emitter.Start.Min, emitter.Start.Max);
+            var startMax = Math.Max(emitter.Start.Min, emitter.Start.Max);
+            foreach (var reference in emitter.References)
+            {
+                startMin = Math.Min(reference.Start.Min, reference.Start.Max) + startMin / reference.Speed;
+                startMax = Math.Max(reference.Start.Min, reference.Start.Max) + startMax / reference.Speed;
+            }
+            // A parent offset can rescue an intermediate start, so check the complete reference chain here.
+            if (!float.IsFinite(startMin) || !float.IsFinite(startMax) || startMin < -600 || startMax > 600)
+            {
+                rejected.Add(emitter);
+                result.Diagnostics.Add(new(snapshot.SourcePath, emitter.Name, "StartTime/LifeTime", "Vfx.Preview.RangeUnsupported"));
+            }
+        }
+        if (rejected.Count != 0)
+        {
+            result.Emitters.RemoveAll(rejected.Contains);
+            foreach (var emitter in result.Emitters)
+                foreach (var particleEvent in emitter.Events)
+                    particleEvent.Children = particleEvent.Children.Where(child => !rejected.Contains(child)).ToArray();
+        }
+        return result;
+    }
+
+    private static VfxConversion ConvertNested(VfxPreviewSnapshot snapshot, HashSet<string> visited, int depth, XElement? overrides, ConversionContext context)
     {
         var key = snapshot.SourcePath.Replace('/', '\\') + "#" + (overrides == null ? "*" : string.Join("|", overrides.Elements("emitter")
             .Where(e => (string?)e.Attribute("enable") != "false").Select(e => (string?)e.Attribute("name") ?? "").Order(StringComparer.Ordinal)));
         if (depth > 8 || !visited.Add(key)) Fail("vfx_ref", "Vfx.Preview.ReferenceCycle");
-        try { return ConvertContents(snapshot, visited, depth, overrides, animationBudget); }
+        try { return ConvertContents(snapshot, visited, depth, overrides, context); }
         finally { visited.Remove(key); }
     }
 
-    private static VfxConversion ConvertContents(VfxPreviewSnapshot snapshot, HashSet<string> visited, int depth, XElement? overrides, VfxModelAnimationBudget animationBudget)
+    private static VfxConversion ConvertContents(VfxPreviewSnapshot snapshot, HashSet<string> visited, int depth, XElement? overrides, ConversionContext context)
     {
         var document = VfxDocument.Read(snapshot.GameBytes);
         var effect = document.Root.Element("vfx")!;
+        var emitterLayers = (effect.Element("emitters")?.Elements("emitter") ?? []).Select(element => new
+        {
+            Name = (string?)element.Attribute("id") ?? "",
+            Type = (string?)element.Attribute("type") ?? "",
+            Element = element,
+        }).ToArray();
+        var references = document.Root.Elements("vfx_references").Elements("vfx").Select(element => new
+        {
+            Name = (string?)element.Attribute("inst_name") ?? "",
+            Element = element,
+        }).ToArray();
         var rootSelection = depth == 0 ? snapshot.RootSelection : null;
-        var result = new VfxConversion { TotalEmitterCount = document.Layers.Count(x => x.Kind == "Emitter"
-            && (rootSelection == null || rootSelection.EmitterIds.Contains(x.Name, StringComparer.Ordinal))) };
-        var modelCache = new Dictionary<(string Path, int Part, string Animation, float Speed, float Life, Vector3 Pivot),
-            (VfxPreviewModel Model, string Texture, VfxScrollingMeshMaterial? Material, int PartCount)>();
-        foreach (var layer in document.Layers.Where(x => x.Kind == "Emitter"))
+        var result = new VfxConversion { TotalEmitterCount = emitterLayers.Count(x => rootSelection == null || rootSelection.EmitterIds.Contains(x.Name, StringComparer.Ordinal)) };
+        var animationBudget = context.AnimationBudget;
+        var modelCache = context.Models;
+        foreach (var layer in emitterLayers)
         {
             if (rootSelection != null && !rootSelection.EmitterIds.Contains(layer.Name, StringComparer.Ordinal))
                 continue;
@@ -64,8 +119,7 @@ internal static class TotalWarVfxConverter
             var behaviourFields = behaviour?.Descendants().Where(x => x.Attribute("name") != null).ToArray() ?? [];
             var stack = effect.Elements("effect_render_stacks").Elements("effect_render_stack").FirstOrDefault(x => (string?)x.Attribute("id") == layer.Name);
             var render = ForQuality(stack?.Elements() ?? []).ToArray();
-            var animationCheckpoint = animationBudget.Capture();
-            var cachedModels = modelCache.Keys.ToHashSet();
+            var animationCheckpoint = context.Capture();
             var textureCount = result.Textures.Count;
             var modelCount = result.Models.Count;
             var materialCount = result.MeshMaterials.Count;
@@ -112,7 +166,7 @@ internal static class TotalWarVfxConverter
                 }
                 var duration = Range(durationNode, 1);
                 var start = Range(Get("StartTime"), 0);
-                if (start.Min < -30 || start.Max > 600 || duration.Min <= 0 || duration.Max > 600)
+                if (Math.Min(start.Min, start.Max) < -600 || Math.Max(start.Min, start.Max) > 600 || duration.Min <= 0 || duration.Max > 600)
                     Fail("StartTime/LifeTime", "Vfx.Preview.RangeUnsupported");
                 var burstInterval = Range(Get("BurstInterval"), 0);
                 var burstLength = Range(Get("BurstIntervalLength"), 0);
@@ -254,7 +308,7 @@ internal static class TotalWarVfxConverter
                 var premultiplied = Scalar(Behaviour("pre_multiplied_alpha"), 0) != 0;
                 VfxPreviewCurve? alphaCrush = null;
                 var sharpAlphaCrush = false;
-                if (native.Kind == 0 && (native.Distortion != 0 || premultiplied) && textureModifier != null
+                if ((native.Kind == 0 || native.Kind == 2 && (string?)pass?.Attribute("value") == "DEFERRED_DECAL") && textureModifier != null
                     && behaviour?.Elements("modifier").Any(x => (string?)x.Attribute("fragment") == "ps_custom_shader") != true
                     && Modifier("ps_alpha_crush") != null)
                 {
@@ -290,7 +344,8 @@ internal static class TotalWarVfxConverter
                     else
                     {
                         Note("ps_lighting", "Vfx.Preview.LightingCandidate");
-                        if (alphaLightingPass && native.Kind == 0 && native.Distortion == 0 && alignment is 0 or 3 && (additive == 0 || premultiplied)
+                        var simpleLighting = (string?)simple?.Attribute("value") == "true";
+                        if (alphaLightingPass && native.Kind == 0 && native.Distortion == 0 && (alignment is 0 or 3 || alignment == 1 && simpleLighting) && (additive == 0 || premultiplied)
                             && emissive.Length == 1 && (string?)emissive[0].Attribute("type") == "float"
                             && VfxCurve.TryNumber((string?)emissive[0].Attribute("value") ?? "", out var weatherEmissive)
                             && weatherEmissive >= 0 && weatherEmissive <= 8)
@@ -299,7 +354,6 @@ internal static class TotalWarVfxConverter
                             var large = Scalar(Behaviour("large_particles"), .5f);
                             var directionality = Scalar(Behaviour("directionality"), .4f);
                             var average = Scalar(Behaviour("average_size"), .6f);
-                            var simpleLighting = (string?)simple?.Attribute("value") == "true";
                             if (simpleLighting || small >= 0 && small <= 1 && large >= 0 && large <= 1
                                 && (directionality is 0 or .4f || directionality == 1 && large == 0) && average > 0 && average <= 2.4f)
                             {
@@ -403,7 +457,39 @@ internal static class TotalWarVfxConverter
                     angle = new(0, 0); spread = new(90, 90);
                     Note("SpawnAngle/SpawnSpread", "Vfx.Preview.DefaultSpawnCandidate");
                 }
-                if (Scalar(Get("SpreadMethod"), 0) != 0) Note("SpreadMethod", "Vfx.Preview.Unmapped");
+                var spreadMethod = Get("SpreadMethod");
+                if (Scalar(spreadMethod, 0) != 0) Note("SpreadMethod", "Vfx.Preview.Unmapped");
+                var spawnDirection = (string?)properties.GetValueOrDefault("ParticleRelativeSpawnDirection")?.Attribute("value");
+                var radialDecalSpawn = native.Kind == 2 && layer.Type == "continuous_mesh"
+                    && (string?)pass?.Attribute("value") == "DEFERRED_DECAL"
+                    && simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY";
+                // Continuous-mesh decals use the same native birth direction; speed is sampled once per birth.
+                var radialSpawnDirection = native.Distortion == 0
+                    && (radialDecalSpawn || native.Kind == 0 && simulation == "WORLD_SPACE" && speed.IsConstant)
+                    && spawnSpacing == 0 && inheritedSpeed == 0
+                    && (string?)spreadMethod?.Attribute("value") == "false"
+                    && Scalar(properties.GetValueOrDefault("UseSurfaceNormal"), 0) == 0
+                    && orientation.IsZero && position.IsConstant && box.IsZero && radius.Minimum >= 0
+                    && spawnDirection is null or "RELATIVE_TO_VFX_UP_AXIS"
+                    && Scalar(properties.GetValueOrDefault("EventEnable"), 0) == 0;
+                var nativeSpawnArea = radialSpawnDirection || native.Kind == 0 && native.Distortion != 0 && layer.Type == "continuous_mesh"
+                    && (string?)pass?.Attribute("value") == "DISTORTION"
+                    && simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY"
+                    && spawnSpacing == 0 && inheritedSpeed == 0 && (string?)spreadMethod?.Attribute("value") == "false"
+                    && Scalar(properties.GetValueOrDefault("UseSurfaceNormal"), 0) == 0
+                    && orientation.IsZero && position.IsConstant && box.IsZero && radius.Minimum >= 0
+                    && spawnDirection is null or "RELATIVE_TO_VFX_UP_AXIS"
+                    && Scalar(properties.GetValueOrDefault("EventEnable"), 0) == 0;
+                var spawnAreaArc = nativeSpawnArea && spawnArc != null
+                    ? new VfxRange(Attribute(spawnArc, "x", 0), Attribute(spawnArc, "y", 0)) : (VfxRange?)null;
+                var spawnAreaAngle = angle;
+                if (radialSpawnDirection)
+                {
+                    Get("ParticleRelativeSpawnDirection");
+                    Note("SpreadMethod", "Vfx.Preview.SpawnCandidate");
+                }
+                else if (native.Kind == 0 && spreadMethod != null && Scalar(spreadMethod, 1) == 0)
+                    Note("SpreadMethod/ParticleRelativeSpawnDirection", "Vfx.Preview.Unmapped");
                 var legacySpreadSpawn = native.Kind == 0 && spawnSpread != null
                     && (spawnArc == null || zeroArc && spawnAngle == null && spawnArc.Attribute("x") != null && spawnArc.Attribute("y") != null)
                     && Scalar(properties.GetValueOrDefault("SpreadMethod"), 0) == 0
@@ -422,23 +508,34 @@ internal static class TotalWarVfxConverter
                 }
                 if (spawnArc != null)
                     Note("SpawnArc", zeroSpawnArc ? "Vfx.Preview.ZeroSpawnArcCandidate"
-                        : legacySpreadSpawn ? "Vfx.Preview.SpawnCandidate" : "Vfx.Preview.Unmapped");
+                        : legacySpreadSpawn || spawnAreaArc != null ? "Vfx.Preview.SpawnCandidate" : "Vfx.Preview.Unmapped");
                 var flatTerrain = false;
                 var spawnOnTerrain = false;
+                var terrainSpawnDirection = 2;
                 if (relativeMode == 2)
                 {
+                    spawnOnTerrain = Scalar(Get("ParticlesSpawnOnTerrain"), 0) != 0;
                     if ((string?)relative.Attribute("value") != "RELATIVE_TO_TERRAIN_NORMAL"
                         || !speed.IsZero || !orientation.IsZero
-                        || native.Kind == 2 && (!position.IsZero || !box.IsZero || !radius.IsZero)
+                        || native.Kind == 2 && (!position.IsZero
+                            || (!spawnOnTerrain || simulation != "WORLD_SPACE") && (!box.IsZero || !radius.IsZero))
                         || !Curve("ForceA", 0).IsZero || !Curve("ForceB", 0).IsZero || !Curve("ForceC", 0).IsZero
                         || Scalar(Get("ParticlesFollowTerrain"), 0) != 0 || Scalar(Get("AllowEmitFromMesh"), 0) != 0
                         || Scalar(Get("EffectedByWindFactor"), 0) != 0 || Scalar(Get("WindVarianceFactor"), 0) != 0)
                         Fail("ParticleRelativeSpawnOrientation", "Vfx.Preview.OrientationUnsupported");
                     var direction = (string?)Get("ParticleRelativeSpawnDirection")?.Attribute("value");
-                    if (direction is not (null or "RELATIVE_TO_VFX_UP_AXIS" or "RELATIVE_TO_TERRAIN_NORMAL"))
+                    if (direction is not (null or "RELATIVE_TO_VFX_UP_AXIS" or "RELATIVE_TO_TERRAIN_NORMAL")
+                        && !(native.Kind == 2 && spawnOnTerrain && simulation == "WORLD_SPACE" && direction == "DISABLED"))
                         Fail("ParticleRelativeSpawnDirection", "Vfx.Preview.OrientationUnsupported");
+                    if (native.Kind == 2)
+                        terrainSpawnDirection = direction switch { "DISABLED" => 0, "RELATIVE_TO_TERRAIN_NORMAL" => 2, _ => 1 };
+                    if (native.Kind == 2 && spawnOnTerrain && simulation == "WORLD_SPACE" && terrainSpawnDirection != 2
+                        && (Get("SpreadMethod") is not { } terrainSpread || Scalar(terrainSpread, 1) != 0))
+                        Fail("SpreadMethod", "Vfx.Preview.OrientationUnsupported");
+                    if (native.Kind == 2 && spawnOnTerrain && simulation == "WORLD_SPACE"
+                        && (spinMin != Vector3.Zero || spinMax != Vector3.Zero))
+                        Fail("ParticleSpin_Min/ParticleSpin_Max", "Vfx.Preview.OrientationUnsupported");
                     flatTerrain = true;
-                    spawnOnTerrain = Scalar(Get("ParticlesSpawnOnTerrain"), 0) != 0;
                     Note("ParticleRelativeSpawnOrientation", native.Kind == 2 ? "Vfx.Preview.TerrainDecalCandidate" : "Vfx.Preview.FlatTerrainCandidate");
                 }
                 var force = Curve("ForceA", 0);
@@ -499,13 +596,15 @@ internal static class TotalWarVfxConverter
                     }
                     else if (native.Kind == 0 && orientation.IsZero
                         && Curve("ForceB", 0).IsZero && Curve("ForceC", 0).IsZero
-                        && Scalar(Get("EffectedByWindFactor"), 0) == 0 && Scalar(Get("WindVarianceFactor"), 0) == 0
                         && Scalar(Get("AllowEmitFromMesh"), 0) == 0 && Scalar(Get("ParticlesFollowTerrain"), 0) == 0
                         && Scalar(Get("UseSurfaceNormal"), 0) == 0)
                     {
                         // Force and drag curves use particle age, independently of spawn rate and direction.
                         particleForceCurve = true;
                         Note("ForceA/ParticleDeceleration", "Vfx.Preview.ParticleForceCurveCandidate");
+                        // Native adds wind separately; missing wind must not erase the supported force.
+                        foreach (var name in new[] { "EffectedByWindFactor", "WindVarianceFactor" })
+                            if (Scalar(Get(name), 0) != 0) Note(name, "Vfx.Preview.Unmapped");
                     }
                     else Note("ForceA", "Vfx.Preview.ForceUnsupported");
                 }
@@ -517,13 +616,15 @@ internal static class TotalWarVfxConverter
                         Note("ParticleInitialSpeed/SpawnArea", "Vfx.Preview.SpawnCandidate");
                 }
                 var loop = Scalar(Get("EmissionLoopAnim"), 0) != 0;
-                foreach (var name in new[] { "ParticleInitialParamLoopAnim", "ParticleLifeTimeLoopAnim", "ParticleInitialSpeedLoopAnim", "SpawnAreaLoopAnim" })
+                var initialParameterLoop = Scalar(Get("ParticleInitialParamLoopAnim"), 0) != 0;
+                if (initialParameterLoop && native.Kind != 0) Note("ParticleInitialParamLoopAnim", "Vfx.Preview.EmitterTimelineCandidate");
+                foreach (var name in new[] { "ParticleLifeTimeLoopAnim", "ParticleInitialSpeedLoopAnim", "SpawnAreaLoopAnim" })
                     if (Scalar(Get(name), 0) != 0) Note(name, "Vfx.Preview.EmitterTimelineCandidate");
                 foreach (var name in new[] { "AllowEmitFromMesh", "ParticlesFollowTerrain" })
                     if (Scalar(Get(name), 0) != 0) Note(name, "Vfx.Preview.Unmapped");
                 var particleCull = Get("ParticleCullDistances");
                 Vector4? particleCullDistances = null;
-                if (native.Kind == 1 && particleCull != null)
+                if (native.Kind is 0 or 1 && particleCull != null)
                 {
                     var distances = new Vector4(Number((string?)particleCull.Attribute("x"), "ParticleCullDistances"),
                         Number((string?)particleCull.Attribute("y"), "ParticleCullDistances"),
@@ -692,26 +793,50 @@ internal static class TotalWarVfxConverter
                     if (native.DistortionSoftScaleStrength != 1) Note("scale_strength", "Vfx.Preview.Unmapped");
                     if (native.SoftDistance > 65504) Note("soft_factor", "Vfx.Preview.RangeUnsupported");
                 }
-                var dynamicSpinDamping = !spinDeceleration.IsConstant && !spinDeceleration.HasBezierSegments
-                    && spinDeceleration.Minimum >= 0 && spinDeceleration.Maximum <= 5
+                var extendedSpriteDamping = spinDeceleration.Minimum < 0 || spinDeceleration.Maximum > 5;
+                float? spriteConstantDamping = null;
+                VfxSpriteNativeSpinDamping? spriteNativeDamping = null;
+                if (native.Kind == 0 && spinDeceleration.IsConstant && extendedSpriteDamping)
+                {
+                    try { spriteConstantDamping = VfxSpriteConstantSpinDamping.Create(Get("ParticleSpinDeceleration")!.Value); }
+                    catch (VfxMappingException exception) { Note(exception.Field, exception.Reason); }
+                }
+                if (native.Kind == 0 && !spinDeceleration.IsConstant && !spinDeceleration.HasBezierSegments
+                    && (extendedSpriteDamping || simulation == "LOCAL_SPACE_POSITION_ROTATION"))
+                {
+                    try { spriteNativeDamping = VfxSpriteNativeSpinDamping.Create(Get("ParticleSpinDeceleration")!.Value); }
+                    catch (VfxMappingException exception) { Note(exception.Field, exception.Reason); }
+                }
+                var dynamicSpinDamping = (!spinDeceleration.IsConstant && !spinDeceleration.HasBezierSegments
+                    && spinDeceleration.Minimum >= 0 && spinDeceleration.Maximum <= 5 || spriteConstantDamping.HasValue || spriteNativeDamping != null)
                     && native.Kind == 0 && meshMaterial == null && meshLoop == null && eventNodes.Length == 0
                     && (relativeMode is null or 0) && (simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY")
                     && angles.X == 0 && angles.Y == 0 && anglesMax.X == 0 && anglesMax.Y == 0
                     && spinMin.X == 0 && spinMin.Y == 0 && spinMax.X == 0 && spinMax.Y == 0
                     && (spinMin.Z != 0 || spinMax.Z != 0) && float.IsFinite(spinDirection.Z);
-                var complexSpinDamping = spinDeceleration.IsConstant && !spinDeceleration.IsZero
-                    && spinDeceleration.Minimum >= 0 && spinDeceleration.Maximum <= 5
-                    && (spinMin.X != 0 || spinMin.Y != 0 || spinMax.X != 0 || spinMax.Y != 0)
+                var spriteFullLocal = simulation == "LOCAL_SPACE_POSITION_ROTATION" && orientation.IsConstant && !flatTerrain
+                    && (spriteConstantDamping.HasValue || spriteNativeDamping != null) && (relativeMode is null or 0)
+                    && angles.X == 0 && angles.Y == 0 && anglesMax.X == 0 && anglesMax.Y == 0
+                    && spinMin.X == 0 && spinMin.Y == 0 && spinMax.X == 0 && spinMax.Y == 0;
+                var complexSpinDamping = !dynamicSpinDamping && !spinDeceleration.IsZero
+                    && (spriteNativeDamping == null || spriteFullLocal)
+                    && (spinDeceleration.IsConstant && spinDeceleration.Minimum >= 0 && spinDeceleration.Maximum <= 5
+                        || spriteConstantDamping.HasValue || spriteNativeDamping != null)
+                    && (spinMin.X != 0 || spinMin.Y != 0 || spinMax.X != 0 || spinMax.Y != 0
+                        || spriteConstantDamping.HasValue || spriteNativeDamping != null)
                     && native.Kind == 0 && meshMaterial == null && meshLoop == null && eventNodes.Length == 0
-                    && (relativeMode is null or 0 or 1) && (simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY")
+                    && (relativeMode is null or 0 or 1) && ((simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY") || spriteFullLocal)
                     && (spinMin != Vector3.Zero || spinMax != Vector3.Zero)
                     && (spinMin.X == 0 && spinMax.X == 0 || float.IsFinite(spinDirection.X))
                     && (spinMin.Y == 0 && spinMax.Y == 0 || float.IsFinite(spinDirection.Y))
                     && (spinMin.Z == 0 && spinMax.Z == 0 || float.IsFinite(spinDirection.Z));
                 VfxModelNativeCurve? nativeModelDamping = null;
                 VfxModelNativeOrientation? nativeModelOrientation = null;
+                VfxModelNativeMotion? nativeModelMotion = null;
                 var modelDampingSupported = spinDeceleration.IsConstant || !spinDeceleration.HasBezierSegments;
-                if (native.Kind == 1 && meshLoop == null && eventNodes.Length == 0)
+                var fullLocalModel = native.Kind == 1 && simulation == "LOCAL_SPACE_POSITION_ROTATION"
+                    && (relativeMode is null or 0 or 1) && meshLoop == null;
+                if (native.Kind == 1 && meshLoop == null && (eventNodes.Length == 0 || fullLocalModel))
                 {
                     if (spinDeceleration.HasBezierSegments || spinDeceleration.Minimum < 0 || spinDeceleration.Maximum > 5)
                     {
@@ -732,12 +857,18 @@ internal static class TotalWarVfxConverter
                         catch (VfxMappingException exception) { Note(exception.Field, exception.Reason); }
                     }
                 }
+                if (fullLocalModel && (!position.IsConstant || !orientation.IsConstant)
+                    && (orientation.IsConstant || nativeModelOrientation != null))
+                {
+                    try { nativeModelMotion = VfxModelNativeMotion.Create(Get("EmitterPosition")?.Value, nativeModelOrientation); }
+                    catch (VfxMappingException exception) { Note(exception.Field, exception.Reason); }
+                }
                 var modelQuaternionSpin = native.Kind == 1 && modelDampingSupported
                     && (spinMin.X != 0 || spinMin.Y != 0 || spinMax.X != 0 || spinMax.Y != 0
                         || (!spinDeceleration.IsConstant || nativeModelDamping != null)
                             && (spinMin.Z != 0 || spinMax.Z != 0)
                         || simulation == "LOCAL_SPACE_POSITION_ROTATION")
-                    && meshLoop == null && eventNodes.Length == 0
+                    && meshLoop == null && (eventNodes.Length == 0 || nativeModelMotion != null)
                     && (relativeMode is null or 0 or 1)
                     && ((simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY")
                         || simulation == "LOCAL_SPACE_POSITION_ROTATION" && (orientation.IsConstant || nativeModelOrientation != null))
@@ -746,19 +877,25 @@ internal static class TotalWarVfxConverter
                     && (spinMin.Z == 0 && spinMax.Z == 0 || float.IsFinite(spinDirection.Z));
                 if (native.Kind == 1 && simulation == "LOCAL_SPACE_POSITION_ROTATION" && !orientation.IsConstant && nativeModelOrientation == null)
                     Note("EmitterOrientation", "Vfx.Preview.Unmapped");
-                if (!spinDeceleration.IsZero && !modelQuaternionSpin && (!spinDeceleration.IsConstant && !dynamicSpinDamping && !complexSpinDamping
-                    || spinDeceleration.Minimum < 0 || spinDeceleration.Maximum > 5))
+                if (!spinDeceleration.IsZero && !modelQuaternionSpin && !dynamicSpinDamping && !complexSpinDamping
+                    && (!spinDeceleration.IsConstant || extendedSpriteDamping))
                 {
                     Note("ParticleSpinDeceleration", "Vfx.Preview.ForceUnsupported");
                     spinMin = spinMax = Vector3.Zero;
                 }
                 if (spinMin != Vector3.Zero || spinMax != Vector3.Zero)
                     Note("ParticleSpin_Min/ParticleSpin_Max", "Vfx.Preview.SpinCandidate");
+                var spriteTables = native.Kind == 0 && native.Distortion == 0 && meshMaterial == null && meshLoop == null
+                    && (string?)pass?.Attribute("value") is "FULLRES_DEFERRED_ALPHA" or "HALFRES_DEFERRED_ALPHA";
                 var projected = new VfxPreviewEmitter
                 {
                     Name = layer.Name, Render = native, Emission = emission, Life = life, Scale = scale,
                     IsEventHelper = eventHelper, Events = events,
                     InitialScale = Curve("ParticleInitialScale", 1, planarScale: native.Kind == 0), InitialAlpha = initialAlpha,
+                    SpriteScaleTable = spriteTables ? VfxSpriteNativeScaleCurve.TryCreateAnalytic(properties.GetValueOrDefault("ParticleScale")?.Value) : null,
+                    SpriteInitialAlphaTable = spriteTables ? VfxSpriteNativeScaleCurve.TryCreateAnalytic(properties.GetValueOrDefault("ParticleInitialAlpha")?.Value, "x") : null,
+                    SpriteAlphaTable = spriteTables && alphaStart == Vector2.Zero && alphaEnd == Vector2.Zero
+                        ? VfxSpriteNativeScaleCurve.TryCreateAnalytic(Behaviour("curve_alpha")?.Value, "alpha") : null,
                     Position = position, Orientation = orientation, Speed = speed, SpawnBox = box, SpawnRadius = radius,
                     Colour = colour, Alpha = alpha, Force = force, Deceleration = deceleration,
                     AlphaStartOffset = alphaStart, AlphaEndOffset = alphaEnd,
@@ -773,17 +910,26 @@ internal static class TotalWarVfxConverter
                     OrientationMin = angles, OrientationMax = anglesMax, RelativeOrientation = relativeOrientation,
                     SpinMin = spinMin, SpinMax = spinMax, SpinDirection = spinDirection,
                     SpinDeceleration = spinDeceleration, DynamicSpinDamping = dynamicSpinDamping,
+                    SpriteConstantSpinDamping = spriteConstantDamping,
+                    SpriteNativeSpinDamping = spriteNativeDamping,
+                    SpriteIndependentSpinRandom = spriteFullLocal && complexSpinDamping,
                     ComplexSpinDamping = complexSpinDamping, ModelQuaternionSpin = modelQuaternionSpin,
                     ModelSpinDeceleration = nativeModelDamping, ModelEmitterOrientation = nativeModelOrientation,
+                    ModelEmitterMotion = nativeModelMotion,
                     ModelEmitterBirthLoop = nativeModelOrientation != null && Scalar(Get("EmitterOrientationLoopAnim"), 0) != 0,
                     ModelEmitterFollowLoop = Scalar(Get("InfiniteLife"), 0) != 0,
-                    RequiresFlatTerrain = flatTerrain, SpawnOnTerrain = spawnOnTerrain,
+                    RequiresFlatTerrain = flatTerrain, SpawnOnTerrain = spawnOnTerrain, TerrainSpawnDirection = terrainSpawnDirection,
                     ParticleCullDistances = particleCullDistances,
                     SpawnAngle = angle, SpawnSpread = spread, ZeroSpawnArc = zeroSpawnArc, DefaultVerticalSpawn = defaultVerticalSpawn,
-                    LegacySpreadSpawn = legacySpreadSpawn, Alignment = native.Kind is 1 or 2 ? 2 : alignment,
-                    Atlas = atlas, LoopEmission = loop,
+                    LegacySpreadSpawn = legacySpreadSpawn, RadialSpawnDirection = radialSpawnDirection,
+                    SpawnAreaArc = spawnAreaArc, SpawnAreaAngle = spawnAreaAngle,
+                    Alignment = native.Kind is 1 or 2 ? 2 : alignment,
+                    Atlas = atlas, LoopEmission = loop, InitialParameterLoop = initialParameterLoop,
                     VelocityStretch = stretch, VelocityStretchCap = stretchCap, TrailMode = trail,
                     MinimumPixelSize = minimumPixelSize,
+                    MinimumPixelHalfResolution = (string?)pass?.Attribute("value") == "HALFRES_DEFERRED_ALPHA",
+                    HalfResolution = (string?)pass?.Attribute("value") == "HALFRES_DEFERRED_ALPHA",
+                    FullResolution = (string?)pass?.Attribute("value") == "FULLRES_DEFERRED_ALPHA",
                     PremultipliedAlpha = meshMaterial == null && premultiplied && native.Distortion == 0, AdditiveMultiplier = additive,
                     AlphaCrush = alphaCrush, SharpAlphaCrush = sharpAlphaCrush,
                     CoveredColourMultiplier = coveredColourMultiplier,
@@ -877,9 +1023,7 @@ internal static class TotalWarVfxConverter
 
             void DiscardLayerResources()
             {
-                animationBudget.Restore(animationCheckpoint);
-                foreach (var cacheKey in modelCache.Keys.Where(key => !cachedModels.Contains(key)).ToArray())
-                    modelCache.Remove(cacheKey);
+                context.Restore(animationCheckpoint);
                 result.Textures.RemoveRange(textureCount, result.Textures.Count - textureCount);
                 result.TexturePaths.RemoveRange(textureCount, result.TexturePaths.Count - textureCount);
                 result.TextureUsages.RemoveRange(textureCount, result.TextureUsages.Count - textureCount);
@@ -951,8 +1095,8 @@ internal static class TotalWarVfxConverter
             {
                 if (Modifier("vs_cell_texture") == null && Modifier("vs_animated_texture") == null) return new();
                 var animated = Modifier("vs_animated_texture") != null;
-                var outerX = Integer(Behaviour("atlas_number_of_cells_x"), 1, 1, 256);
-                var outerY = Integer(Behaviour("atlas_number_of_cells_y"), 1, 1, 256);
+                var outerX = Math.Max(1, Integer(Behaviour("atlas_number_of_cells_x"), 1, 0, 256));
+                var outerY = Math.Max(1, Integer(Behaviour("atlas_number_of_cells_y"), 1, 0, 256));
                 var outerCell = Integer(Behaviour("atlas_cell"), 0, 0, outerX * outerY - 1);
                 var columns = 1; var rows = 1;
                 if (animated)
@@ -982,17 +1126,17 @@ internal static class TotalWarVfxConverter
             }
             void Note(string field, string reason) => result.Diagnostics.Add(new(snapshot.SourcePath, layer.Name, field, reason));
         }
-        foreach (var reference in document.Layers.Where(x => x.Kind == "Reference"))
+        foreach (var reference in references)
         {
             if (rootSelection != null && !rootSelection.ReferenceNames.Contains(reference.Name, StringComparer.Ordinal)) continue;
-            var animationCheckpoint = animationBudget.Capture();
+            var animationCheckpoint = context.Capture();
             try
             {
                 var node = reference.Element;
                 var path = (string?)node.Attribute("vfx_ref") ?? "";
                 if (!path.StartsWith("vfx/", StringComparison.OrdinalIgnoreCase) && !path.StartsWith("vfx\\", StringComparison.OrdinalIgnoreCase)) path = "vfx\\" + path;
                 if (!path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)) path += ".xml";
-                var child = ConvertNested(new(Read(path), path, snapshot.Resolve, snapshot.Quality), visited, depth + 1, node, animationBudget);
+                var child = ConvertNested(new(Read(path), path, snapshot.Resolve, snapshot.Quality), visited, depth + 1, node, context);
                 if (result.Emitters.Count + child.Emitters.Count > 256) Fail("vfx_ref", "Vfx.Preview.RangeUnsupported");
                 if (result.Emitters.Sum(emitter => emitter.RenderLayerCount) + child.Emitters.Sum(emitter => emitter.RenderLayerCount) > 512)
                     Fail("vfx_ref", "Vfx.Preview.RangeUnsupported");
@@ -1000,6 +1144,7 @@ internal static class TotalWarVfxConverter
                     Fail("vfx_ref", "Vfx.Preview.RangeUnsupported");
                 RebaseResources(child, result);
                 var referencedEmitters = new List<VfxPreviewEmitter>();
+                var referenceInstance = new object();
                 foreach (var emitter in child.Emitters)
                 {
                     if (emitter.IsEventTemplate) { referencedEmitters.Add(emitter); continue; }
@@ -1019,7 +1164,8 @@ internal static class TotalWarVfxConverter
                         new(Attribute(node, "pos_x", 0), Attribute(node, "pos_y", 0), Attribute(node, "pos_z", 0)),
                         new(Attribute(node, "rot_x", 0), Attribute(node, "rot_y", 0), Attribute(node, "rot_z", 0)),
                         Bounds(node, "start_time", 0), speed, Bounds(values, "spawn_rate_scale_factor", 1),
-                        Bounds(values, "particle_lifetime_bias", 0), Bounds(values, "emitter_lifetime_bias", 0), Tint("min"), Tint("max"))];
+                        Bounds(values, "particle_lifetime_bias", 0), Bounds(values, "emitter_lifetime_bias", 0), Tint("min"), Tint("max"))
+                        { InstanceKey = referenceInstance }];
                     ValidateReferenceProjection(emitter);
                     referencedEmitters.Add(emitter);
                 }
@@ -1047,9 +1193,9 @@ internal static class TotalWarVfxConverter
                         result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, Name(values) + "/" + attribute.Name.LocalName, "Vfx.Preview.Unmapped"));
             }
             catch (VfxMappingException exception)
-            { animationBudget.Restore(animationCheckpoint); result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, exception.Field, exception.Reason)); }
+            { context.Restore(animationCheckpoint); result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, exception.Field, exception.Reason)); }
             catch (Exception exception) when (exception is InvalidDataException or FormatException or System.Xml.XmlException)
-            { animationBudget.Restore(animationCheckpoint); result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, "vfx_ref", "Vfx.Preview.InvalidData")); }
+            { context.Restore(animationCheckpoint); result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, "vfx_ref", "Vfx.Preview.InvalidData")); }
         }
         // Event children are templates. Only an actual parent particle instantiates them at runtime.
         foreach (var emitter in result.Emitters.Where(e => !e.IsEventTemplate).ToArray())
@@ -1057,14 +1203,14 @@ internal static class TotalWarVfxConverter
             {
                 if (particleEvent.Resolved) continue;
                 particleEvent.Resolved = true;
-                var checkpoint = animationBudget.Capture();
+                var checkpoint = context.Capture();
                 var field = particleEvent.OnDeath ? "OnParticleDeath" : "OnParticleSpawn";
                 try
                 {
                     var path = particleEvent.Path.Replace('/', '\\');
                     if (!path.StartsWith("vfx\\", StringComparison.OrdinalIgnoreCase)) path = "vfx\\" + path;
                     if (!path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase)) path += ".xml";
-                    var child = ConvertNested(new(Read(path), path, snapshot.Resolve, snapshot.Quality), visited, depth + 1, null, animationBudget);
+                    var child = ConvertNested(new(Read(path), path, snapshot.Resolve, snapshot.Quality), visited, depth + 1, null, context);
                     if (result.Emitters.Count + child.Emitters.Count > 256
                         || result.Emitters.Sum(e => e.RenderLayerCount) + child.Emitters.Sum(e => e.RenderLayerCount) > 512
                         || result.MeshMaterials.Count + child.MeshMaterials.Count > 256)
@@ -1080,12 +1226,12 @@ internal static class TotalWarVfxConverter
                 }
                 catch (VfxMappingException exception)
                 {
-                    animationBudget.Restore(checkpoint);
+                    context.Restore(checkpoint);
                     result.Diagnostics.Add(new(snapshot.SourcePath, emitter.Name, field + "/" + exception.Field, exception.Reason));
                 }
                 catch (Exception exception) when (exception is InvalidDataException or FormatException or System.Xml.XmlException)
                 {
-                    animationBudget.Restore(checkpoint);
+                    context.Restore(checkpoint);
                     result.Diagnostics.Add(new(snapshot.SourcePath, emitter.Name, field, "Vfx.Preview.InvalidData"));
                 }
             }
@@ -1107,22 +1253,39 @@ internal static class TotalWarVfxConverter
             string animation = "", float animationSpeed = 1, float maximumLife = 1)
         {
             var animated = !string.IsNullOrWhiteSpace(animation);
-            var cacheKey = (path.Replace('\\', '/').ToLowerInvariant(), partIndex, animation.Replace('\\', '/').ToLowerInvariant(),
+            var cacheKey = new ModelCacheKey(path.Replace('\\', '/').ToLowerInvariant(), partIndex, animation.Replace('\\', '/').ToLowerInvariant(),
                 animated ? animationSpeed : 0, animated ? maximumLife : 0, pivot);
             if (modelCache.TryGetValue(cacheKey, out var cached)) return cached;
             WsModelMaterialFile? material = null;
             byte[]? materialBytes = null;
+            WsModelFile? wrapper = null;
             if (path.EndsWith(".wsmodel", StringComparison.OrdinalIgnoreCase))
             {
-                var wrapper = new WsModelFile(new PackFile(Path.GetFileName(path), new MemorySource(Read(path))));
+                wrapper = new WsModelFile(new PackFile(Path.GetFileName(path), new MemorySource(Read(path))));
                 if (wrapper.GeometryPaths.Count != 1) Fail("RigidData", "Vfx.Preview.GeometryUnsupported");
-                var entry = wrapper.MaterialList.SingleOrDefault(x => x.LodIndex == 0 && x.PartIndex == partIndex);
+                path = wrapper.GeometryPath;
+            }
+            if (!path.EndsWith(".rigid_model_v2", StringComparison.OrdinalIgnoreCase)) Fail("RigidData", "Vfx.Preview.GeometryUnsupported");
+            var file = ModelFactory.Create().Load(Read(path));
+            if (file.ModelList.Length == 0 || file.ModelList[0].Length is < 1 or > 64 || partIndex >= file.ModelList[0].Length)
+                Fail("RigidData", "Vfx.Preview.GeometryUnsupported");
+            if (wrapper != null)
+            {
+                var exact = wrapper.MaterialList.Where(x => x.LodIndex == 0 && x.PartIndex == partIndex).ToArray();
+                if (exact.Length > 1) Fail("material", "Vfx.Preview.AmbiguousField");
+                var entry = exact.SingleOrDefault();
+                if (entry == null && wrapper.MaterialList.Any(x => x.LodIndex == -1 && x.PartIndex == -1))
+                {
+                    // Omitted indexes are unambiguous only for a single material and single mesh/LOD.
+                    if (wrapper.MaterialList.Count != 1 || file.ModelList.Length != 1 || file.ModelList[0].Length != 1)
+                        Fail("material", "Vfx.Preview.AmbiguousField");
+                    entry = wrapper.MaterialList[0];
+                }
                 if (entry != null)
                 {
                     materialBytes = Read(entry.MaterialPath);
                     material = new WsModelMaterialFile(new PackFile("material", new MemorySource(materialBytes)));
                 }
-                path = wrapper.GeometryPath;
             }
             VfxScrollingMeshMaterial? scrolling = null;
             if (material != null && VfxScrollingMeshMaterial.Supports(material.ShaderPath))
@@ -1136,10 +1299,6 @@ internal static class TotalWarVfxConverter
             }
             if (scrolling == null && material != null && !material.Textures.ContainsKey(TextureType.Diffuse) && !material.Textures.ContainsKey(TextureType.BaseColour))
                 Fail(material.ShaderPath, "Vfx.Preview.MaterialUnsupported");
-            if (!path.EndsWith(".rigid_model_v2", StringComparison.OrdinalIgnoreCase)) Fail("RigidData", "Vfx.Preview.GeometryUnsupported");
-            var file = ModelFactory.Create().Load(Read(path));
-            if (file.ModelList.Length == 0 || file.ModelList[0].Length is < 1 or > 64 || partIndex >= file.ModelList[0].Length)
-                Fail("RigidData", "Vfx.Preview.GeometryUnsupported");
             var part = file.ModelList[0][partIndex];
             if (!animated && part.Mesh.VertexList.Any(x => x.WeightCount > 0)) Fail("RigidData", "Vfx.Preview.GeometryUnsupported");
             if (scrolling?.UsesVertexColour == true && part.Mesh.VertexList.Any(x => x.UnormColour == null))
@@ -1253,18 +1412,15 @@ internal static class TotalWarVfxConverter
 
     private static void ValidateReferenceProjection(VfxPreviewEmitter emitter)
     {
-        double startMin = Math.Min(emitter.Start.Min, emitter.Start.Max), startMax = Math.Max(emitter.Start.Min, emitter.Start.Max);
         double rate = emitter.Emission.Maximum, life = emitter.Life.Maximum, duration = Math.Max(emitter.Duration.Min, emitter.Duration.Max);
         foreach (var reference in emitter.References)
         {
             if (Math.Min(reference.Rate.Min, reference.Rate.Max) < 0 || Math.Max(reference.Rate.Min, reference.Rate.Max) > 1000)
                 Fail("spawn_rate_scale_factor", "Vfx.Preview.RangeUnsupported");
-            startMin = Math.Min(reference.Start.Min, reference.Start.Max) + startMin / reference.Speed;
-            startMax = Math.Max(reference.Start.Min, reference.Start.Max) + startMax / reference.Speed;
             rate *= Math.Max(reference.Rate.Min, reference.Rate.Max) * reference.Speed;
             life = (life + Math.Max(reference.LifeBias.Min, reference.LifeBias.Max)) / reference.Speed;
             duration = (duration + Math.Max(reference.DurationBias.Min, reference.DurationBias.Max)) / reference.Speed;
-            if (startMin < -30 || startMax > 600 || !double.IsFinite(rate) || rate > 10000 || rate < 0
+            if (!double.IsFinite(rate) || rate > 10000 || rate < 0
                 || !double.IsFinite(life) || !double.IsFinite(duration) || duration > 600)
                 Fail("vfx_ref", "Vfx.Preview.RangeUnsupported");
         }

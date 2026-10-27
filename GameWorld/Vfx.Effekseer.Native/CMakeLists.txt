@@ -40,9 +40,19 @@ target_include_directories(AecnVfxMaterialCompiler PRIVATE
     "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/Effekseer"
     "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/EffekseerMaterialCompiler/DirectX11")
 target_link_libraries(AecnVfxMaterialCompiler PRIVATE EffekseerRendererDX11 d3dcompiler)
+add_executable(AecnVfxSceneShaderCompiler CompileSceneShaders.cpp)
+target_link_libraries(AecnVfxSceneShaderCompiler PRIVATE d3dcompiler bcrypt)
+set(scene_shader_sources "${CMAKE_CURRENT_SOURCE_DIR}/FloatSceneShaderSources.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/SceneUtilityShaderSources.h")
+set(compiled_scene_shaders "${CMAKE_CURRENT_BINARY_DIR}/CompiledFloatSceneShaders.h")
+set_source_files_properties(CompileSceneShaders.cpp PROPERTIES OBJECT_DEPENDS "${scene_shader_sources}")
+add_custom_command(OUTPUT "${compiled_scene_shaders}"
+    COMMAND $<TARGET_FILE:AecnVfxSceneShaderCompiler> "${compiled_scene_shaders}"
+    DEPENDS AecnVfxSceneShaderCompiler ${scene_shader_sources}
+    VERBATIM)
 set(compiled_materials "${CMAKE_CURRENT_BINARY_DIR}/CompiledVfxMaterials.h")
 set(material_headers
-    "${CMAKE_CURRENT_SOURCE_DIR}/CoverageMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/ScrollingMeshMaterial.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/BulkSpriteShaderSources.h" "${CMAKE_CURRENT_SOURCE_DIR}/NativeMboitShaderSources.h" "${CMAKE_CURRENT_SOURCE_DIR}/CoverageMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/ScrollingMeshMaterial.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/OneShotMeshMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/BasicMeshMaterial.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/GemstoneMeshMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/AnimatedUvSpriteMaterial.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/BasicSpriteMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/PremultiplyAnimatedMaterial.h"
@@ -54,16 +64,18 @@ set(material_headers
 # Localized MSVC include output must not leave the generator or embedded shaders stale.
 set_source_files_properties(CompileMaterials.cpp PROPERTIES OBJECT_DEPENDS "${material_headers}")
 set_source_files_properties(Bridge.cpp PROPERTIES OBJECT_DEPENDS
-    "${compiled_materials};${CMAKE_CURRENT_SOURCE_DIR}/Bridge.h;${CMAKE_CURRENT_SOURCE_DIR}/FloatSceneTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/WeightedDistortionTarget.h")
+    "${compiled_materials};${compiled_scene_shaders};${CMAKE_CURRENT_SOURCE_DIR}/Bridge.h;${CMAKE_CURRENT_SOURCE_DIR}/FloatSceneTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/WeightedDistortionTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/SpriteUploadCache.h;${CMAKE_CURRENT_SOURCE_DIR}/BulkSpriteQueue.h;${CMAKE_CURRENT_SOURCE_DIR}/HalfResolutionScene.h")
 add_custom_command(OUTPUT "${compiled_materials}"
     COMMAND $<TARGET_FILE:AecnVfxMaterialCompiler> "${compiled_materials}"
     DEPENDS AecnVfxMaterialCompiler ${material_headers}
     VERBATIM)
-add_library(AssetEditor.CN.Effekseer SHARED Bridge.cpp "${compiled_materials}")
+add_library(AssetEditor.CN.Effekseer SHARED Bridge.cpp "${compiled_materials}" "${compiled_scene_shaders}")
 target_include_directories(AssetEditor.CN.Effekseer PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}"
     "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/Effekseer"
-    "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/EffekseerRendererDX11")
+    "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/EffekseerRendererDX11"
+    "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/EffekseerRendererDX11/EffekseerRenderer"
+    "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/EffekseerRendererCommon")
 target_link_libraries(AssetEditor.CN.Effekseer PRIVATE EffekseerRendererDX11 d3d11 d3dcompiler)
 set_target_properties(AssetEditor.CN.Effekseer PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")

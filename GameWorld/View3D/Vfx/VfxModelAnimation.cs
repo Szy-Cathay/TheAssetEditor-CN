@@ -8,14 +8,21 @@ namespace GameWorld.Core.Vfx;
 
 internal sealed class VfxModelAnimationBudget
 {
+    private const long VertexBytes = 72, MaximumBytes = 96000000, MaximumIndices = 6000000;
     private long _vertices, _indices;
 
     public void Reserve(long vertices, long indices)
     {
-        if (_vertices + vertices > 1000000 || _indices + indices > 6000000)
+        // Preserve the original combined byte budget while allowing different geometry ratios.
+        if (vertices < 0 || indices < 0 || vertices > MaximumBytes / VertexBytes - _vertices
+            || indices > MaximumIndices - _indices)
             throw new VfxMappingException("RigidData/Animation", "Vfx.Preview.RangeUnsupported");
-        _vertices += vertices;
-        _indices += indices;
+        var totalVertices = _vertices + vertices;
+        var totalIndices = _indices + indices;
+        if (totalVertices * VertexBytes + totalIndices * sizeof(int) > MaximumBytes)
+            throw new VfxMappingException("RigidData/Animation", "Vfx.Preview.RangeUnsupported");
+        _vertices = totalVertices;
+        _indices = totalIndices;
     }
 
     public void Release(long vertices, long indices) { _vertices -= vertices; _indices -= indices; }

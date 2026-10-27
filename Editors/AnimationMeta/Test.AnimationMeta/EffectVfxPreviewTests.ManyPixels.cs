@@ -121,8 +121,12 @@ public partial class EffectVfxPreviewTests
                 foreach (var instance in result.Instances) instance.Update(1);
                 var nodes = root.Children.Select(marker => (VfxPreviewSceneNode)marker.Children.Single()).ToArray();
                 foreach (var node in nodes)
+                {
+                    // This screen-space grid crosses world Y0; isolate instance contribution without a scene floor.
+                    node.FlatGroundHeight = null;
                     Assert.That(node.PrepareFrame(node.Parent.ModelMatrix), Is.True,
                         string.Join(',', node.Diagnostics.Select(item => item.ReasonKey)));
+                }
                 var label = mixed ? "mixed-sixteen" : "same-sixteen";
                 var baseline = RenderManyOfficial(graphics.GraphicsDevice, [], label + "-baseline", camera);
                 var combined = RenderManyOfficial(graphics.GraphicsDevice, nodes, label + "-combined", camera);
@@ -144,7 +148,7 @@ public partial class EffectVfxPreviewTests
                     });
                     signals.Add(new { Index = index, entries[index].VfxName, Solo = soloMask.Length, Contribution = contribution, Reversed = reverseSignal });
                 }
-                ManyEvidence(label + ".json", new { Scope = "DIAG: sixteen independent META instances across both owners, using complete original official VFX and dependencies. Only metadata positions and timing are arranged for distinct screen regions. Not an untouched official META or native visual acceptance.",
+                ManyEvidence(label + ".json", new { Scope = "DIAG: sixteen independent META instances across both owners, using complete original official VFX and dependencies. Only metadata positions and timing are arranged for distinct screen regions. Scene ground is disabled because this layout crosses world Y0. Not an untouched official META or native visual acceptance.",
                     Signals = signals, Sources = official.Origins.Values, LookupMisses = official.Missing.ToArray() });
             }
             finally { foreach (var instance in result.Instances) instance.CleanUp(); }

@@ -37,6 +37,17 @@ public sealed class VfxAttachmentHistory
     }
     public Matrix Sample(float time) => Sample(time, false);
     public Matrix SampleCurrent(float time) => Sample(time, true);
+    public float? NextSampleTime(float time)
+    {
+        var low = 0; var high = _samples.Count;
+        while (low < high)
+        {
+            var middle = (high + low) / 2;
+            if (_samples[middle].Time <= time) low = middle + 1;
+            else high = middle;
+        }
+        return low < _samples.Count ? _samples[low].Time : null;
+    }
     private Matrix Sample(float time, bool current)
     {
         if (_samples.Count == 0) return Matrix.Identity;
