@@ -3,6 +3,8 @@ using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using GameWorld.Core.Animation;
 using GameWorld.Core.Services;
+using Serilog;
+using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
 using Shared.Core.Events.Global;
 using Shared.Core.PackFiles;
@@ -16,6 +18,7 @@ namespace Editors.Shared.Core.Common.ReferenceModel
 {
     public partial class BinAnimationViewModel : ObservableObject
     {
+        private readonly ILogger _logger = Logging.Create<BinAnimationViewModel>();
         private readonly SceneObject _sceneObject;
         private readonly SceneObjectEditor _sceneObjectEditor;
         private readonly IPackFileService _pfs;
@@ -89,7 +92,7 @@ namespace Editors.Shared.Core.Common.ReferenceModel
             FragmentList.UpdatePossibleValues(allPossibleFragments);
         }
 
-        List<IAnimationBinGenericFormat> LoadFragmentsForSkeleton(string skeletonName, bool onlyPacksThatCanBeSaved = false)
+        internal List<IAnimationBinGenericFormat> LoadFragmentsForSkeleton(string skeletonName, bool onlyPacksThatCanBeSaved = false)
         {
             var outputFragments = new List<IAnimationBinGenericFormat>();
             var animPacks = PackFileServiceUtility.GetAllAnimPacks(_pfs);
@@ -105,6 +108,16 @@ namespace Editors.Shared.Core.Common.ReferenceModel
                 var fragments = animPackFile.GetGenericAnimationSets(skeletonName);
                 foreach (var fragment in fragments)
                     outputFragments.Add(fragment);
+            }
+            var jsonFragments = ThreeKingdomsAnimationFragment.LoadForSkeleton(
+                _pfs, skeletonName, onlyPacksThatCanBeSaved,
+                (path, exception) => _logger.Warning(exception, "Unable to preview JSON animation fragment {Path}", path));
+            foreach (var fragment in jsonFragments)
+            {
+                outputFragments.Add(fragment);
+                if (fragment.Diagnostics.Count != 0)
+                    _logger.Warning("JSON animation fragment {Path} contains unsupported slots: {Diagnostics}",
+                        fragment.FullPath, string.Join("; ", fragment.Diagnostics));
             }
             return outputFragments;
         }

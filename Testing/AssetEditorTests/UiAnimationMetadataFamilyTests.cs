@@ -34,6 +34,7 @@ public class UiAnimationMetadataFamilyTests
         "Editors/MetaDataEditor/AnimationMeta/MetaEditor/View/MetaDataEntryView.xaml",
         "Editors/MetaDataEditor/AnimationMeta/MetaEditor/View/NewMetaDataEntryWindow.xaml",
         "Editors/MetaDataEditor/AnimationMeta/SuperView/EditorView.xaml",
+        "Editors/MetaDataEditor/AnimationMeta/SuperView/SuperViewWorkspaceView.xaml",
         "Editors/MetaDataEditor/AnimationMeta/SuperView/Inspection/MetaDataProblemListView.xaml",
         "Editors/MetaDataEditor/AnimationMeta/SuperView/Inspection/MetaDataTimelineView.xaml",
         "Editors/Shared/Editors.Shared.Core/Common/AnimationPlayer/AnimationPlayerView.xaml",
@@ -61,7 +62,7 @@ public class UiAnimationMetadataFamilyTests
 
         NUnitAssert.Multiple(() =>
         {
-            NUnitAssert.That(sources.Count, Is.EqualTo(33));
+            NUnitAssert.That(sources.Count, Is.EqualTo(34));
             NUnitAssert.That(combined, Does.Contain("AeBrush."));
             NUnitAssert.That(combined, Does.Contain("AppFontFamily"));
             NUnitAssert.That(combined, Does.Contain("AppFontWeight"));
@@ -673,6 +674,9 @@ public class UiAnimationMetadataFamilyTests
             "AnimationMeta",
             "SuperView",
             "SuperViewViewModel.cs"));
+        XNamespace mathViews = "clr-namespace:CommonControls.MathViews;assembly=Shared.Ui";
+        var attributeDocument = XDocument.Parse(attributeView);
+        var vectorEditors = attributeDocument.Descendants(mathViews + "Vector3View").ToArray();
 
         NUnitAssert.Multiple(() =>
         {
@@ -716,12 +720,10 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(
                 superViewViewModel,
                 Does.Contain("ScrollBarVisibility.Auto"));
-            NUnitAssert.That(
-                attributeView,
-                Does.Contain("HorizontalAlignment=\"Left\""));
-            NUnitAssert.That(
-                attributeView,
-                Does.Contain("MinWidth=\"300\""));
+            NUnitAssert.That(vectorEditors, Has.Length.EqualTo(2));
+            NUnitAssert.That(vectorEditors.All(editor =>
+                (string?)editor.Attribute("HorizontalAlignment") == "Stretch" &&
+                (string?)editor.Attribute("MinWidth") == "0"), Is.True);
             NUnitAssert.That(
                 attributeView,
                 Does.Contain("Style=\"{StaticResource AeForm.Label}\""));

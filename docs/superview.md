@@ -71,6 +71,8 @@
 
 `SuperViewViewModel` 继承 `EditorHostBase`。基类建立共享 `IWpfGame`、核心 View3D 组件、参考模型 VM、动画播放器和场景对象集合；超级视图构造时再显式加入 scoped 的 `CombatMetaDataGizmoComponent` 与 `MetaDataMarkerPickerComponent`。
 
+工具入口使用模块内的 `SuperViewWorkspaceView`，保留主窗口资源树，中间为紧凑菜单、原三维宿主及公共播放器，右侧依次为参考资源、元数据、预览设置和诊断分类。诊断独占右侧内容区，问题列表沿用同一检查索引与选择状态，不挤占双 META 编辑区。分类切换只改变可见内容；META 标记、问题或时间轴导航必须同时切回元数据分类和正确的文档 owner。原 `EditorView` 仍是双 META 面板及字段专属祖先绑定的锚点，不再由共享 `EditorHostView` 的外层滚动容器承载。场景和播放器在分类切换时不重建。
+
 超级视图不插入 `KitbashSceneComponentSet`。其专属 Gizmo 使用共享 `Gizmo` 原语，但编辑目标是 `ParsedMetadataAttribute`，不是 `SelectionManager` 中的模型选择。专属 marker picker 只消费当前 `MetaDataInspectionIndex` 与当前可见 marker 预览，同样不进入共享模型选择。
 
 ## 4. 对象与状态所有权
@@ -139,6 +141,8 @@
 
 超级视图不应自己再写一套 Fragment/Slot 解析逻辑。若游戏数据库或引用语义变化，先修共享参考模型层并验证所有调用者。
 
+三国独立存放在 `animations/database/battle/fragments/` 的 JSON `.txt` 片段由共享格式层只读解析，再进入同一 Fragment/Slot 选择链；保持原始动画及两类 META 引用，不生成替代动画包或写回 JSON。下拉显示使用文件名，完整资源路径仍用于身份与查找，避免带反斜杠的路径回写搜索框后清空所选片段及动作槽。禁用、空条目及尚未还原的组合语义不能伪装成可正常播放的槽位。
+
 ### 6.2 更新事件
 
 `SuperViewViewModel` 收到场景对象更新后：
@@ -172,7 +176,7 @@
 `MetaDataBuildResult` 一次返回三类运行时结果：
 
 1. 场景实例：普通 Prop、Animated Prop、Effect、战斗定位器和通用空间标记；
-2. 根播放器动画规则：Dock Equipment 和 Transform Bone；Animated Prop 的根变换复制仍由其附属播放器持有并随实例清理；
+2. 根播放器动画规则：Dock Equipment 和 Transform Bone；普通 Animated Prop 的根变换复制由其附属播放器持有并随实例清理。三国 v13、挂点模式 2 且带风字段时保留绑定根姿态，由本实例更新归一化后的节点挂点矩阵，风规则仍归其附属播放器；
 3. 结构化诊断：原始 `ParsedMetadataAttribute` 引用、`Persistent`/`Animation` owner、严重程度、本地化原因键，以及可用的时间范围、空间位置、资源路径或骨骼上下文。
 
 构建器不直接把根规则写入 `AnimationPlayer`。调用者只消费完整结果，不参与 META 类型分派。`MetaDataBuildDiagnostic.ReasonKey` 必须对应中文本地化资源；诊断只描述预览问题，不改变字段校验、dirty 或保存门禁。
@@ -279,7 +283,7 @@ Effect 通过共享场景绘制参数读取 `GameWeatherStore` 中明确选择�
 
 问题列表是同一检查索引的另一个只读投影：字段输入无效显示为保存前必须修正的“错误”；负时间、倒置/超出 clip 范围、资源缺失、规则创建失败或显式的预览不可用诊断显示为不阻塞保存的“警告”。单纯没有预览实例不会自动变成问题，未知或未支持 payload 仍按原有语义保留；预览警告不得改动字段校验或保存门禁。
 
-点击问题项只导航到其 owner 和同一个源对象；若 authored start 在当前 clip 内则跳转，若已建立可用的三维焦点则同时定位，否则保留选择且不移动时间或相机。问题列表、META 列表、时间轴和 3D 预览都以 `owner + ParsedMetadataAttribute` 引用身份对齐，选择同步不能触发完整预览重建，导航不能自动修改文档。
+点击问题项只导航到其 owner 和同一个源对象；再次点击已选中的问题或按 Enter 同样可以从诊断页返回对应元数据。若 authored start 在当前 clip 内则跳转，若已建立可用的三维焦点则同时定位，否则保留选择且不移动时间或相机。问题列表、META 列表、时间轴和 3D 预览都以 `owner + ParsedMetadataAttribute` 引用身份对齐，选择同步不能触发完整预览重建，导航不能自动修改文档。
 
 ## 10. 空间元数据能力目录
 
@@ -307,7 +311,7 @@ Effect 通过共享场景绘制参数读取 `GameWeatherStore` 中明确选择�
 
 `CombatMetaDataEditSession` 不使用 Kitbash 的共享模型选择和 `TransformGizmoWrapper`。它为每个文档 owner 维护自己的命令历史，直接对 `ParsedMetadataAttribute` 的已适配空间字段执行事务。
 
-`CombatMetaDataGizmoComponent` 只提供 translate/rotate，默认以局部参考系显示；它不提供缩放，不选取网格，不改变模型节点。
+`CombatMetaDataGizmoComponent` 只提供 translate/rotate，默认以局部参考系显示；它不提供缩放，不选取网格，不改变模型节点。只有位置字段的目标仍按实际参考系显示局部移动轴，不因缺少 authored 方向退回世界轴，也不因此开放旋转编辑。
 
 ### 11.2 Gesture 事务
 
@@ -369,6 +373,8 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 
 只有两个需要保存的子操作都成功时，宿主才能把对应编辑历史标记为 saved。取消、解析失败、路径失败或部分保存不能清除仍未持久化的 dirty。
 
+单文档保存服务返回空结果时必须返回失败，不发布 `ScopedFileSavedEvent`。预览警告、无法解码但保有原始 payload 的标签不能阻止其他有效编辑保存；无效字段输入仍须修正，不能为了绕过预览报错放宽序列化校验。
+
 保存/重载验证必须确认：
 
 - 位置与方向局部值没有被错误写成世界坐标；
@@ -387,7 +393,17 @@ Edit Session 以 owner 的引用身份隔离历史。Persistent 与 Animation �
 
 这些规则改变预览 pose，不直接改写原始动画文件。完整构建只返回根规则，由 `SuperViewViewModel` 在清除旧规则后统一安装。规则创建失败应只产生该源对象的诊断并隔离单条规则；旧规则在 rebuild 时必须从播放器移除，不能累计执行。
 
+Dock Equipment 在世界姿态阶段读取当前回调传入的完整帧，不能读取骨架上次已经发布的姿态；首次播放、暂停定位和正常推进必须使用同一规则。完整官方 VMD／META 配对中的 `DOCK_EQPT_*_v3.PropBoneId` 从 1 开始，仅在建立预览规则时转换为从 0 开始的 `be_prop_*` 索引；原始字段、版本、时间和保存数值保持不变，无效旧槽位保留并给出预览诊断。旧版规则字段编辑必须重建规则，不能只更新骨骼标记。现代标签沿用现有映射，其他旧版未知布局不能因为名称相近就套用。
+
+参考模型的嵌套 VMD 中，未指定挂点的 SLOT 继承外层有效挂点，明确指定的内层挂点优先。该约定同时覆盖内嵌模型和 VMD 引用，不能让装备经过无挂点包装层后退回场景原点；它不表示全部装备组合已经完成游戏原生验收。
+
 修改规则时同时检查：局部/世界空间接口、时间单位、骨骼索引、父子层级、循环/暂停刷新和错误后的停用行为。不能把预览规则的结果烘焙回模型或动画资源，除非另有明确功能授权。
+
+`ANIMATED_PROP_v13_3K.MetaData` 是附属模型中的风向骨骼名，`PathToAnotherAnim` 是备用动画路径，分别独立于模型及主动画路径保存。自制动作和替代模型沿用同一资源链，模型骨架、主／备用动作及指定风骨骼必须实际兼容；更换普通模型不会自动获得旗帜专用材质能力。原生反序列化、严格骨骼名查找及备用资源加载已核对，不能再把 `flag_base_0` 当作 profile，也不能按该示例骨骼名写分支。只有这个版本且有相应字段时才建立风规则；找不到确切骨骼给出诊断，不退回根骨骼。
+
+三国的“预览设置”提供当前窗口的显式世界 X／Z 风向量，默认零；它不写入 META、不从光照猜风速，也不代表游戏当前战场天气。静止步兵预览按原生风力门槛选择主／备用动画，使用有状态短整型风角和 Prop 模型空间旋转。已核实的挂点模式 2 先按绑定根骨骼消除原点和朝向，再组合 authored 偏移及角色挂点，将结果放在 Prop 对象矩阵；动画根恢复绑定姿态，避免根替换与材质风向使用不同的空间。其他挂点模式保留原预览并给出风向尚未还原的诊断。`OverrideProp == 1` 控制姿态缓存混合，不作为循环位。Persistent 使用独立连续时间循环，动作 META 按开始时间偏移并钳位；暂停重绘不累进 CPU 风状态，定位和重启重建状态。完整游戏实体运动、骑兵／死亡输入及随机实体相位仍未接入，不能据此宣称任意自制旗帜或完整战场风已还原。
+
+旗帜 GPU 材质风摆独立于上述 CPU 骨骼规则，限三国已核实的 weighted2／weighted4 flag 着色器，读取原始顶点色及两张独立布法线；详见 [共享渲染契约](architecture.md#3d-交互能力)。
 
 ## 15. 生命周期与清理
 

@@ -23,10 +23,10 @@
             </Grid.RowDefinitions>
 
             <Grid Grid.Row="0" Margin="0,0,0,8">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <TextBlock
                     VerticalAlignment="Center"
                     Style="{StaticResource AeText.Body}"
@@ -34,13 +34,12 @@
                     TextTrimming="CharacterEllipsis"
                     TextWrapping="NoWrap"
                     ToolTip="{Binding SelectedTag.Description}" />
-                <StackPanel x:Name="SuperViewBatchControls"
-                    Grid.Column="1"
-                    Margin="12,0,0,0"
-                    VerticalAlignment="Center"
-                    Orientation="Horizontal">
-                    <StackPanel.Style>
-                        <Style TargetType="StackPanel">
+                <WrapPanel x:Name="SuperViewBatchControls"
+                    Grid.Row="1"
+                    Margin="0,8,0,0"
+                    VerticalAlignment="Center">
+                    <WrapPanel.Style>
+                        <Style TargetType="WrapPanel">
                             <Setter Property="Visibility" Value="Collapsed" />
                             <Style.Triggers>
                                 <DataTrigger
@@ -50,7 +49,7 @@
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </StackPanel.Style>
+                    </WrapPanel.Style>
                     <CheckBox
                         Margin="0,0,12,0"
                         Content="{loc:Loc SuperView.Batch.ShowAll}"
@@ -71,7 +70,7 @@
                         IsEnabled="{Binding DataContext.CanToggleAnimationMeta3D, RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}}"
                         Style="{StaticResource AeInput.CheckBox}"
                         ToolTip="{loc:Loc SuperView.Batch.Edit3DTip}" />
-                </StackPanel>
+                </WrapPanel>
             </Grid>
 
             <Border x:Name="SuperViewSelectedMetaDataControls"
@@ -160,11 +159,21 @@
                 Grid.Row="2"
                 MinHeight="0"
                 ItemsSource="{Binding SelectedTag.Variables, UpdateSourceTrigger=PropertyChanged}"
-                ScrollViewer.HorizontalScrollBarVisibility="Auto"
                 ScrollViewer.VerticalScrollBarVisibility="Auto"
-                Style="{StaticResource AeList.View}"
                 VirtualizingPanel.IsVirtualizing="True"
                 VirtualizingPanel.VirtualizationMode="Recycling">
+                <ListView.Style>
+                    <Style TargetType="ListView" BasedOn="{StaticResource AeList.View}">
+                        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+                        <Style.Triggers>
+                            <DataTrigger
+                                Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}, FallbackValue={x:Null}}"
+                                Value="{x:Null}">
+                                <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListView.Style>
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <Setter Property="Focusable" Value="False" />
@@ -173,7 +182,19 @@
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="{x:Type ListViewItem}">
-                                    <ContentPresenter MinWidth="260" />
+                                    <ContentPresenter>
+                                        <ContentPresenter.Style>
+                                            <Style TargetType="ContentPresenter">
+                                                <Style.Triggers>
+                                                    <DataTrigger
+                                                        Binding="{Binding RelativeSource={RelativeSource AncestorType={x:Type superview:EditorView}}, FallbackValue={x:Null}}"
+                                                        Value="{x:Null}">
+                                                        <Setter Property="MinWidth" Value="260" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ContentPresenter.Style>
+                                    </ContentPresenter>
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
@@ -524,9 +545,9 @@
                                     ToolTip="{Binding Description}" />
                                 <mathviews:Vector3View
                                     Grid.Column="2"
-                                    MinWidth="300"
+                                    MinWidth="0"
                                     Margin="0,3"
-                                    HorizontalAlignment="Left"
+                                    HorizontalAlignment="Stretch"
                                     ToolTip="{Binding Description}"
                                     VerticalContentAlignment="Center"
                                     Vector3="{Binding Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />
@@ -563,9 +584,9 @@
                                 ToolTip="{Binding Description}" />
                             <mathviews:Vector3View
                                 Grid.Column="2"
-                                MinWidth="300"
+                                MinWidth="0"
                                 Margin="0,3"
-                                HorizontalAlignment="Left"
+                                HorizontalAlignment="Stretch"
                                 ToolTip="{Binding Description}"
                                 VerticalContentAlignment="Center"
                                 Vector3="{Binding Value, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay}" />

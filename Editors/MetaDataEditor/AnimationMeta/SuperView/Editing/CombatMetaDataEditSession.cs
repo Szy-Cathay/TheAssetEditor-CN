@@ -459,9 +459,8 @@ public sealed class CombatMetaDataEditSession
         public Vector3 GetWorldPosition() =>
             _transformSpace.ToWorldPosition(Get());
         public Quaternion? GetWorldOrientation() =>
-            GetOrientation() is Quaternion orientation
-                ? _transformSpace.ToWorldOrientation(orientation)
-                : null;
+            _transformSpace.ToWorldOrientation(
+                GetOrientation() ?? Quaternion.Identity);
         public Vector3 ToLocalTranslation(Vector3 worldTranslation) =>
             _transformSpace.ToLocalTranslation(worldTranslation);
         public Matrix ToLocalRotationDelta(Matrix worldRotationDelta) =>

@@ -62,7 +62,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             AnimationsContainerComponent animationsContainerComponent,
             IVfxPreviewFactory? vfxFactory = null,
             IDeviceResolver? devices = null,
-            VfxPreviewDocumentStore? liveDocuments = null)
+            VfxPreviewDocumentStore? liveDocuments = null,
+            SceneRenderParametersStore? renderParameters = null)
         {
             var resourceResolver = new MetaDataResourceResolver(
                 packFileService);
@@ -72,7 +73,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 skeletonAnimationLookUpHelper,
                 resourceResolver,
                 animationsContainerComponent,
-                vfxFactory, devices, liveDocuments);
+                vfxFactory, devices, liveDocuments, renderParameters);
             _ruleBuilder = new(resourceResolver);
         }
 
@@ -157,6 +158,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         private readonly IVfxPreviewFactory? _vfxFactory;
         private readonly IDeviceResolver? _devices;
         private readonly VfxPreviewDocumentStore? _liveDocuments;
+        private readonly SceneRenderParametersStore? _renderParameters;
         public bool EnableInteractiveVfxPreview { get; set; }
 
         private static Color s_color = Color.Black;
@@ -178,7 +180,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             int BoneId,
             Vector3 Position,
             Vector4 Orientation,
-            float Scale);
+            float Scale,
+            IThreeKingdomsAnimatedPropWindMeta? Wind = null);
 
         private sealed record SplashPreviewData(
             ParsedMetadataAttribute Source,
@@ -195,7 +198,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             AnimationsContainerComponent animationsContainerComponent,
             IVfxPreviewFactory? vfxFactory = null,
             IDeviceResolver? devices = null,
-            VfxPreviewDocumentStore? liveDocuments = null)
+            VfxPreviewDocumentStore? liveDocuments = null,
+            SceneRenderParametersStore? renderParameters = null)
         {
             _complexMeshLoader = complexMeshLoader;
             _resourceLibrary = resourceLibrary;
@@ -205,6 +209,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             _vfxFactory = vfxFactory;
             _devices = devices;
             _liveDocuments = liveDocuments;
+            _renderParameters = renderParameters;
         }
 
         public void AppendInstances(
@@ -494,7 +499,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             AnimationPlayer rootPlayer)
         {
             var diagnostics = new List<MetaDataBuildDiagnostic>();
-            if (attribute is Transform_v10 or DockEquipment)
+            if (attribute is Transform_v10 or DockEquipment or DockEquipment_v3)
                 return new(false, null, diagnostics);
 
             var existingChildren = root.Children.ToHashSet();
@@ -714,7 +719,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 animatedPropMeta.BoneId,
                 animatedPropMeta.Position,
                 animatedPropMeta.Orientation,
-                animatedPropMeta.Scale);
+                animatedPropMeta.Scale,
+                animatedPropMeta as IThreeKingdomsAnimatedPropWindMeta);
             return CreatePropPreview(
                 data,
                 root,
@@ -786,6 +792,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             AnimationPlayer? propPlayer = null;
             SceneNode? loadedNode = null;
             SkeletonNode? propSkeletonNode = null;
+            Func<Matrix>? nativePropAttachment = null;
             try
             {
                 var animationPath = string.IsNullOrWhiteSpace(data.AnimationName)
@@ -820,6 +827,62 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                     var animFile = AnimationFile.Create(animationPath);
                     var clip = new AnimationClip(animFile, skeleton);
                     propPlayer.SetAnimation(clip, skeleton);
+                    if (data.Wind is { AttachMethod: 2 } wind &&
+                        (!string.IsNullOrWhiteSpace(wind.MetaData) ||
+                         !string.IsNullOrWhiteSpace(wind.PathToAnotherAnim)))
+                    {
+                        AnimationClip? alternate = null;
+                        if (!string.IsNullOrWhiteSpace(wind.PathToAnotherAnim))
+                        {
+                            var alternatePath = _resourceResolver.FindAnimation(
+                                data.Source, owner, wind.PathToAnotherAnim, diagnostics);
+                            if (alternatePath != null)
+                                alternate = ReferenceEquals(alternatePath, animationPath) ? clip :
+                                    new AnimationClip(AnimationFile.Create(alternatePath), skeleton);
+                        }
+
+                        var windBone = string.IsNullOrEmpty(wind.MetaData)
+                            ? -1 : skeleton.GetBoneIndexByName(wind.MetaData);
+                        if (windBone >= 0 && animFile.Bones?.Any(bone => bone.Name == wind.MetaData) != true)
+                            windBone = -1;
+                        if (!string.IsNullOrEmpty(wind.MetaData) && windBone < 0)
+                        {
+                            diagnostics.Add(new(data.Source, owner, MetaDataDiagnosticSeverity.Warning,
+                                "SuperView.Diagnostics.MissingBone", BoneName: wind.MetaData));
+                        }
+
+                        Matrix GetWindAttachment()
+                        {
+                            return ThreeKingdomsPropWindRule.CreateAttachmentTransform(skeleton,
+                                spatialBinding.Position, spatialBinding.Orientation ?? Quaternion.Identity,
+                                rootSkeleton.Skeleton.GetAnimatedWorldTranform(data.BoneId));
+                        }
+
+                        if (data.BoneId >= 0 && data.BoneId < rootSkeleton.Skeleton.BoneCount)
+                        {
+                            propPlayer.AnimationRules.Add(new ThreeKingdomsPropWindRule(
+                                skeleton, clip, alternate, windBone, wind.OverrideProp == 1,
+                                () => _renderParameters?.WindVector ?? Vector2.Zero,
+                                () => GetWindAttachment() *
+                                    (root.SceneManager?.GetWorldPosition(root) ?? Matrix.Identity),
+                                () => rootPlayer.PlaybackTime,
+                                owner == MetaDataDocumentOwner.Persistent, data.StartTime));
+                            nativePropAttachment = GetWindAttachment;
+                            loadedNode.ModelMatrix = nativePropAttachment();
+                        }
+                        else
+                        {
+                            diagnostics.Add(new(data.Source, owner, MetaDataDiagnosticSeverity.Warning,
+                                "SuperView.Diagnostics.MissingBone", BoneName: data.BoneId.ToString()));
+                        }
+                    }
+                    else if (data.Wind is { } unsupportedWind &&
+                        (!string.IsNullOrWhiteSpace(unsupportedWind.MetaData) ||
+                         !string.IsNullOrWhiteSpace(unsupportedWind.PathToAnotherAnim)))
+                    {
+                        diagnostics.Add(new(data.Source, owner, MetaDataDiagnosticSeverity.Warning,
+                            "SuperView.Diagnostics.PropWindAttachmentUnsupported"));
+                    }
                     propSkeletonNode = new SkeletonNode(skeleton)
                     {
                         NodeColour = color,
@@ -838,7 +901,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                 });
                 loadedNode.ScaleMult = data.Scale;
 
-                if (attachThroughAnimation)
+                if (attachThroughAnimation && nativePropAttachment == null)
                 {
                     propPlayer.AnimationRules.Add(new CopyRootTransform(
                         rootSkeleton,
@@ -881,7 +944,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                                     ? s_selectedColor
                                     : s_color;
                             }
-                        });
+                        },
+                        nativePropAttachment);
                     animatedProp.Update(
                         (float)rootPlayer.CurrentTime.TotalSeconds);
                     return animatedProp;

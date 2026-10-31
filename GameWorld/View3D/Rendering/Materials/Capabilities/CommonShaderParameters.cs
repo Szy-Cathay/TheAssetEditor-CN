@@ -27,6 +27,7 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities
         public TextureCube? ViewportSpecular { get; set; }
         public Vector2 ViewportSize { get; set; }
         public float MaterialTimeSeconds { get; set; }
+        public Vector2 WindVector { get; set; }
 
         public void Apply(Effect effect, IScopedResourceLibrary _)
         {
@@ -39,6 +40,8 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities
             effect.Parameters["World"].SetValue(ModelMatrix);
             effect.Parameters["CameraPos"].SetValue(CameraPosition);
             effect.Parameters["MaterialTimeSeconds"]?.SetValue(MaterialTimeSeconds);
+            effect.Parameters["FlagWindTimeSeconds"]?.SetValue(MaterialTimeSeconds);
+            effect.Parameters["FlagWindVector"]?.SetValue(WindVector);
             effect.Parameters["ViewportSurfaceOpacity"]?.SetValue(SurfaceOpacity);
             effect.Parameters["ViewportWireframe"]?.SetValue(ViewportWireframe);
             effect.Parameters["ViewportWireframeObjectSelection"]?.SetValue(ViewportShading?.WireframeObjectSelection ?? true);
@@ -78,6 +81,7 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities
             ViewportSpecular = parameters.ViewportSpecular;
             ViewportSize = new Vector2(parameters.ViewportWidth, parameters.ViewportHeight);
             MaterialTimeSeconds = parameters.MaterialTimeSeconds;
+            WindVector = parameters.WindVector;
         }
 
         public ICapability Clone()
@@ -103,6 +107,7 @@ namespace GameWorld.Core.Rendering.Materials.Capabilities
                 ViewportSpecular = ViewportSpecular,
                 ViewportSize = ViewportSize,
                 MaterialTimeSeconds = MaterialTimeSeconds,
+                WindVector = WindVector,
             };
         }
 

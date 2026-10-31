@@ -178,6 +178,8 @@ namespace AssetEditorTests
                 [
                     "{StaticResource AeVerticalGridSplitterStyle}",
                 ],
+                ["Editors/MetaDataEditor/AnimationMeta/SuperView/SuperViewWorkspaceView.xaml"] =
+                ["{StaticResource AeVerticalGridSplitterStyle}"],
                 ["Editors/Kitbashing/KitbasherEditor/Core/KitbasherView.xaml"] =
                 [
                     "{StaticResource AeVerticalGridSplitterStyle}",

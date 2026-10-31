@@ -9,6 +9,18 @@ namespace GameWorld.Core.Components.Rendering
         public GameWorld.Core.Rendering.GameEnvironmentLighting? GameWeather => weather?.Current;
         private ViewportRenderSettings? _globalLighting;
         private int _lightingOverrideCount;
+        private Vector2 _windVector;
+
+        // Explicit preview input in world X/Z; independent of lighting-only weather data.
+        public Vector2 WindVector
+        {
+            get => _windVector;
+            set
+            {
+                if (float.IsFinite(value.X) && float.IsFinite(value.Y))
+                    _windVector = value;
+            }
+        }
 
         public float EnvLightRotationDegrees_Y { get; set; } = 20;
         public float DirLightRotationDegrees_X { get; set; } = 0;

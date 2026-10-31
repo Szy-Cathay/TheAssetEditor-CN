@@ -13,6 +13,7 @@ namespace GameWorld.Core.Rendering
         public Vector4 BlendWeights;
         public Vector4 BlendIndices;
         public Vector2 TextureCoordinate1;
+        public Color VertexColour;
 
         public readonly static VertexDeclaration VertexDeclaration
             = new(
@@ -23,7 +24,8 @@ namespace GameWorld.Core.Rendering
                     new VertexElement(48, VertexElementFormat.Vector3, VertexElementUsage.Binormal, 0),
                     new VertexElement(60, VertexElementFormat.Vector4, VertexElementUsage.Color, 0),
                     new VertexElement(76, VertexElementFormat.Vector4, VertexElementUsage.BlendIndices, 0),
-                    new VertexElement(92, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 1)
+                    new VertexElement(92, VertexElementFormat.Vector2, VertexElementUsage.TextureCoordinate, 1),
+                    new VertexElement(100, VertexElementFormat.Color, VertexElementUsage.Color, 1)
                 );
 
         VertexDeclaration IVertexType.VertexDeclaration

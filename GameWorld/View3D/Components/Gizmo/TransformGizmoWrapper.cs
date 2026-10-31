@@ -1473,6 +1473,9 @@ namespace GameWorld.Core.Components.Gizmo
             var poses = _effectedMeshNodes
                 .Select(MeshPoseSnapshot.Capture)
                 .ToList();
+            // Local axes follow the first selected mesh's actual render frame.
+            if (poses[0].WorldTransform.Decompose(out _, out var rotation, out _))
+                Orientation = Quaternion.Normalize(rotation);
             var position = Vector3.Zero;
             var positionCount = 0;
 

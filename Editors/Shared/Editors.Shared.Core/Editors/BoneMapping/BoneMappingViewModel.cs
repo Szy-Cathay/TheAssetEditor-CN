@@ -72,6 +72,8 @@ namespace Shared.Ui.Editors.BoneMapping
             }
 
             MeshBones.SelectedItem.ClearMapping();
+            ParentModelBones.SelectedItem = null;
+            OnBoneSelected(MeshBones.SelectedItem);
             MappingUpdated();
         }
 
@@ -113,6 +115,8 @@ namespace Shared.Ui.Editors.BoneMapping
             }
 
             MeshBones.SelectedItem.ClearMapping(false);
+            ParentModelBones.SelectedItem = null;
+            OnBoneSelected(MeshBones.SelectedItem);
             MappingUpdated();
         }
 

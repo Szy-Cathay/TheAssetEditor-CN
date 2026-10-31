@@ -12,6 +12,7 @@ struct VertexInputType
 
     float4 Weights : COLOR;
     float4 BoneIndices : BLENDINDICES0;
+    float4 vertexColour : COLOR1;
     
     float2 tex1 : TEXCOORD0;
 };
@@ -27,6 +28,7 @@ struct PixelInputType
 
     float3 viewDirection : TEXCOORD1;
     float3 worldPosition : TEXCOORD5;
+    float4 vertexColour : COLOR1;
 
 };
 

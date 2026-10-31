@@ -112,6 +112,9 @@ namespace GameWorld.Core.Services
 
             foreach (var slot in mesh.ChildSlots)
             {
+                var childAttachmentPoint = string.IsNullOrWhiteSpace(slot.AttachmentPoint)
+                    ? attachmentPointName
+                    : slot.AttachmentPoint;
                 var slotNode = root.AddObject(new SlotNode(slot.Name + " " + slot.AttachmentPoint, slot.AttachmentPoint));
 
                
@@ -124,7 +127,7 @@ namespace GameWorld.Core.Services
                             break;
                     }
 
-                    LoadVariantMesh(childMesh, slotNode, player, slot.AttachmentPoint, onlyLoadRootNode, onlyLoadFirstMesh);
+                    LoadVariantMesh(childMesh, slotNode, player, childAttachmentPoint, onlyLoadRootNode, onlyLoadFirstMesh);
                 }
 
                 foreach (var meshReference in slot.ChildReferences)
@@ -136,7 +139,7 @@ namespace GameWorld.Core.Services
                             break;
                     }
 
-                    Load(meshReference.Reference.ToLower(), slotNode, player, slot.AttachmentPoint, onlyLoadRootNode, onlyLoadFirstMesh);
+                    Load(meshReference.Reference.ToLower(), slotNode, player, childAttachmentPoint, onlyLoadRootNode, onlyLoadFirstMesh);
                 }
 
                 for (var i = 0; i < slotNode.Children.Count(); i++)

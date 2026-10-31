@@ -77,6 +77,7 @@ namespace Shared.GameFormats.RigidModel.Vertex.Formats
                     Tangent = VertexLoadHelper.CreatVector3_FromByte(item.Tangent),
                     Uv = new Vector2(item.Uv.X, item.Uv.Y),
                     Colour = VertexLoadHelper.CreatVector4_FromByte(item.Colour),
+                    UnormColour = new Vector4(item.Colour.X, item.Colour.Y, item.Colour.Z, item.Colour.W) / 255f,
 
                     BoneIndex = [item.BoneIndex.X, item.BoneIndex.Y, item.BoneIndex.Z, item.BoneIndex.W],
                     BoneWeight = [item.BoneWeight.X / 255.0f, item.BoneWeight.Y / 255.0f, item.BoneWeight.Z / 255.0f, item.BoneWeight.W / 255.0f],

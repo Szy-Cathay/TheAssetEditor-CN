@@ -16,6 +16,14 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
         public float Scale { get; }
     }
 
+    public interface IThreeKingdomsAnimatedPropWindMeta
+    {
+        string MetaData { get; }
+        string PathToAnotherAnim { get; }
+        int OverrideProp { get; }
+        int AttachMethod { get; }
+    }
+
     [MetaData("ANIMATED_PROP", 0)]
     public class AnimatedProp_v0 : DecodedMetaEntryBase_v0
     {
@@ -109,7 +117,7 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
     }
 
     [MetaData("ANIMATED_PROP", 13, MetaDataAttributePriority.Low)]
-    public class AnimatedProp_v13_3K : Prop_v13_3K, IAnimatedPropMeta
+    public class AnimatedProp_v13_3K : Prop_v13_3K, IAnimatedPropMeta, IThreeKingdomsAnimatedPropWindMeta
     {
     }
 

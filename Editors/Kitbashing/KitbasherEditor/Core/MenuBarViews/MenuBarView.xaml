@@ -137,6 +137,16 @@
                         VerticalAlignment="Center"
                         Margin="4,0">
                 <StackPanel Orientation="Horizontal">
+                    <ComboBox x:Name="TransformSpaceSelector" Width="80" Height="{StaticResource AeSize.CompactRowHeight}"
+                              MinHeight="{StaticResource AeSize.CompactRowHeight}"
+                              Margin="0,0,4,0" VerticalContentAlignment="Center"
+                              SelectedIndex="{Binding TransformTool.SelectedTransformSpaceIndex, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                              IsEnabled="{Binding TransformTool.CanEditValues}"
+                              ToolTip="{loc:Loc Kitbash.Transform.SpaceTip}"
+                              AutomationProperties.Name="{loc:Loc Kitbash.Transform.Space}">
+                        <ComboBoxItem Content="{loc:Loc Kitbash.Transform.World}" />
+                        <ComboBoxItem Content="{loc:Loc Kitbash.Transform.Local}" />
+                    </ComboBox>
                     <ToggleButton Width="28" Height="28" Padding="4" Margin="0,0,4,0"
                                   x:Name="XRaySelectionButton"
                                   Style="{DynamicResource AeEditor.ToggleIcon}"

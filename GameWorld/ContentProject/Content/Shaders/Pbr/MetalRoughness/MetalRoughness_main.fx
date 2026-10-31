@@ -54,7 +54,11 @@ GBufferMaterial GetMaterial(in PixelInputType input)
 
     }
 
-    if (UseNormal)
+    if (FlagWindEnabled)
+    {
+        material.pixelNormal = GetNativeFlagPixelNormal(input);
+    }
+    else if (UseNormal)
     {
         material.pixelNormal = GetPixelNormal(input);
     }

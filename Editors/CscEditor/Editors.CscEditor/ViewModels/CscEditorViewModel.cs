@@ -88,6 +88,7 @@ namespace Editors.CscEditor.ViewModels
                 RebuildCurveSeries();
                 NotifyPropertyChanged(nameof(HasSelection));
                 NotifyPropertyChanged(nameof(IsElementSelected));
+                NotifyPropertyChanged(nameof(CurveStructureLocked));
             }
         }
 
@@ -152,7 +153,7 @@ namespace Editors.CscEditor.ViewModels
 
         /// <summary>True when keyframes must not be added/removed (the file's COMPOSITE_SCENE
         /// manifest could not be parsed, so keyframe counts cannot be restated on save).</summary>
-        public bool CurveStructureLocked => !ManifestEditable;
+        public bool CurveStructureLocked => !ManifestEditable || SelectedElement?.Element.IsStaticTransform == true;
 
         // ---- Curve editor ----
         public ObservableCollection<CurveSeries> CurveSeriesList { get; } = [];
@@ -340,12 +341,13 @@ namespace Editors.CscEditor.ViewModels
 
         public void LoadFile(PackFile file)
         {
-            CurrentFile = file;
-            DisplayName = file.Name;
-
             try
             {
-                SceneData = CscScene.Load(file.DataSource.ReadData());
+                // A failed replacement must not retarget the previous scene's save destination.
+                var scene = CscScene.Load(file.DataSource.ReadData());
+                CurrentFile = file;
+                DisplayName = file.Name;
+                SceneData = scene;
                 _context.Duration =
                     (float)NormalizePlaybackDuration(SceneData.Duration);
                 _context.CurrentTime = 0;
@@ -701,7 +703,7 @@ namespace Editors.CscEditor.ViewModels
             SelectedCurveSeries = null;
 
             var element = SelectedElement?.Element;
-            if (element == null)
+            if (element == null || element.IsStaticTransform)
                 return;
 
             void Add(string name, System.Windows.Media.Color colour, CscChannel channel) =>

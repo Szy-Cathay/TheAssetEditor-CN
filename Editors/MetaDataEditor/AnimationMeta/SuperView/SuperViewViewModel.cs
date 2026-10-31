@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.Input;
 using System.Windows.Controls;
 using Editors.AnimationMeta.Presentation;
@@ -10,12 +11,14 @@ using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.BaseControl;
 using Editors.Shared.Core.Common.ReferenceModel;
 using GameWorld.Core.SceneNodes;
+using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Vfx;
 using Microsoft.Xna.Framework;
 using Shared.Core.Events;
 using Shared.Core.Events.Scoped;
 using Shared.Core.PackFiles;
 using Shared.Core.Services;
+using Shared.Core.Settings;
 using Shared.Core.ToolCreation;
 using Shared.GameFormats.AnimationMeta.Definitions;
 using Shared.GameFormats.AnimationMeta.Parsing;
@@ -40,6 +43,25 @@ namespace Editors.AnimationMeta.SuperView
         private readonly CombatMetaDataEditSession _combatEditSession;
         private readonly CombatMetaDataGizmoComponent _combatGizmo;
         private readonly MetaDataMarkerPickerComponent _markerPicker;
+        private readonly SceneRenderParametersStore _renderParameters;
+        public bool CanPreviewFlagWind { get; }
+        [ObservableProperty] private string _previewWindX = "0";
+        [ObservableProperty] private string _previewWindZ = "0";
+
+        partial void OnPreviewWindXChanged(string value) => UpdatePreviewWind();
+        partial void OnPreviewWindZChanged(string value) => UpdatePreviewWind();
+
+        private void UpdatePreviewWind()
+        {
+            if (float.TryParse(PreviewWindX.Replace(',', '.'), NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out var x) &&
+                float.TryParse(PreviewWindZ.Replace(',', '.'), NumberStyles.Float,
+                    CultureInfo.InvariantCulture, out var z) &&
+                float.IsFinite(x) && float.IsFinite(z))
+            {
+                _renderParameters.WindVector = new Vector2(x, z);
+            }
+        }
         private CombatMetaDataPoint _selectedSplashPoint =
             CombatMetaDataPoint.SplashStart;
         private CombatMetaDataTransformMode _selectedTransformMode =
@@ -60,6 +82,7 @@ namespace Editors.AnimationMeta.SuperView
         [ObservableProperty] MetaDataEditorViewModel _persistentMetaEditor = null!;
         [ObservableProperty] MetaDataEditorViewModel _metaEditor = null!;
         [ObservableProperty] int _selectedTabControllerIndex = 0;
+        [ObservableProperty] int _selectedInspectorTabIndex = 0;
         [ObservableProperty] bool _showImpactPositions = true;
         [ObservableProperty] bool _showTargetPositions = true;
         [ObservableProperty] bool _showFirePositions = true;
@@ -391,7 +414,9 @@ namespace Editors.AnimationMeta.SuperView
             IMetaDataBuilder metaDataFactory,
             CombatMetaDataEditSession combatEditSession,
             CombatMetaDataGizmoComponent combatGizmo,
-            MetaDataMarkerPickerComponent markerPicker)
+            MetaDataMarkerPickerComponent markerPicker,
+            SceneRenderParametersStore renderParameters,
+            ApplicationSettingsService settings)
             : base(editorHostParameters)
         {
             if (GameWorld is D3D11Host host)
@@ -415,6 +440,8 @@ namespace Editors.AnimationMeta.SuperView
             _combatEditSession = combatEditSession;
             _combatGizmo = combatGizmo;
             _markerPicker = markerPicker;
+            _renderParameters = renderParameters;
+            CanPreviewFlagWind = settings.CurrentSettings.CurrentGame == GameTypeEnum.ThreeKingdoms;
             MetaDataTimeline = new MetaDataTimelineViewModel(
                 SelectMetaDataInspectionItem);
             MetaDataProblems = new MetaDataProblemListViewModel(
@@ -800,6 +827,7 @@ namespace Editors.AnimationMeta.SuperView
             if (tag == null)
                 return false;
 
+            SelectedInspectorTabIndex = 1;
             SelectedTabControllerIndex = item.Owner ==
                 MetaDataDocumentOwner.Persistent ? 0 : 1;
             editor.SelectedTag = tag;

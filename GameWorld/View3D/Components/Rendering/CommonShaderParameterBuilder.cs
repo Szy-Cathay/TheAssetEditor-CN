@@ -31,7 +31,8 @@ namespace GameWorld.Core.Components.Rendering
                 viewportHeight,
                 viewportWidth,
                 sceneLightParameters.FactionColoursEnabled,
-                GameWeather: sceneLightParameters.GameWeather);
+                GameWeather: sceneLightParameters.GameWeather,
+                WindVector: sceneLightParameters.WindVector);
 
             return commonShaderParameters;
         }

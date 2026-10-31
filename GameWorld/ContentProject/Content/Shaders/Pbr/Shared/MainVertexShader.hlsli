@@ -4,6 +4,7 @@
 #include "../Shared/const_layout.hlsli"
 #include "../inputlayouts.hlsli"
 #include "../Capabilites/Animation.hlsli"
+#include "../Capabilites/FlagWind.hlsli"
 
 // **************************************************************************************************************************************
 // *		VERTEX SHADER CODE
@@ -12,9 +13,14 @@ PixelInputType MainVertexShader(in VertexInputType input)
 {
     PixelInputType output = (PixelInputType) 0;
 
-    DoSkinning(input, output.position, output.normal, output.tangent, output.binormal);
+    if (FlagWindEnabled && CapabilityFlag_ApplyAnimation && (Animation_WeightCount == 2 || Animation_WeightCount == 4))
+        DoNativeFlagSkinning(input, output.position, output.normal, output.tangent, output.binormal);
+    else
+        DoSkinning(input, output.position, output.normal, output.tangent, output.binormal);
 
     output.position = mul(output.position, World);
+    output.position.xyz = ApplyNativeFlagWind(output.position.xyz, input.vertexColour);
+    output.vertexColour = input.vertexColour;
     output.worldPosition = output.position.xyz;
     output.position = mul(output.position, View);
     output.position = mul(output.position, Projection);

@@ -276,9 +276,11 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
     {
         public override string Description { get; } = "_3KOnly";
 
+        // Native v13 resolves this exact name against the prop animation skeleton.
         [MetaDataTag(16)]
         public string MetaData { get; set; } = "";
 
+        // The alternate animation is selected when the effective wind gate is off.
         [MetaDataTag(17, "This works in pair with MetaData")]
         public string PathToAnotherAnim { get; set; } = "";
     }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using GameWorld.Core.Rendering.Materials.Shaders;
 using GameWorld.Core.Services;
 using Shared.Core.Settings;
@@ -76,7 +77,21 @@ namespace GameWorld.Core.Rendering.Materials
             try
             {
                 var material = CreateMaterial(preferredMaterial);
+                var flagWind = material.TryGetCapability<Capabilities.FlagWindCapability>();
+                if (flagWind != null)
+                    flagWind.AllowNativeFlag = currentGame == GameTypeEnum.ThreeKingdoms;
                 material.Initialize(wsModelMaterial, rmvMaterial);
+                if (currentGame == GameTypeEnum.ThreeKingdoms && flagWind?.Enabled == true)
+                {
+                    var surface = material.GetCapability<Capabilities.MetalRoughCapability>();
+                    // The verified flag shaders have no mask binding; retain the legacy RMV path for saving.
+                    surface.Mask.UseTexture = false;
+                    if (!wsModelMaterial!.TextureSlots.TryGetValue("s_xml_normal", out var normal)
+                        || string.IsNullOrWhiteSpace(normal))
+                        throw new InvalidDataException("Native flag material is missing texture slot: s_xml_normal");
+                    surface.NormalMap.TexturePath = normal;
+                    surface.NormalMap.UseTexture = true;
+                }
                 return material;
             }
             catch (Exception ex)

@@ -37,6 +37,7 @@ namespace Editors.KitbasherEditor.Components
         bool _isEnabled = false;
         TransformGizmoWrapper _activeTransformation;
         bool _isCtrlPressed = false;
+        private TransformSpace _transformSpace = TransformSpace.World;
 
         // Edit mode state (Tab to toggle, 1/2/3 for sub-modes)
         private GeometrySelectionMode _lastEditSubMode = GeometrySelectionMode.Vertex;
@@ -67,6 +68,7 @@ namespace Editors.KitbasherEditor.Components
         {
             _gizmo = new Gizmo(_camera, _mouse, _deviceResolverComponent.Device, _resourceLibary);
             _gizmo.ActivePivot = PivotType.ObjectCenter;
+            _gizmo.GizmoDisplaySpace = _transformSpace;
             _gizmo.SetKeyboard(_keyboard);  // Enable keyboard axis locking
             _gizmo.TranslateEvent += GizmoTranslateEvent;
             _gizmo.RotateEvent += GizmoRotateEvent;
@@ -81,6 +83,19 @@ namespace Editors.KitbasherEditor.Components
         /// Get the Gizmo instance for KitbashSelectionInputComponent to check modal transform state.
         /// </summary>
         public Gizmo Gizmo => _gizmo;
+        public bool TrySetTransformSpace(TransformSpace space)
+        {
+            if (_gizmo?.IsInModalTransform == true)
+                return false;
+
+            _transformSpace = space;
+            if (_gizmo != null)
+            {
+                _gizmo.GizmoDisplaySpace = space;
+                _gizmo.ResetDeltas();
+            }
+            return true;
+        }
         public event Action<GizmoMode, ModalPreviewReplacement?> PreviewChanged;
 
         private void OnCaptureInterrupted()

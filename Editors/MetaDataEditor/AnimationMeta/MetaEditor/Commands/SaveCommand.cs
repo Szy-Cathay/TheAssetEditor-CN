@@ -36,10 +36,12 @@ namespace Editors.AnimationMeta.MetaEditor.Commands
             // Ensure there are no errors
             foreach (var tag in controller.Tags)
             {
-                var currentErrorMessage = tag.HasError();
-                if (string.IsNullOrWhiteSpace(currentErrorMessage) == false)
+                var invalidField = tag.Variables.FirstOrDefault(variable => !variable.IsValid);
+                if (invalidField != null)
                 {
-                    _standardDialogs.ShowDialogBox($"Unable to save : {currentErrorMessage}");
+                    _standardDialogs.ShowDialogBox(
+                        string.Format(LocalizationManager.Instance.Get("MetaData.Save.InvalidField"), tag.DisplayName, invalidField.FieldName),
+                        LocalizationManager.Instance.Get("MetaData.Save.ErrorTitle"));
                     return false;
                 }
             }
@@ -51,12 +53,12 @@ namespace Editors.AnimationMeta.MetaEditor.Commands
             var bytes = _metaDataFileParser.GenerateBytes(controller.MetaDataFileVersion, controller.ParsedFile);
             _logger.Here().Information("Saving");
             var res = _packFileSaveService.Save(path, bytes, false);
-            if (res != null)
-            {
-                controller.CurrentFile = res;
-                controller.DisplayName = res.Name;
-                controller.HasUnsavedChanges = false;
-            }
+            if (res == null)
+                return false;
+
+            controller.CurrentFile = res;
+            controller.DisplayName = res.Name;
+            controller.HasUnsavedChanges = false;
 
             _logger.Here().Information("Creating metadata file complete");
             var saveEvent = new ScopedFileSavedEvent()

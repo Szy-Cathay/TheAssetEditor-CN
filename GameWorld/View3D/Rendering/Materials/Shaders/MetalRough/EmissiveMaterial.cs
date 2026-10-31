@@ -14,6 +14,7 @@ namespace GameWorld.Core.Rendering.Materials.Shaders.MetalRough
                 [
                     new CommonShaderParametersCapability(),
                     new MetalRoughCapability(),
+                    new FlagWindCapability(),
                     new AnimationCapability(),
                     new BloodCapability(),
                     new EmissiveCapability(),

@@ -94,9 +94,10 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         protected override void MappingUpdated()
         {
-            if (_targetSkeleton == null)
+            if (_targetSkeleton == null || _currentSkeletonNode == null)
                 return;
 
+            UpdateBoneHighlights();
             ApplyMeshFittingTransforms();
         }
 
@@ -117,28 +118,28 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
                     BoneScaleFactor.Value = MeshBones.SelectedItem.BoneScaleOffset;
                     BoneRotationOffset.Set(MeshBones.SelectedItem.BoneRotOffset.X, MeshBones.SelectedItem.BoneRotOffset.Y, MeshBones.SelectedItem.BoneRotOffset.Z);
                     BonePositionOffset.Set(MeshBones.SelectedItem.BonePosOffset.X, MeshBones.SelectedItem.BonePosOffset.Y, MeshBones.SelectedItem.BonePosOffset.Z);
-
-                    _currentSkeletonNode.SelectedBoneIndex = MeshBones.SelectedItem.BoneIndex.Value;
-                    var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
-                    rootNode.SkeletonNode.SelectedBoneIndex = MeshBones.SelectedItem.MappedBoneIndex.Value;
                 }
                 else
                 {
                     BoneScaleFactor.Value = 1;
                     BoneRotationOffset.Set(0);
                     BonePositionOffset.Set(0);
-
-                    _currentSkeletonNode.SelectedBoneIndex = null;
-
-                    var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
-                    rootNode.SkeletonNode.SelectedBoneIndex = null;
                 }
+
+                UpdateBoneHighlights();
             }
             finally
             {
                 _updatingBoneValues = false;
                 NotifyPropertyChanged(nameof(HasValidTransform));
             }
+        }
+
+        private void UpdateBoneHighlights()
+        {
+            _currentSkeletonNode.SelectedBoneIndex = MeshBones.SelectedItem?.BoneIndex.Value;
+            var rootNode = _sceneManager.GetNodeByName<MainEditableNode>(SpecialNodes.EditableModel);
+            rootNode.SkeletonNode.SelectedBoneIndex = MeshBones.SelectedItem?.MappedBoneIndex.Value;
         }
 
         void BoneScaleUpdate(float newValue, AnimatedBone bone)

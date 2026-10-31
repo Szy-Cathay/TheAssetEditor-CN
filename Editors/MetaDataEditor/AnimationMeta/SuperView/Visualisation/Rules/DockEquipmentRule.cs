@@ -59,7 +59,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Rules
                     var offsetFrame = AnimationSampler.Sample(0, _skeletonProvider.Skeleton, _dockAnimation);
                     _offset = offsetFrame.GetSkeletonAnimatedWorldDiff(_skeletonProvider.Skeleton, _dockTargetkBoneId, _equipmentSlotToDock);
 
-                    var propTransform = _skeletonProvider.Skeleton.GetAnimatedWorldTranform(_dockTargetkBoneId);
+                    // World rules run before this frame is published to the skeleton.
+                    var propTransform = frame.BoneTransforms[_dockTargetkBoneId].WorldTransform;
                     frame.BoneTransforms[_equipmentSlotToDock].WorldTransform = _offset * propTransform;
                 }
             }
