@@ -80,6 +80,43 @@ internal class CombatMetaDataEditSessionTests
     }
 
     [Test]
+    public void PositionOnlyTarget_FollowsReferenceAxesWithoutEnablingRotation()
+    {
+        var fire = new FirePos_v10 { Position = new Vector3(1, 2, 3) };
+        var reference = Matrix.CreateFromYawPitchRoll(.7f, -.3f, .4f) *
+            Matrix.CreateTranslation(10, 20, 30);
+        var session = new CombatMetaDataEditSession(new TestEventHub());
+        Assert.That(session.SetTarget(new object(), fire,
+            CombatMetaDataPoint.Position, () => reference), Is.True);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.CurrentOrientation, Is.Null);
+            Assert.That(session.CanRotate, Is.False);
+            Assert.That(session.BeginGesture(CombatMetaDataTransformMode.Rotate), Is.False);
+            Assert.That(session.CurrentWorldOrientation, Is.Not.Null);
+        });
+        AssertDirection(session.CurrentWorldOrientation!.Value, reference);
+
+        var start = fire.Position;
+        var worldDelta = Vector3.TransformNormal(Vector3.UnitX * .5f, reference);
+        Assert.That(session.BeginGesture(), Is.True);
+        Assert.That(session.Translate(worldDelta), Is.True);
+        Assert.That(session.EndGesture(), Is.True);
+        AssertVector(fire.Position, start + Vector3.UnitX * .5f);
+        Assert.That(session.Undo(), Is.True);
+        AssertVector(fire.Position, start);
+        Assert.That(session.Redo(), Is.True);
+        AssertVector(fire.Position, start + Vector3.UnitX * .5f);
+
+        reference = Matrix.CreateFromYawPitchRoll(-.2f, .5f, -.8f);
+        AssertDirection(session.CurrentWorldOrientation!.Value, reference);
+        Assert.That(session.CanRotate, Is.False);
+        session.ClearTarget();
+        Assert.That(session.CurrentWorldOrientation, Is.Null);
+    }
+
+    [Test]
     public void EffectTransform_CanMoveRotateUndoAndRedo()
     {
         var effect = new Effect_v11

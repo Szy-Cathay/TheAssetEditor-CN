@@ -31,6 +31,8 @@ namespace Shared.Ui.Common.Behaviors
 
     public class BindableSelectedItemBehavior : Behavior<TreeView>
     {
+        private bool _clearingSelection;
+
         public object SelectedItem
         {
             get { return GetValue(SelectedItemProperty); }
@@ -42,31 +44,25 @@ namespace Shared.Ui.Common.Behaviors
 
         private static void OnSelectedItemChanged(DependencyObject sender, DependencyPropertyChangedEventArgs e)
         {
-            return;
-            //var item = e.NewValue as TreeViewItem;
-            //
-            //if (item != null)
-            //{
-            //    item.SetValue(TreeViewItem.IsSelectedProperty, true);
-            //}
-            //else
-            //{
-            //    var cast = sender as BindableSelectedItemBehavior;
-            //
-            //    var treeItem = cast.AssociatedObject
-            //               .ItemContainerGenerator
-            //               .ContainerFromItemRecursive(e.NewValue);
-            //    if (treeItem != null)
-            //        treeItem.SetValue(TreeViewItem.IsSelectedProperty, true);
-            //    else
-            //    {
-            //        var oldTreeItem = cast.AssociatedObject
-            //            .ItemContainerGenerator
-            //            .ContainerFromItemRecursive(e.OldValue);
-            //        if (oldTreeItem != null)
-            //            oldTreeItem.SetValue(TreeViewItem.IsSelectedProperty, false);
-            //    }
-            //}
+            var behavior = (BindableSelectedItemBehavior)sender;
+            if (e.NewValue != null || behavior._clearingSelection || behavior.AssociatedObject?.SelectedItem == null)
+                return;
+
+            var tree = behavior.AssociatedObject;
+            var selectedContainer = tree.SelectedItem as TreeViewItem ??
+                tree.ItemContainerGenerator.ContainerFromItemRecursive(tree.SelectedItem);
+            if (selectedContainer == null)
+                return;
+
+            behavior._clearingSelection = true;
+            try
+            {
+                selectedContainer.SetCurrentValue(TreeViewItem.IsSelectedProperty, false);
+            }
+            finally
+            {
+                behavior._clearingSelection = false;
+            }
         }
 
         protected override void OnAttached()
@@ -87,7 +83,8 @@ namespace Shared.Ui.Common.Behaviors
 
         private void OnTreeViewSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            SelectedItem = e.NewValue;
+            if (!_clearingSelection)
+                SetCurrentValue(SelectedItemProperty, e.NewValue);
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using AnimationEditor.Common.BaseControl;
-using Editors.AnimationMeta.MetaEditor.Commands;
+﻿using Editors.AnimationMeta.MetaEditor.Commands;
 using Editors.AnimationMeta.Presentation;
 using Editors.AnimationMeta.Presentation.View;
 using Editors.AnimationMeta.SuperView;
@@ -43,7 +42,7 @@ namespace Editors.AnimationMeta
         public override void RegisterTools(IEditorDatabase factory)
         {
             EditorInfoBuilder
-                .Create<SuperViewViewModel, EditorHostView>(EditorEnums.SuperView_Editor)
+                .Create<SuperViewViewModel, SuperViewWorkspaceView>(EditorEnums.SuperView_Editor)
                 .AddToToolbar("DisplayName.SuperView")
                 .Build(factory);
 

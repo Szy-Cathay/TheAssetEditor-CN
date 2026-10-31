@@ -126,46 +126,7 @@ public class UiAnimationMetadataFamilyGallery
     [TestCase(ThemeType.HighContrastLight, 800d)]
     public void PreviewMetadata_ShortHostKeepsTagListAndSaveAccessible(ThemeType theme, double height)
     {
-        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
-        {
-            var previousTheme = ThemesController.CurrentTheme;
-            ThemesController.SetTheme(theme);
-            RegisterApplicationResources();
-            var host = new EditorHostView
-            {
-                DataContext = new MetadataSuperViewGalleryModel(false, true, 1),
-            };
-            var window = Host(host, 740, height);
-            try
-            {
-                window.Show();
-                window.UpdateLayout();
-                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                window.UpdateLayout();
-                var metadata = FindVisualDescendants<MetadataSuperView>(host).Single();
-                var scroll = FindVisualDescendants<ScrollViewer>(host).Single(view => view.Content is DockPanel);
-                var tags = FindVisualDescendants<ListView>(metadata).Single(view => view.IsVisible && view.DisplayMemberPath == "DisplayName");
-                NUnitAssert.Multiple(() =>
-                {
-                    NUnitAssert.That(metadata.ActualHeight, Is.EqualTo(Math.Max(480, scroll.ViewportHeight)).Within(1));
-                    NUnitAssert.That(tags.ActualHeight, Is.GreaterThanOrEqualTo(48));
-                });
-                var save = FindVisualDescendants<Button>(metadata).Single(button => button.IsVisible && button.Content?.ToString() == "保存");
-                save.BringIntoView();
-                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                window.UpdateLayout();
-                NUnitAssert.Multiple(() =>
-                {
-                    NUnitAssert.That(save.TranslatePoint(new Point(0, 0), scroll).Y, Is.GreaterThanOrEqualTo(-1));
-                    NUnitAssert.That(save.TranslatePoint(new Point(0, save.ActualHeight), scroll).Y, Is.LessThanOrEqualTo(scroll.ViewportHeight + 1));
-                });
-            }
-            finally
-            {
-                window.Close();
-                ThemesController.SetTheme(previousTheme);
-            }
-        });
+        SuperViewWorkspaceLayoutTests.AssertShortWorkspaceLayout(theme, height);
     }
 
     private static IEnumerable<TestCaseData> Cases()
@@ -1517,35 +1478,7 @@ public class UiAnimationMetadataFamilyGallery
                     Has.All.Matches<Button>(button => button.IsEnabled));
             });
 
-            var problemView = FindVisualDescendants<MetadataProblemListView>(
-                window).Single();
-            var problemList = FindVisualDescendants<ListBox>(problemView)
-                .Single(list => list.Name == "ProblemList");
-            var problemLabels = FindVisualDescendants<TextBlock>(problemView)
-                .Where(text => text.IsVisible)
-                .Select(text => text.Text)
-                .ToArray();
-            NUnitAssert.Multiple(() =>
-            {
-                NUnitAssert.That(problemView.ActualHeight, Is.GreaterThan(0));
-                NUnitAssert.That(
-                    System.Windows.Automation.AutomationProperties.GetName(
-                        problemList),
-                    Is.EqualTo("SuperView META 问题列表"));
-                NUnitAssert.That(
-                    problemList.Items.Count,
-                    Is.EqualTo(isLoadedMetadataEditor ? 2 : 0));
-                NUnitAssert.That(
-                    problemList.SelectedItem,
-                    isLoadedMetadataEditor ? Is.Not.Null : Is.Null);
-                NUnitAssert.That(
-                    problemLabels,
-                    isLoadedMetadataEditor
-                        ? Does.Contain("错误")
-                        : Does.Contain("未发现问题"));
-                if (isLoadedMetadataEditor)
-                    NUnitAssert.That(problemLabels, Does.Contain("警告"));
-            });
+            NUnitAssert.That(FindVisualDescendants<MetadataProblemListView>(window), Is.Empty);
 
             if (isLoadedMetadataEditor)
             {
@@ -1672,15 +1605,25 @@ public class UiAnimationMetadataFamilyGallery
         }
     }
 
-    private sealed class MetadataSuperViewGalleryModel : Editors.Shared.Core.Common.BaseControl.IEditorViewModelTypeProvider
+    internal sealed class MetadataSuperViewGalleryModel : Editors.Shared.Core.Common.BaseControl.IEditorViewModelTypeProvider
     {
         public Type EditorViewModelType => typeof(MetadataSuperView);
         public GridLength LeftColumnWidth { get; set; } = new(3, GridUnitType.Star);
         public GridLength RightColumnWidth { get; set; } = new(2, GridUnitType.Star);
         public ScrollBarVisibility EditorContentVerticalScrollBarVisibility => ScrollBarVisibility.Auto;
-        public GalleryModel Player { get; } = CreateAnimationPlayerModel();
+        public object? GameWorld => null;
+        public int SelectedInspectorTabIndex { get; set; } = 1;
+        public GalleryModel Player { get; }
+        public MetaDataTimelineViewModel MetaDataTimeline { get; } = CreateTimelineModel(populated: true);
         public GalleryModel[] SceneObjects { get; } = [CreateSceneObjectModel()];
         public int SelectedTabControllerIndex { get; set; }
+        public bool IsAnimationMetaTabSelected => SelectedTabControllerIndex == 1;
+        public bool CanToggleAnimationMetaPreviewVisibility => HasAnimationMetaFile;
+        public bool CanToggleAnimationMetaDisplayTime => HasAnimationMetaFile;
+        public bool CanToggleAnimationMeta3D => HasAnimationMetaFile;
+        public bool ShowAllAnimationMetaPreviews { get; set; } = true;
+        public bool ShowAllAnimationMetaForEntireAnimation { get; set; }
+        public bool EnableAllAnimationMeta3D { get; set; }
         public GalleryModel PersistentMetaEditor { get; } =
             CreateMetadataModel();
         public GalleryModel MetaEditor { get; } = CreateMetadataModel();
@@ -1697,6 +1640,9 @@ public class UiAnimationMetadataFamilyGallery
         public bool ShowTargetPositions { get; set; } = true;
         public bool ShowFirePositions { get; set; } = true;
         public bool ShowSplashAttacks { get; set; } = true;
+        public bool CanPreviewFlagWind { get; set; }
+        public string PreviewWindX { get; set; } = "0";
+        public string PreviewWindZ { get; set; } = "0";
         public bool ShowCombatMetaDataDuringActiveTime { get; set; } = true;
         public bool ShowCombatMetaDataForEntireAnimation { get; set; }
         public bool CanFocusSelectedMetaData => HasAnimationMetaFile;
@@ -1738,6 +1684,9 @@ public class UiAnimationMetadataFamilyGallery
             GalleryCommand.Instance;
         public ICommand RedoCombatMetaDataActionCommand =>
             GalleryCommand.Instance;
+        public ICommand FocusCameraCommand => GalleryCommand.Instance;
+        public ICommand ResetCameraCommand => GalleryCommand.Instance;
+        public ICommand OpenFactionColourSettingsCommand => GalleryCommand.Instance;
 
         public MetadataSuperViewGalleryModel(
             bool hasPersistentMetaFile,
@@ -1747,6 +1696,7 @@ public class UiAnimationMetadataFamilyGallery
             HasPersistentMetaFile = hasPersistentMetaFile;
             HasAnimationMetaFile = hasAnimationMetaFile;
             SelectedTabControllerIndex = selectedTabControllerIndex;
+            Player = CreateAnimationPlayerModel(MetaDataTimeline);
             MetaDataProblems = CreateProblemListModel(hasAnimationMetaFile);
         }
 
@@ -1780,7 +1730,7 @@ public class UiAnimationMetadataFamilyGallery
     }
 
 #pragma warning disable CA1812
-    private sealed class GalleryModel
+    internal sealed class GalleryModel
     {
         public object? ActiveFragmentSlot { get; set; }
         public object? ActiveOutputFragment { get; set; }

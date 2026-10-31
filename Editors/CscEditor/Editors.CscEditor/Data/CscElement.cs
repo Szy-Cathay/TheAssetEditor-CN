@@ -45,11 +45,20 @@ namespace Editors.CscEditor.Data
         public string AnchorMode { get; set; } = "free";         // terrain anchoring mode
         public byte ElementVersion { get; set; } = 100;
 
-        // ---- ELEMENT keyframable channel groups (null on legacy v5 records) ----
+        // ---- ELEMENT channels (static adapters for the fixed v5 transform layout) ----
         public CscChannelGroup? Position { get; set; }
         public CscChannelGroup? Rotation { get; set; }
         public CscChannelGroup? Scale { get; set; }
         public CscChannelGroup? Weight { get; set; }
+
+        public bool IsStaticTransform { get; internal set; }
+        internal Quaternion StaticRotation { get; set; } = Quaternion.Identity;
+        internal Quaternion StaticBaseRotation { get; set; } = Quaternion.Identity;
+        internal Vector3 StaticRotationEuler { get; set; }
+        internal Vector3 StaticBaseRotationEuler { get; set; }
+        internal CscChannel? StaticCameraFov { get; set; }
+        internal CscChannel? StaticCameraNear { get; set; }
+        internal CscChannel? StaticCameraFar { get; set; }
 
         // ---- ELEMENT trailing placement transform (in-game confirmed) ----
         public Vector3 BasePosition { get; set; }
@@ -76,7 +85,7 @@ namespace Editors.CscEditor.Data
         }
 
         /// <summary>True when the ELEMENT record's channel-group layout was not recognized (e.g.
-        /// legacy v5). The whole element group is then preserved verbatim and is read-only.</summary>
+        /// an unknown legacy shape). The whole element group is preserved verbatim and is read-only.</summary>
         public bool IsLegacyRaw { get; set; }
 
         /// <summary>All records of the element group in encounter order (ELEMENT first, usually).
@@ -262,9 +271,25 @@ namespace Editors.CscEditor.Data
             var rot = EvaluateRotation(channelTime);
             var scale = EvaluateScale(channelTime);
 
-            var channelMatrix = Matrix.CreateScale(scale) * EulerMatrix(rot) * Matrix.CreateTranslation(pos);
-            var baseMatrix = EulerMatrix(BaseRotation) * Matrix.CreateTranslation(BasePosition);
+            var channelRotation = IsStaticTransform ? Matrix.CreateFromQuaternion(CurrentStaticRotation()) : EulerMatrix(rot);
+            var baseRotation = IsStaticTransform ? Matrix.CreateFromQuaternion(CurrentStaticBaseRotation()) : EulerMatrix(BaseRotation);
+            var channelMatrix = Matrix.CreateScale(scale) * channelRotation * Matrix.CreateTranslation(pos);
+            var baseMatrix = baseRotation * Matrix.CreateTranslation(BasePosition);
             return baseMatrix * channelMatrix;
+        }
+
+        internal Quaternion CurrentStaticRotation() => EvaluateRotation(0) == StaticRotationEuler
+            ? StaticRotation : Quaternion.CreateFromRotationMatrix(EulerMatrix(EvaluateRotation(0)));
+
+        internal Quaternion CurrentStaticBaseRotation() => BaseRotation == StaticBaseRotationEuler
+            ? StaticBaseRotation : Quaternion.CreateFromRotationMatrix(EulerMatrix(BaseRotation));
+
+        internal static Vector3 ToEulerXyz(Matrix matrix)
+        {
+            var y = MathF.Asin(Math.Clamp(-matrix.M13, -1f, 1f));
+            return MathF.Abs(matrix.M13) < 0.9999f
+                ? new Vector3(MathF.Atan2(matrix.M23, matrix.M33), y, MathF.Atan2(matrix.M12, matrix.M11))
+                : new Vector3(MathF.Atan2(-matrix.M32, matrix.M22), y, 0);
         }
 
         public static Matrix EulerMatrix(Vector3 euler) =>
@@ -342,10 +367,10 @@ namespace Editors.CscEditor.Data
         /// <summary>The real near/far render clip planes (not depth-of-field - camera_focal_depth,
         /// group index 4, is always some default value in every file checked and isn't used for
         /// anything; see CameraGroupNames for the full group list).</summary>
-        public CscChannel? CameraFov => Kind == CscElementKind.Camera ? TypeChannel(CameraGroupIndex("fov")) : null;
+        public CscChannel? CameraFov => Kind == CscElementKind.Camera ? StaticCameraFov ?? TypeChannel(CameraGroupIndex("fov")) : null;
         public CscChannel? CameraRoll => Kind == CscElementKind.Camera ? TypeChannel(CameraGroupIndex("roll")) : null;
-        public CscChannel? CameraNear => Kind == CscElementKind.Camera ? TypeChannel(CameraGroupIndex("near")) : null;
-        public CscChannel? CameraFar => Kind == CscElementKind.Camera ? TypeChannel(CameraGroupIndex("far")) : null;
+        public CscChannel? CameraNear => Kind == CscElementKind.Camera ? StaticCameraNear ?? TypeChannel(CameraGroupIndex("near")) : null;
+        public CscChannel? CameraFar => Kind == CscElementKind.Camera ? StaticCameraFar ?? TypeChannel(CameraGroupIndex("far")) : null;
 
         /// <summary>Identity of the original Bool node sitting between the roll and near groups of
         /// every CAMERA_ELEMENT (any version) - not part of the Group/Channel/Curve grammar (see
@@ -396,7 +421,7 @@ namespace Editors.CscEditor.Data
         public List<int> AllChannelKeyframeCounts()
         {
             var counts = new List<int>();
-            foreach (var group in ElementGroups().Concat(TypeGroups))
+            foreach (var group in ElementGroups().Where(_ => !IsStaticTransform).Concat(TypeGroups))
                 foreach (var channel in group.Channels)
                     counts.Add(channel.Keyframes.Count);
             return counts;

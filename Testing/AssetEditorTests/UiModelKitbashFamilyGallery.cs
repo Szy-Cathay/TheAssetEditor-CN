@@ -412,10 +412,16 @@ public class UiModelKitbashFamilyGallery
         }
     }
 
-    private static GalleryModel CreateMenuBarModel() => new()
+    internal static GalleryModel CreateMenuBarModel() => new()
     {
         MenuItems = Array.Empty<object>(),
         CustomButtons = Array.Empty<object>(),
+        TransformTool = new GalleryModel
+        {
+            SelectedTransformSpaceIndex = 0,
+            CanEditValues = true,
+            IsVisible = false,
+        },
         ProportionalEditing = new GalleryModel
         {
             IsVisible = new GalleryModel { Value = true },
@@ -763,7 +769,7 @@ public class UiModelKitbashFamilyGallery
     }
 
 #pragma warning disable CA1812
-    private sealed class GalleryModel
+    internal sealed class GalleryModel
     {
         public object? AffectedMeshCollection { get; set; }
         public object? Animation { get; set; }
@@ -851,6 +857,8 @@ public class UiModelKitbashFamilyGallery
         public object? TextValue { get; set; }
         public object? TextureCount { get; set; }
         public object? TransformTool { get; set; }
+        public int SelectedTransformSpaceIndex { get; set; }
+        public bool CanEditValues { get; set; }
         public object? Value { get; set; }
         public object? ViewportShading { get; set; }
         public object? WsStrategies { get; set; }

@@ -38,6 +38,7 @@ namespace GameWorld.Core.Services
                 mesh.VertexArray[i].Tangent = vertex.Tangent;
                 mesh.VertexArray[i].TextureCoordinate = vertex.Uv;
                 mesh.VertexArray[i].TextureCoordinate1 = vertex.Uv1;
+                mesh.VertexArray[i].VertexColour = new Color(vertex.UnormColour ?? Vector4.One);
 
                 // Inline bounding box computation
                 var pos = vertex.Position;

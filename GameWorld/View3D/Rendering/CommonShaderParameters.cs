@@ -32,7 +32,8 @@ namespace GameWorld.Core.Rendering
         SharpDX.Direct3D11.ShaderResourceView? VfxSoftDepth = null,
         bool VfxWriteGroundDepth = false,
         // Native ordinary-sprite global default; explicit overrides are renderer diagnostics.
-        float VfxLowOpacityCulling = .01f
+        float VfxLowOpacityCulling = .01f,
+        Vector2 WindVector = default
         );
 
 }

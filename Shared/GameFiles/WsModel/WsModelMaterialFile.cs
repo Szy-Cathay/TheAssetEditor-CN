@@ -25,6 +25,7 @@ namespace Shared.GameFormats.WsModel
     {
         public bool Alpha { get; set; } = false;
         public Dictionary<TextureType, string> Textures { get; set; } = [];
+        public Dictionary<string, string> TextureSlots { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public List<string> ReferencedTexturePaths { get; set; } = [];
         public UiVertexFormat VertexType { get; set; } = UiVertexFormat.Unknown;
         public string Name { get; set; } = string.Empty;
@@ -137,6 +138,8 @@ namespace Shared.GameFormats.WsModel
                     ReferencedTexturePaths.Add(texturePath);
 
                 var textureSlotName = slotNode.InnerText;
+                if (!string.IsNullOrWhiteSpace(texturePath))
+                    TextureSlots[textureSlotName] = texturePath;
 
                 if (textureSlotName.Contains("diffuse", StringComparison.InvariantCultureIgnoreCase))
                     Textures[TextureType.Diffuse] = texturePath;

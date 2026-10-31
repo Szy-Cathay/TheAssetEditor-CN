@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Editors.AnimationMeta.SuperView.Visualisation;
 using Shared.Core.Services;
 using Shared.GameFormats.AnimationMeta.Parsing;
@@ -118,6 +119,13 @@ namespace Editors.AnimationMeta.SuperView.Inspection
             Action<MetaDataInspectionProblem> navigate)
         {
             _navigate = navigate;
+        }
+
+        [RelayCommand]
+        private void NavigateSelectedProblem()
+        {
+            if (SelectedProblem != null)
+                _navigate(SelectedProblem.Problem);
         }
 
         partial void OnSelectedProblemChanged(

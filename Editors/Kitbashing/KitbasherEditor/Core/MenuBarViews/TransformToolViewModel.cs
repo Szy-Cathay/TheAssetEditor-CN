@@ -39,6 +39,20 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
         private bool _gizmoActive;
         private Vector3 _numericInitialValue;
         public bool CanEditValues => !_gizmoActive;
+        private int _selectedTransformSpaceIndex;
+        public int SelectedTransformSpaceIndex
+        {
+            get => _selectedTransformSpaceIndex;
+            set
+            {
+                if (value is < 0 or > 1 || value == _selectedTransformSpaceIndex || !CanEditValues)
+                    return;
+                EndNumericEdit(true);
+                if (_gizmoComponent?.TrySetTransformSpace(value == 1 ? TransformSpace.Local : TransformSpace.World) == false)
+                    return;
+                SetAndNotify(ref _selectedTransformSpaceIndex, value);
+            }
+        }
         public double DragStep => _activeMode == TransformMode.Rotate ? 0.25 : 0.01;
         public string CoordinateDescription => LocalizationManager.Instance.Get(
             _activeMode == TransformMode.Scale && _scaleOrientation != Matrix.Identity
@@ -177,6 +191,7 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             if (_gizmoComponent != null)
                 _gizmoComponent.PreviewChanged -= SynchronizeGizmoPreview;
             _gizmoComponent = component;
+            component.TrySetTransformSpace(_selectedTransformSpaceIndex == 1 ? TransformSpace.Local : TransformSpace.World);
             component.PreviewChanged += SynchronizeGizmoPreview;
         }
 

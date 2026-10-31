@@ -16,6 +16,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
         private readonly Func<Quaternion> _orientationProvider =
             () => Quaternion.Identity;
         private readonly Action<bool>? _selectionChanged;
+        private readonly Func<Matrix>? _modelTransformProvider;
         private bool _isEnabled = true;
         private bool _isSelected;
         private bool _showForEntireAnimation;
@@ -109,7 +110,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
             float endTime,
             ParsedMetadataAttribute source,
             bool isSelected,
-            Action<bool> selectionChanged)
+            Action<bool> selectionChanged,
+            Func<Matrix>? modelTransformProvider = null)
             : this(node, player, startTime, endTime)
         {
             _skeleton = skeleton;
@@ -118,6 +120,9 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
             _orientationProvider = orientationProvider;
             Source = source;
             _selectionChanged = selectionChanged;
+            _modelTransformProvider = modelTransformProvider;
+            if (_modelTransformProvider != null)
+                _node.ModelMatrix = _modelTransformProvider();
             _isSelected = isSelected;
             _selectionChanged(isSelected);
         }
@@ -125,6 +130,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
         public void Update(float currentTime)
         {
             _currentTimeSeconds = currentTime;
+            if (_modelTransformProvider != null)
+                _node.ModelMatrix = _modelTransformProvider();
             if (Player.IsEnabled && Player.IsPlaying == false)
                 Player.SeekToTimeSeconds(GetPlayerTime(currentTime));
             ApplyVisibility();

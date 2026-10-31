@@ -145,6 +145,9 @@ namespace Editors.CscEditor.Data
 
         static EsfNode RebuildElementRecord(CscElement element, EsfNode record)
         {
+            if (element.IsStaticTransform)
+                return RebuildStaticElementRecord(element, record);
+
             if (!HasSingleGroup(record) || element.Position == null || element.Rotation == null ||
                 element.Scale == null || element.Weight == null)
                 return record;
@@ -166,6 +169,33 @@ namespace Editors.CscEditor.Data
             fields.Add(EsfNode.Leaf(EsfNodeKind.Coord3d, new Coord3d(element.BaseRotation.X, element.BaseRotation.Y, element.BaseRotation.Z)));
             fields.AddRange(element.ElementTrailingFields);
 
+            return RebuildRecord(record, fields);
+        }
+
+        static EsfNode RebuildStaticElementRecord(CscElement element, EsfNode record)
+        {
+            if (element.ElementGroups().Any(g => g.Channels.Any(c => c.Keyframes.Count != 0)))
+                throw new InvalidDataException("ELEMENT v5 stores static transforms and cannot contain keyframes.");
+
+            var fields = record.Children.ToList();
+            var position = element.EvaluatePosition(0);
+            var rotation = element.CurrentStaticRotation();
+            var baseRotation = element.CurrentStaticBaseRotation();
+            var rotationComponents = new[] { rotation.X, rotation.Y, rotation.Z, rotation.W };
+            var baseRotationComponents = new[] { baseRotation.X, baseRotation.Y, baseRotation.Z, baseRotation.W };
+            fields[0] = EsfNode.Leaf(EsfNodeKind.U32, (uint)element.Id, fields[0].Optimized);
+            fields[1] = EsfNode.Leaf(EsfNodeKind.Ascii, element.HeaderString);
+            fields[2] = EsfNode.Leaf(EsfNodeKind.F32, element.Begin);
+            fields[3] = EsfNode.Leaf(EsfNodeKind.F32, element.End);
+            fields[4] = EsfNode.Leaf(EsfNodeKind.Ascii, element.TimingMode);
+            fields[5] = EsfNode.Leaf(EsfNodeKind.Ascii, element.AnchorMode);
+            fields[6] = EsfNode.Leaf(EsfNodeKind.Coord3d, new Coord3d(position.X, position.Y, position.Z));
+            for (var i = 0; i < 4; i++)
+                fields[7 + i] = EsfNode.Leaf(EsfNodeKind.F32, rotationComponents[i]);
+            fields[11] = EsfNode.Leaf(EsfNodeKind.F32, element.EvaluateScale(0));
+            fields[12] = EsfNode.Leaf(EsfNodeKind.Coord3d, new Coord3d(element.BasePosition.X, element.BasePosition.Y, element.BasePosition.Z));
+            for (var i = 0; i < 4; i++)
+                fields[13 + i] = EsfNode.Leaf(EsfNodeKind.F32, baseRotationComponents[i]);
             return RebuildRecord(record, fields);
         }
 
@@ -199,6 +229,21 @@ namespace Editors.CscEditor.Data
                 return record;
 
             var originalFields = record.Groups![0];
+            if (element.StaticCameraFov != null)
+            {
+                if (new[] { element.StaticCameraFov, element.StaticCameraNear, element.StaticCameraFar }
+                    .Any(c => c?.Keyframes.Count > 0))
+                    throw new InvalidDataException("Static camera parameters cannot contain keyframes.");
+                var staticFields = originalFields.ToList();
+                staticFields[0] = EsfNode.Leaf(EsfNodeKind.F32, element.StaticCameraFov.StaticValue);
+                if (element.StaticCameraNear != null && element.StaticCameraFar != null)
+                {
+                    staticFields[1] = EsfNode.Leaf(EsfNodeKind.F32, element.StaticCameraNear.StaticValue);
+                    staticFields[2] = EsfNode.Leaf(EsfNodeKind.F32, element.StaticCameraFar.StaticValue);
+                    staticFields[3] = EsfNode.Leaf(EsfNodeKind.Bool, element.CameraUnknownFlag);
+                }
+                return RebuildRecord(record, staticFields);
+            }
             var fields = new List<EsfNode>(originalFields.Count);
 
             // Channel-group runs are re-detected on the original fields and spliced with the
@@ -454,7 +499,7 @@ namespace Editors.CscEditor.Data
 
             // Unnamed form: U32(0) + I32(channelCount) + per group: one channel whose
             // sub-components are the group's channels.
-            var groups = element.ElementGroups().Concat(element.TypeGroups).ToList();
+            var groups = element.ElementGroups().Where(_ => !element.IsStaticTransform).Concat(element.TypeGroups).ToList();
             var fields = new List<EsfNode>
             {
                 EsfNode.Leaf(EsfNodeKind.U32, 0u, optimized: true),

@@ -3,14 +3,13 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              AutomationProperties.Name="{loc:Loc SuperView.Problems.ListAutomationName}">
-    <Border
-        Margin="4"
-        Padding="8"
-        Style="{StaticResource AeSurface.Panel}">
-        <Grid>
+    <UserControl.InputBindings>
+        <KeyBinding Key="Return" Command="{Binding NavigateSelectedProblemCommand}" />
+    </UserControl.InputBindings>
+    <Grid Margin="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
             <TextBlock
@@ -21,7 +20,6 @@
             <ListBox
                 x:Name="ProblemList"
                 Grid.Row="1"
-                MaxHeight="176"
                 AutomationProperties.Name="{loc:Loc SuperView.Problems.ListAutomationName}"
                 ItemsSource="{Binding Problems}"
                 ScrollViewer.CanContentScroll="True"
@@ -45,6 +43,7 @@
                     <Style
                         TargetType="ListBoxItem"
                         BasedOn="{StaticResource AeList.Item}">
+                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OnProblemItemMouseDown" />
                         <Setter
                             Property="AutomationProperties.Name"
                             Value="{Binding AutomationName}" />
@@ -128,6 +127,5 @@
                         TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
-        </Grid>
-    </Border>
+    </Grid>
 </UserControl>

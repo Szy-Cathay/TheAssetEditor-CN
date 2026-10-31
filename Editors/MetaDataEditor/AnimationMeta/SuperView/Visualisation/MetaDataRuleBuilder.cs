@@ -16,6 +16,14 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         private readonly ILogger _logger = Logging.Create<MetaDataRuleBuilder>();
         private readonly MetaDataResourceResolver _resourceResolver;
 
+        private sealed record DockRuleSource(
+            ParsedMetadataAttribute Source,
+            int EquipmentBoneId,
+            string AnimationSlotName,
+            string[] SkeletonNameAlternatives,
+            float StartTime,
+            float EndTime);
+
         public MetaDataRuleBuilder(
             MetaDataResourceResolver resourceResolver)
         {
@@ -33,12 +41,26 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             if (file == null)
                 return;
 
-            foreach (var item in file.GetItemsOfType<DockEquipment>())
+            foreach (var item in file.Attributes)
             {
+                var dock = item switch
+                {
+                    DockEquipment current => new DockRuleSource(current,
+                        current.PropBoneId, current.AnimationSlotName,
+                        current.SkeletonNameAlternatives, current.StartTime, current.EndTime),
+                    DockEquipment_v3 legacy when !string.IsNullOrEmpty(legacy.AnimationSlotName) =>
+                        // Legacy v3 stores equipment slots from one; modern tags store be_prop indices.
+                        new DockRuleSource(legacy, legacy.PropBoneId > 0 ? legacy.PropBoneId - 1 : -1, legacy.AnimationSlotName,
+                            legacy.SkeletonNameAlternatives, legacy.StartTime, legacy.EndTime),
+                    _ => null,
+                };
+                if (dock == null)
+                    continue;
+
                 try
                 {
                     TryAddDockRule(
-                        item,
+                        dock,
                         owner,
                         fragment,
                         skeleton,
@@ -69,17 +91,24 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         }
 
         private void TryAddDockRule(
-            DockEquipment source,
+            DockRuleSource source,
             MetaDataDocumentOwner owner,
             IAnimationBinGenericFormat? fragment,
             ISkeletonProvider skeleton,
             ICollection<IAnimationChangeRule> rules,
             ICollection<MetaDataBuildDiagnostic> diagnostics)
         {
+            if (source.Source is DockEquipment_v3 && source.EquipmentBoneId < 0)
+            {
+                AddDiagnostic(source.Source, owner,
+                    "SuperView.Diagnostics.RuleUnavailable", diagnostics);
+                return;
+            }
+
             if (fragment == null)
             {
                 AddDiagnostic(
-                    source,
+                    source.Source,
                     owner,
                     "SuperView.Diagnostics.MissingAnimation",
                     diagnostics,
@@ -94,7 +123,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             if (string.IsNullOrWhiteSpace(animationPath))
             {
                 AddDiagnostic(
-                    source,
+                    source.Source,
                     owner,
                     "SuperView.Diagnostics.MissingAnimation",
                     diagnostics,
@@ -106,7 +135,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             if (boneIndex < 0)
             {
                 AddDiagnostic(
-                    source,
+                    source.Source,
                     owner,
                     "SuperView.Diagnostics.MissingBone",
                     diagnostics,
@@ -115,15 +144,25 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             }
 
             var animationFile = _resourceResolver.FindAnimation(
-                source,
+                source.Source,
                 owner,
                 animationPath,
                 diagnostics);
             if (animationFile == null)
                 return;
 
+            var equipmentBoneName = DockEquipmentRule.GetEquipmentBoneName(source.EquipmentBoneId);
+            if (source.Source is DockEquipment_v3 &&
+                skeleton.Skeleton.GetBoneIndexByName(equipmentBoneName) < 0)
+            {
+                AddDiagnostic(source.Source, owner,
+                    "SuperView.Diagnostics.MissingBone", diagnostics,
+                    boneName: equipmentBoneName);
+                return;
+            }
+
             TryAddRule(
-                source,
+                source.Source,
                 owner,
                 () =>
                 {
@@ -132,7 +171,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                         skeleton.Skeleton);
                     return new DockEquipmentRule(
                         boneIndex,
-                        source.PropBoneId,
+                        source.EquipmentBoneId,
                         clip,
                         skeleton,
                         source.StartTime,
@@ -143,7 +182,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         }
 
         private static int FindBoneIndex(
-            DockEquipment source,
+            DockRuleSource source,
             ISkeletonProvider skeleton)
         {
             if (skeleton?.Skeleton == null)
