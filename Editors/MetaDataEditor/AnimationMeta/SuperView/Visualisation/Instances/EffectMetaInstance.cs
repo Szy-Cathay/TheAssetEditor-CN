@@ -16,11 +16,13 @@ public sealed class EffectMetaInstance : IMetaDataInstance, IMetaDataPlaybackIns
     private readonly bool _persistentOwner;
     private readonly AnimationPlayer? _ownerPlayer;
     private readonly float? _rangeEmissionEnd;
+    private readonly Func<bool>? _refreshTransform;
     private AnimationPlaybackTime? _previousPlayback;
     private double _cycleOriginSeconds;
     private double _playbackOriginSeconds;
     private readonly List<double> _cycleStarts = [];
     private bool _showForEntireAnimation;
+    private bool _cleaned;
     public event Action<EffectMetaInstance>? DiagnosticsChanged;
     public IReadOnlyList<VfxPreviewDiagnostic> Diagnostics => _particles.Diagnostics;
     public bool DependsOn(object file) => _particles.DependsOn(file);
@@ -43,19 +45,28 @@ public sealed class EffectMetaInstance : IMetaDataInstance, IMetaDataPlaybackIns
     public int? HighlightedBoneIndex => _marker.HighlightedBoneIndex;
 
     public EffectMetaInstance(DrawableMetaInstance marker, VfxPreviewSceneNode particles, MetaDataTimeRange? range,
-        bool persistentOwner = false, AnimationPlayer? ownerPlayer = null)
+        bool persistentOwner = false, AnimationPlayer? ownerPlayer = null, Func<bool>? refreshTransform = null)
     {
         _marker = marker; _particles = particles; _start = range?.StartTime ?? 0;
         _instantTrigger = range is { } time && !time.IsWholeAnimationRange && float.IsFinite(time.StartTime)
             && float.IsFinite(time.EndTime) && Math.Abs(time.EndTime - time.StartTime) <= 0.000001f;
         _persistentOwner = persistentOwner;
         _ownerPlayer = ownerPlayer;
+        _refreshTransform = refreshTransform;
         if (range is { IsWholeAnimationRange: false } interval && !_instantTrigger
             && float.IsFinite(interval.EndTime) && interval.EndTime > _start)
             _rangeEmissionEnd = interval.EndTime - _start;
         particles.DiagnosticsChanged += OnDiagnosticsChanged;
     }
     private void OnDiagnosticsChanged() => DiagnosticsChanged?.Invoke(this);
+    public bool TryRefreshTransform()
+    {
+        if (_cleaned || _refreshTransform?.Invoke() != true) return false;
+        _particles.RefreshPlayback();
+        _previousPlayback = null;
+        _cycleStarts.Clear();
+        return true;
+    }
     public void Update(float currentTime)
     {
         var revision = _previousPlayback?.Revision ?? 0;
@@ -66,6 +77,8 @@ public sealed class EffectMetaInstance : IMetaDataInstance, IMetaDataPlaybackIns
     {
         var previous = _previousPlayback;
         var reset = previous is { } old && (old.Revision != playback.Revision || old.IsStopped && !playback.IsStopped);
+        _particles.IsPlaybackAdvancing = playback.IsRunning && previous is { } advancing && !reset
+            && advancing.CycleIndex == playback.CycleIndex;
         if (previous == null || reset)
         {
             _playbackOriginSeconds = _cycleOriginSeconds = playback.ElapsedSeconds - playback.ClipTimeSeconds;
@@ -119,6 +132,7 @@ public sealed class EffectMetaInstance : IMetaDataInstance, IMetaDataPlaybackIns
     }
     public void CleanUp()
     {
+        _cleaned = true;
         _particles.DiagnosticsChanged -= OnDiagnosticsChanged;
         _particles.Dispose();
         _marker.CleanUp();

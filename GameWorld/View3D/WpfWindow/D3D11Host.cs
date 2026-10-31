@@ -31,6 +31,8 @@ namespace GameWorld.Core.WpfWindow
         private static int _referenceCount;
 
         private D3D11Image _d3D11Image;
+        private D3D11Image _legacyImage = null!;
+        private RenderTarget2D? _legacyRenderTarget;
         private bool _disposed;
         private TimeSpan _lastRenderingTime;
         private bool _suspendWhenHidden, _renderingSuspended;
@@ -52,6 +54,12 @@ namespace GameWorld.Core.WpfWindow
         private SpriteBatch _spriteBatch;
         private DeviceContext _presentationContext;
         private Query _presentationQuery;
+        private D3D11FramePresenter? _framePresenter;
+        private readonly List<D3D11FramePresenter> _retiredPresenters = new();
+        private bool _useAsynchronousPresentation;
+        private long _renderSequence;
+        private bool _preparedStartupBackBuffer;
+        private PresentationParameters? _pendingPresentationParameters;
         private double _dpiScalingFactor = 1;
         private static bool _useASingleSharedGraphicsDevice = true;
         private List<IDisposable> _toBeDisposedNextFrame = new List<IDisposable>();
@@ -109,6 +117,21 @@ namespace GameWorld.Core.WpfWindow
         /// WPF CompositionTarget.Rendering will drive rendering at the display's refresh rate.
         /// </summary>
         public TimeSpan TargetElapsedTime { get; set; } = TimeSpan.FromTicks(1); // Sync with screen refresh rate
+
+        // Explicit VFX startup preparation; no UI-thread wait and no elapsed-time catch-up.
+        public System.Threading.Tasks.Task? RenderingPreparation { get; set; }
+
+        // Explicit opt-in for VFX scenes. Other editors retain synchronous presentation.
+        public bool UseAsynchronousPresentation
+        {
+            get => _useAsynchronousPresentation;
+            set
+            {
+                if (_useAsynchronousPresentation == value) return;
+                _useAsynchronousPresentation = value;
+                _resetBackBuffer = true;
+            }
+        }
 
         // Opt in only for scenes whose hidden playback must remain paused.
         public bool SuspendWhenHidden
@@ -277,6 +300,9 @@ namespace GameWorld.Core.WpfWindow
         {
         }
 
+        protected virtual bool SupportsFrameUpdatesWithoutDrawing => false;
+        protected virtual void UpdateFrameWithoutDrawing(GameTime time) { }
+
         private void InitializeGraphicsDevice()
         {
             lock (GraphicsDeviceLock)
@@ -317,7 +343,12 @@ namespace GameWorld.Core.WpfWindow
                 if (GraphicsDevice == null)
                     throw new NotSupportedException("Can only recreate graphicsdevice when one already exists. Initalize one first!");
 
-                CreateGraphicsDeviceDependentResources(pp);
+                if (UseAsynchronousPresentation || _framePresenter != null)
+                {
+                    _pendingPresentationParameters = pp;
+                    _resetBackBuffer = true;
+                }
+                else CreateGraphicsDeviceDependentResources(pp);
             }
         }
 
@@ -361,15 +392,23 @@ namespace GameWorld.Core.WpfWindow
             //}
         }
 
-        private void CreateBackBuffer()
+        private bool CreateBackBuffer()
         {
-            _d3D11Image.SetBackBuffer(null);
-            if (_sharedRenderTarget != null)
+            // Keep a single live GPU generation while a submitted frame is unfinished.
+            if (_framePresenter != null && !_framePresenter.IsComplete) return false;
+            if (!UseAsynchronousPresentation) _legacyImage.SetBackBuffer(null);
+            if (_framePresenter != null)
+            {
+                _retiredPresenters.Add(_framePresenter);
+                _framePresenter = null;
+            }
+            if (!UseAsynchronousPresentation && _legacyRenderTarget != null)
             {
                 // can't directly dispose rendertargets now since Monogame needs it for one more frame
                 // (when a rendertarget is swapped, monogame still uses the old one for one more frame)
                 // so queue dispose for later
-                _toBeDisposedNextFrame.Add(_sharedRenderTarget);
+                _toBeDisposedNextFrame.Add(_legacyRenderTarget);
+                _legacyRenderTarget = null;
             }
 
             var sampleCount = 0;
@@ -386,12 +425,15 @@ namespace GameWorld.Core.WpfWindow
             var width = (int)(Math.Max(ActualWidth, 1) * DpiScalingFactor);
             var height = (int)(Math.Max(ActualHeight, 1) * DpiScalingFactor);
 
-            CreateGraphicsDeviceDependentResources(new PresentationParameters
+            var parameters = new PresentationParameters
             {
-                BackBufferWidth = width,
-                BackBufferHeight = height,
-                MultiSampleCount = sampleCount
-            });
+                BackBufferWidth = ActualWidth > 0 ? width : _pendingPresentationParameters?.BackBufferWidth ?? width,
+                BackBufferHeight = ActualHeight > 0 ? height : _pendingPresentationParameters?.BackBufferHeight ?? height,
+                MultiSampleCount = _pendingPresentationParameters?.MultiSampleCount ?? sampleCount
+            };
+            CreateGraphicsDeviceDependentResources(parameters);
+            _pendingPresentationParameters = null;
+            return true;
         }
 
         private void CreateGraphicsDeviceDependentResources(PresentationParameters pp)
@@ -400,10 +442,23 @@ namespace GameWorld.Core.WpfWindow
             var height = pp.BackBufferHeight;
             var ms = pp.MultiSampleCount;
 
-            _sharedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
+            if (UseAsynchronousPresentation)
+            {
+                _framePresenter = new D3D11FramePresenter(GraphicsDevice, width, height, OnIsFrontBufferAvailableChanged,
+                    SupportsFrameUpdatesWithoutDrawing ? 2 : 1);
+                if (_sharedRenderTarget == null || _legacyRenderTarget == null && ReferenceEquals(Source, _legacyImage))
+                    _sharedRenderTarget = _framePresenter.DisplayedTarget;
+            }
+            else
+            {
+                _sharedRenderTarget = new RenderTarget2D(GraphicsDevice, width, height, false, SurfaceFormat.Bgr32,
                     DepthFormat.Depth24Stencil8, 0, RenderTargetUsage.DiscardContents, true);
-            _sharedRenderTarget.Name = "sharedRenderTarget";
-            _d3D11Image.SetBackBuffer(_sharedRenderTarget);
+                _sharedRenderTarget.Name = "sharedRenderTarget";
+                _legacyRenderTarget = _sharedRenderTarget;
+                _d3D11Image = _legacyImage;
+                _legacyImage.SetBackBuffer(_sharedRenderTarget);
+                Source = _legacyImage;
+            }
 
             // internal rendertarget; all user draws render into this before we draw it to the actual back buffer
             // that way flickering of screen will be prevented when under heavy system load (such as when using rendertargets on intel graphics: https://gitlab.com/MarcStan/MonoGame.Framework.WpfInterop/issues/12)
@@ -416,6 +471,7 @@ namespace GameWorld.Core.WpfWindow
         private void InitializeImageSource()
         {
             _d3D11Image = new D3D11Image();
+            _legacyImage = _d3D11Image;
             _d3D11Image.IsFrontBufferAvailableChanged += OnIsFrontBufferAvailableChanged;
             CreateBackBuffer();
             Source = _d3D11Image;
@@ -427,7 +483,8 @@ namespace GameWorld.Core.WpfWindow
 
         private void OnIsFrontBufferAvailableChanged(object sender, DependencyPropertyChangedEventArgs eventArgs)
         {
-            if (_d3D11Image.IsFrontBufferAvailable)
+            if (!ReferenceEquals(sender, Source)) return;
+            if (((D3D11Image)sender).IsFrontBufferAvailable)
             {
                 StartRendering();
                 _resetBackBuffer = true;
@@ -590,6 +647,19 @@ namespace GameWorld.Core.WpfWindow
                     return;
 
                 var renderingEventArgs = (RenderingEventArgs)eventArgs;
+                if (RenderingPreparation is { } preparation)
+                {
+                    if (!preparation.IsCompleted)
+                    {
+                        PrepareStartupBackBuffer(diagnostics, ref sample);
+                        _lastRenderingTime = renderingEventArgs.RenderingTime;
+                        _renderingSuspended = true;
+                        return;
+                    }
+                    RenderingPreparation = null;
+                    // A failed optional preparation falls back to ordinary runtime compilation.
+                    _ = preparation.Exception;
+                }
                 if (!PrepareRenderingTime(renderingEventArgs.RenderingTime, IsVisible, out var frameTime))
                 {
                     sample.HiddenSkipped = true;
@@ -602,14 +672,33 @@ namespace GameWorld.Core.WpfWindow
                     DisposeRenderTargetsFromPreviousFrames();
                     diagnostics?.EndPhase(ref sample, D3D11FramePhase.DisposeTargets);
                 }
+                DisposeCompletedPresenters();
+                ReleaseUnusedLegacyTarget();
 
                 // Recreate back buffer if necessary.
                 if (_resetBackBuffer || _dpiChanged)
                 {
                     diagnostics?.StartPhase(ref sample, D3D11FramePhase.Rebuild);
-                    CreateBackBuffer();
+                    if (!CreateBackBuffer())
+                    {
+                        diagnostics?.EndPhase(ref sample, D3D11FramePhase.Rebuild);
+                        sample.PresentationDeferred++;
+                        TryUpdateWithoutPresentation(frameTime, renderingEventArgs.RenderingTime, ref sample);
+                        return;
+                    }
                     _dpiChanged = false;
                     diagnostics?.EndPhase(ref sample, D3D11FramePhase.Rebuild);
+                    sample.ResourceRebuilds++;
+                }
+
+                if (_framePresenter != null)
+                {
+                    sample.AsynchronousPresentation = true;
+                    TryCompleteAsynchronousPresentation(diagnostics, ref sample);
+                    if (frameTime != null && SupportsFrameUpdatesWithoutDrawing
+                        && !_framePresenter.TryReserveFrame(diagnostics, ref sample)
+                        && TryUpdateWithoutPresentation(frameTime, renderingEventArgs.RenderingTime, ref sample))
+                        return;
                 }
 
                 if (frameTime != null)
@@ -617,10 +706,21 @@ namespace GameWorld.Core.WpfWindow
                     diagnostics?.StartPhase(ref sample, D3D11FramePhase.Render);
                     GraphicsDevice.SetRenderTarget(_cachedRenderTarget);
                     Render(frameTime);
+                    _renderSequence++;
                     diagnostics?.EndPhase(ref sample, D3D11FramePhase.Render);
                     sample.ElapsedGameTimeTicks = frameTime.ElapsedGameTime.Ticks;
                     _lastRenderingTime = renderingEventArgs.RenderingTime;
                     _renderingSuspended = false;
+                }
+
+                if (_framePresenter != null)
+                {
+                    _framePresenter.TrySubmit(GraphicsDevice, _spriteBatch, _cachedRenderTarget, _renderSequence,
+                        diagnostics, ref sample);
+                    sample.SubmittedSequence = _framePresenter.LastSubmittedSequence;
+                    sample.PresentedSequence = _framePresenter.PresentedSequence;
+                    _resetBackBuffer = false;
+                    return;
                 }
 
                 sample.PresentAttempts++;
@@ -661,7 +761,7 @@ namespace GameWorld.Core.WpfWindow
                 }
                 _resetBackBuffer = false;
             }
-            catch { sample.Faulted = true; throw; }
+            catch { _framePresenter?.CancelReservedFrame(); sample.Faulted = true; throw; }
             finally
             {
                 if (diagnostics != null)
@@ -670,6 +770,68 @@ namespace GameWorld.Core.WpfWindow
                     diagnostics.EndCallback(ref sample);
                 }
             }
+        }
+
+        private void PrepareStartupBackBuffer(D3D11HostFrameDiagnostics? diagnostics, ref D3D11FrameTiming sample)
+        {
+            if (_preparedStartupBackBuffer || !GraphicsDeviceInitialized || !UseAsynchronousPresentation || _renderSequence != 0
+                || SuspendWhenHidden && !IsVisible
+                || !_resetBackBuffer && !_dpiChanged
+                || !(ActualWidth > 0 && ActualHeight > 0
+                    || _pendingPresentationParameters is { BackBufferWidth: > 0, BackBufferHeight: > 0 })) return;
+            diagnostics?.StartPhase(ref sample, D3D11FramePhase.Rebuild);
+            try
+            {
+                if (!CreateBackBuffer()) return;
+                _resetBackBuffer = false;
+                _dpiChanged = false;
+                _preparedStartupBackBuffer = true;
+                sample.ResourceRebuilds++;
+            }
+            finally { diagnostics?.EndPhase(ref sample, D3D11FramePhase.Rebuild); }
+        }
+
+        private bool TryUpdateWithoutPresentation(GameTime? frameTime, TimeSpan now, ref D3D11FrameTiming sample)
+        {
+            if (frameTime == null || !SupportsFrameUpdatesWithoutDrawing) return false;
+            UpdateFrameWithoutDrawing(frameTime);
+            _lastRenderingTime = now;
+            _renderingSuspended = false;
+            sample.ElapsedGameTimeTicks = frameTime.ElapsedGameTime.Ticks;
+            if (_framePresenter != null)
+            {
+                _framePresenter.RecordUpdateWithoutDrawing();
+                sample.SubmittedSequence = _framePresenter.LastSubmittedSequence;
+                sample.PresentedSequence = _framePresenter.PresentedSequence;
+            }
+            return true;
+        }
+
+        private bool TryCompleteAsynchronousPresentation(D3D11HostFrameDiagnostics? diagnostics, ref D3D11FrameTiming sample)
+        {
+            if (_framePresenter == null || !_framePresenter.TryPresent(diagnostics, ref sample)) return false;
+            _sharedRenderTarget = _framePresenter.DisplayedTarget;
+            _d3D11Image = _framePresenter.DisplayedImage;
+            Source = _d3D11Image;
+            return true;
+        }
+
+        private void DisposeCompletedPresenters()
+        {
+            for (var index = _retiredPresenters.Count - 1; index >= 0; index--)
+            {
+                var presenter = _retiredPresenters[index];
+                if (presenter.OwnsImage(Source) || !presenter.TryDisposeIfComplete()) continue;
+                _retiredPresenters.RemoveAt(index);
+            }
+        }
+
+        private void ReleaseUnusedLegacyTarget()
+        {
+            if (!UseAsynchronousPresentation || _legacyRenderTarget == null || ReferenceEquals(Source, _legacyImage)
+                || !_legacyImage.TryDetachBackBuffer()) return;
+            _toBeDisposedNextFrame.Add(_legacyRenderTarget);
+            _legacyRenderTarget = null;
         }
 
         private bool PrepareRenderingTime(TimeSpan now, bool isVisible, out GameTime? frameTime)
@@ -731,17 +893,20 @@ namespace GameWorld.Core.WpfWindow
             // The immediate context is owned by the shared graphics device.
             _presentationContext = null;
 
-            if (_d3D11Image != null)
+            if (_legacyImage != null)
             {
-                _d3D11Image.IsFrontBufferAvailableChanged -= OnIsFrontBufferAvailableChanged;
-                _d3D11Image.Dispose();
-                _d3D11Image = null;
+                _legacyImage.IsFrontBufferAvailableChanged -= OnIsFrontBufferAvailableChanged;
+                _legacyImage.Dispose();
+                _legacyImage = null!;
             }
-            if (_sharedRenderTarget != null)
-            {
-                _sharedRenderTarget.Dispose();
-                _sharedRenderTarget = null;
-            }
+            _d3D11Image = null;
+            _legacyRenderTarget?.Dispose();
+            _legacyRenderTarget = null;
+            _sharedRenderTarget = null;
+            _framePresenter?.Dispose();
+            _framePresenter = null;
+            foreach (var presenter in _retiredPresenters) presenter.Dispose();
+            _retiredPresenters.Clear();
             if (_cachedRenderTarget != null)
             {
                 if (_cachedRenderTarget.MultiSampleCount > 0 && UseASingleSharedGraphicsDevice)

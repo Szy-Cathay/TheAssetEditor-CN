@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using System;
 using System.Diagnostics;
 using System.Globalization;
@@ -32,9 +32,12 @@ internal struct D3D11FrameTiming
     public long AllocatedBytes, IntervalAllocatedBytes;
     public int Gc0, Gc1, Gc2, IntervalGc0, IntervalGc1, IntervalGc2, ManagedThreadId;
     public int RenderCalls, PresentAttempts, PresentCalls, QueryPolls, ResourceRebuilds;
+    public int PresentationSubmitted, PresentationDeferred;
+    public long SubmittedSequence, PresentedSequence;
     public int Width, Height, WidthBefore, HeightBefore;
     public double ActualWidth, ActualHeight, DpiScale;
     public bool IsVisible, IsRendering, WasSuspended, HiddenSkipped, PendingResize, PendingDpi, Faulted, HasPreviousCallback;
+    public bool AsynchronousPresentation;
     public long ElapsedGameTimeTicks;
     internal long PhaseStart, AllocatedStart;
     internal int Gc0Start, Gc1Start, Gc2Start;
@@ -173,7 +176,7 @@ internal sealed class D3D11HostFrameDiagnostics : IDisposable
         switch (phase)
         {
             case D3D11FramePhase.DisposeTargets: sample.DisposeTargetsTicks += ticks; break;
-            case D3D11FramePhase.Rebuild: sample.RebuildTicks += ticks; sample.ResourceRebuilds++; break;
+            case D3D11FramePhase.Rebuild: sample.RebuildTicks += ticks; break;
             case D3D11FramePhase.Render: sample.RenderTicks += ticks; sample.RenderCalls++; break;
             case D3D11FramePhase.Lock: sample.LockTicks += ticks; break;
             case D3D11FramePhase.Blit: sample.BlitTicks += ticks; break;

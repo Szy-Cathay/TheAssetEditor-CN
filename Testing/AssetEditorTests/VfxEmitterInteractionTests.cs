@@ -782,7 +782,8 @@ public class VfxEmitterInteractionTests
                 """);
             var assembly = typeof(VfxPreviewComponent).Assembly;
             var converter = assembly.GetType("GameWorld.Core.Vfx.TotalWarVfxConverter", true)!;
-            var conversion = converter.GetMethod("Convert", BindingFlags.Static | BindingFlags.Public)!.Invoke(null, [new VfxPreviewSnapshot(bytes, "vfx/cpu.xml", _ => [1])]);
+            var conversion = converter.GetMethod("Convert", BindingFlags.Static | BindingFlags.Public, [typeof(VfxPreviewSnapshot)])!
+                .Invoke(null, [new VfxPreviewSnapshot(bytes, "vfx/cpu.xml", _ => [1])]);
             if (groundEvent)
             {
                 var emitters = (System.Collections.IEnumerable)conversion!.GetType().GetProperty("Emitters")!.GetValue(conversion)!;

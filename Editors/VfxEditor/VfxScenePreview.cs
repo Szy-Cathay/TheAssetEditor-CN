@@ -13,6 +13,7 @@ public sealed class VfxScenePreview(IWpfGame game, IComponentInserter components
     : IDisposable
 {
     private bool _started;
+    private bool _disposed;
     private bool _framed;
     private ArcBallCamera? _camera;
     private (float Zoom, float Yaw, float Pitch, Vector3 Target, ProjectionType Projection)? _initialCamera;
@@ -32,8 +33,14 @@ public sealed class VfxScenePreview(IWpfGame game, IComponentInserter components
     public void SetGizmoMode(GizmoMode mode) => interaction?.SetGizmoMode(mode);
     public void Start()
     {
-        if (_started) return;
-        if (Game is D3D11Host host) host.SuspendWhenHidden = true;
+        if (_disposed || _started) return;
+        if (Game is D3D11Host host)
+        {
+            host.SuspendWhenHidden = true;
+            host.UseAsynchronousPresentation = true;
+            host.RenderingPreparation = VfxRuntimePreparation.PrepareAsync(typeof(VfxEmitterInteractionComponent),
+                typeof(VfxScenePreview), typeof(VfxAttachmentHistory));
+        }
         _camera = core.Components.OfType<ArcBallCamera>().SingleOrDefault();
         if (_camera != null)
         {
@@ -43,6 +50,7 @@ public sealed class VfxScenePreview(IWpfGame game, IComponentInserter components
                 || _camera.CurrentProjectionType != ProjectionType.Perspective;
         }
         Preview.EnableContinuousTrailPreview = true;
+        Preview.EnableInteractiveReload = true;
         Preview.Reloaded += FrameInitialContent;
         if (interaction != null) components.Execute(core, interaction, Preview);
         else components.Execute(core, Preview);
@@ -50,6 +58,7 @@ public sealed class VfxScenePreview(IWpfGame game, IComponentInserter components
     }
     public void Stop()
     {
+        if (_disposed) return;
         interaction?.CancelTransform();
         Preview.Stop();
     }
@@ -72,6 +81,8 @@ public sealed class VfxScenePreview(IWpfGame game, IComponentInserter components
     }
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
         Preview.Reloaded -= FrameInitialContent;
         interaction?.Dispose();
         Preview.Dispose();

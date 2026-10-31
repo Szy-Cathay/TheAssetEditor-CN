@@ -1,4 +1,4 @@
-<UserControl x:Class="Editors.VfxEditor.VfxEditorView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:Editors.VfxEditor" xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui" xmlns:colour="clr-namespace:Shared.Ui.BaseDialogs.ColourPickerButton;assembly=Shared.Ui" xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF" Background="{DynamicResource AeBrush.Canvas}" Foreground="{DynamicResource AeBrush.TextPrimary}" FontFamily="{DynamicResource AppFontFamily}" FontWeight="{DynamicResource AppFontWeight}" PreviewKeyDown="EditorKeyDown" xmlns:player="clr-namespace:AnimationEditor.Common.AnimationPlayer;assembly=Editors.Shared.Core">
+<UserControl x:Class="Editors.VfxEditor.VfxEditorView" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:Editors.VfxEditor" xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui" xmlns:colour="clr-namespace:Shared.Ui.BaseDialogs.ColourPickerButton;assembly=Shared.Ui" xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF" Background="{DynamicResource AeBrush.Canvas}" Foreground="{DynamicResource AeBrush.TextPrimary}" FontFamily="{DynamicResource AppFontFamily}" FontWeight="{DynamicResource AppFontWeight}" PreviewKeyDown="EditorKeyDown" Unloaded="EditorUnloaded" DataContextChanged="EditorDataContextChanged" xmlns:player="clr-namespace:AnimationEditor.Common.AnimationPlayer;assembly=Editors.Shared.Core">
     <UserControl.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -6,6 +6,11 @@
                 <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/GridSplitterStyles.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <BooleanToVisibilityConverter x:Key="BoolVisibility" />
+            <CollectionViewSource x:Key="LayerGroups" Source="{Binding Layers}">
+                <CollectionViewSource.GroupDescriptions>
+                    <PropertyGroupDescription PropertyName="GroupLabel" />
+                </CollectionViewSource.GroupDescriptions>
+            </CollectionViewSource>
             <DataTemplate DataType="{x:Type local:VfxValueViewModel}">
                 <Grid Margin="0,0,0,12">
                     <Grid.ColumnDefinitions>
@@ -21,7 +26,7 @@
                     <TextBox Grid.Column="1" Text="{Binding Text, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" Visibility="{Binding IsInput, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{Binding Label}" IsUndoEnabled="False" />
                     <ComboBox Grid.Column="1" ItemsSource="{Binding Choices}" DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding Text}" Visibility="{Binding IsChoice, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{Binding Label}" />
                     <CheckBox Grid.Column="1" IsChecked="{Binding Boolean}" Content="{loc:Loc Vfx.Enabled}" Visibility="{Binding IsBoolean, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{Binding Label}" Style="{StaticResource AeInput.Switch}" HorizontalAlignment="Left" />
-                    <Slider Grid.Row="1" Grid.Column="1" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Number, Mode=OneWay}" Style="{StaticResource AeEditor.PlaybackSlider}" Margin="0,8,0,0" IsMoveToPointEnabled="True" PreviewMouseLeftButtonUp="SliderMouseUp" KeyUp="SliderKeyUp" Visibility="{Binding IsNumber, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{Binding Label}" />
+                    <Slider Grid.Row="1" Grid.Column="1" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Number, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource AeEditor.PlaybackSlider}" Margin="0,8,0,0" IsMoveToPointEnabled="True" Visibility="{Binding IsNumber, Converter={StaticResource BoolVisibility}}" AutomationProperties.Name="{Binding Label}" />
                     <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Error}" Style="{StaticResource AeValidation.Message}" TextWrapping="Wrap" Visibility="{Binding HasError, Converter={StaticResource BoolVisibility}}" />
                 </Grid>
             </DataTemplate>
@@ -67,7 +72,7 @@
                     </Grid.RowDefinitions>
                     <TextBlock Text="{Binding Label}" Style="{StaticResource AeForm.TextLabel}" Margin="0,0,8,0" />
                     <TextBox Grid.Column="1" Text="{Binding Text, UpdateSourceTrigger=PropertyChanged, ValidatesOnDataErrors=True}" AutomationProperties.Name="{Binding Label}" IsUndoEnabled="False" />
-                    <Slider Grid.Row="1" Grid.ColumnSpan="2" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Number, Mode=OneWay}" Style="{StaticResource AeEditor.PlaybackSlider}" Margin="0,8,0,0" IsMoveToPointEnabled="True" PreviewMouseLeftButtonUp="SliderMouseUp" KeyUp="SliderKeyUp" AutomationProperties.Name="{Binding Label}" />
+                    <Slider Grid.Row="1" Grid.ColumnSpan="2" Minimum="{Binding Minimum}" Maximum="{Binding Maximum}" Value="{Binding Number, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource AeEditor.PlaybackSlider}" Margin="0,8,0,0" IsMoveToPointEnabled="True" AutomationProperties.Name="{Binding Label}" />
                     <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="{Binding Error}" Style="{StaticResource AeValidation.Message}" TextWrapping="Wrap" Visibility="{Binding HasError, Converter={StaticResource BoolVisibility}}" />
                 </Grid>
             </DataTemplate>
@@ -177,88 +182,8 @@
                 <player:AnimationPlayerView x:Name="PlaybackPanel" Grid.Row="2" DataContext="{Binding Playback}" ShowFrameInformation="False" />
             </Grid>
             <GridSplitter Grid.Column="1" Style="{StaticResource AeVerticalGridSplitterStyle}" />
-            <TabControl x:Name="Inspector" Grid.Column="2">
-                <TabItem Header="{loc:Loc Vfx.Parameters}">
-            <Grid x:Name="ParameterPanel" Background="{DynamicResource AeBrush.Surface1}">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                </Grid.RowDefinitions>
-                <Grid Margin="8,8,8,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <ComboBox ItemsSource="{Binding Layers}" SelectedItem="{Binding SelectedLayer}" DisplayMemberPath="Label" AutomationProperties.Name="{loc:Loc Vfx.Layers}" ToolTip="{loc:Loc Vfx.LayerHint}" />
-                    <Grid Grid.Column="1" Width="144" Margin="8,0,0,0">
-                        <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:Loc Vfx.SearchHint}" AutomationProperties.Name="{loc:Loc Vfx.SearchHint}" Padding="28,2,8,2" />
-                        <icons:MaterialIcon Kind="Magnify" Width="16" Height="16" HorizontalAlignment="Left" Margin="8,0,0,0" Foreground="{DynamicResource AeBrush.TextMuted}" IsHitTestVisible="False" />
-                        <TextBlock Text="{loc:Loc Vfx.SearchPlaceholder}" Margin="28,0,8,0" VerticalAlignment="Center" IsHitTestVisible="False">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource AeText.Caption}">
-                                    <Setter Property="Visibility" Value="Collapsed" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Search}" Value="">
-                                            <Setter Property="Visibility" Value="Visible" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
-                </Grid>
-                <StackPanel Grid.Row="1" Margin="8,0,8,4">
-                    <ComboBox ItemsSource="{Binding Categories}" DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding Category}"
-                              AutomationProperties.Name="{loc:Loc Vfx.CategoryLabel}" ToolTip="{Binding CategoryHint}" />
-                    <DockPanel Margin="4,4,4,0">
-                        <ComboBox DockPanel.Dock="Right" Width="144" ItemsSource="{Binding Qualities}" DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding Quality}" AutomationProperties.Name="{loc:Loc Vfx.QualityLabel}" ToolTip="{loc:Loc Vfx.QualityHint}" />
-                        <TextBlock Text="{Binding FieldCount}" Style="{StaticResource AeText.Caption}" VerticalAlignment="Center" />
-                    </DockPanel>
-                </StackPanel>
-                <ListBox x:Name="FieldList" Grid.Row="2" ItemsSource="{Binding VisibleFields}" SelectedItem="{Binding SelectedField}" Margin="8,0,8,8" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.CanContentScroll="True" AutomationProperties.Name="{loc:Loc Vfx.Parameters}">
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource AeList.Item}">
-                            <Setter Property="Padding" Value="0" />
-                            <Setter Property="Margin" Value="0,0,0,4" />
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Expander Header="{Binding}" IsExpanded="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Mode=TwoWay}" HorizontalContentAlignment="Stretch">
-                                <Expander.HeaderTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="4,4,8,4" ToolTip="{Binding ToolTip}">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Label}" Style="{StaticResource AeText.Label}" TextWrapping="Wrap" />
-                                            <TextBlock Grid.Column="1" Text="{Binding Summary}" Style="{StaticResource AeText.Caption}" TextTrimming="CharacterEllipsis" MaxWidth="180" Margin="16,0,0,0" VerticalAlignment="Center" />
-                                            <icons:MaterialIcon Grid.Column="2" Kind="AlertCircleOutline" Width="16" Height="16" Margin="8,0,0,0" Foreground="{DynamicResource AeBrush.Danger}" ToolTip="{loc:Loc Vfx.Status.Invalid}" AutomationProperties.Name="{loc:Loc Vfx.Status.Invalid}" Visibility="{Binding HasErrors, Converter={StaticResource BoolVisibility}}" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </Expander.HeaderTemplate>
-                                <Expander.Style>
-                                    <Style TargetType="Expander" BasedOn="{StaticResource {x:Type Expander}}">
-                                        <Setter Property="Background" Value="Transparent" />
-                                        <Setter Property="ContentTemplate" Value="{StaticResource FieldDetails}" />
-                                        <Style.Triggers>
-                                            <Trigger Property="IsExpanded" Value="True">
-                                                <Setter Property="Content" Value="{Binding}" />
-                                            </Trigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Expander.Style>
-                            </Expander>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-                <TextBlock Grid.Row="2" Text="{loc:Loc Vfx.NoFields}" Style="{StaticResource AeText.Caption}" Margin="16" TextWrapping="Wrap" Visibility="{Binding HasNoFields, Converter={StaticResource BoolVisibility}}" />
-            </Grid>
-                </TabItem>
-                <TabItem Header="{loc:Loc Vfx.Layers}">
+            <TabControl x:Name="Inspector" Grid.Column="2" SelectedIndex="{Binding InspectorTabIndex, Mode=TwoWay}">
+                <TabItem x:Name="EffectsTab" Header="{loc:Loc Vfx.Layers}">
             <Grid x:Name="LayerPanel" Background="{DynamicResource AeBrush.Surface1}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -284,7 +209,18 @@
                     </DockPanel>
                     <TextBlock Text="{Binding PreviewSelectionSummary}" Style="{StaticResource AeText.Caption}" Margin="0,4,0,0" />
                 </StackPanel>
-                <ListBox x:Name="LayerList" Grid.Row="1" ItemsSource="{Binding Layers}" SelectedItem="{Binding SelectedLayer}" AutomationProperties.Name="{loc:Loc Vfx.Layers}">
+                <ListBox x:Name="LayerList" Grid.Row="1" ItemsSource="{Binding Source={StaticResource LayerGroups}}" SelectedItem="{Binding SelectedLayer}" AutomationProperties.Name="{loc:Loc Vfx.Layers}"
+                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.IsVirtualizingWhenGrouping="True"
+                         VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True">
+                    <ListBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}" Style="{StaticResource AeText.SectionTitle}" Margin="0,8,0,4" />
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListBox.GroupStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Grid Margin="0,4">
@@ -319,11 +255,26 @@
                                     <TextBlock Text="{Binding Label}" Style="{StaticResource AeText.Body}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Label}" />
                                     <TextBlock Text="{Binding Subtitle}" Style="{StaticResource AeText.Caption}" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Subtitle}" />
                                 </StackPanel>
-                                <Button Grid.Column="3" Command="{Binding PreviewOnlyCommand}" Style="{StaticResource AeButton.Icon}"
-                                        ToolTip="{loc:Loc Vfx.Preview.OnlyLayer}" AutomationProperties.Name="{loc:Loc Vfx.Preview.OnlyLayer}"
-                                        Visibility="{Binding CanPreview, Converter={StaticResource BoolVisibility}}">
-                                    <icons:MaterialIcon Kind="EyeOutline" Width="16" Height="16" />
-                                </Button>
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="8,0,0,0">
+                                    <Button Command="{Binding PreviewOnlyCommand}" Style="{StaticResource AeButton.Icon}"
+                                            ToolTip="{loc:Loc Vfx.Preview.OnlyLayer}" AutomationProperties.Name="{loc:Loc Vfx.Preview.OnlyLayer}"
+                                            Visibility="{Binding CanPreview, Converter={StaticResource BoolVisibility}}">
+                                        <icons:MaterialIcon Kind="EyeOutline" Width="16" Height="16" />
+                                    </Button>
+                                    <Button Style="{StaticResource AeButton.Quiet}"
+                                            IsEnabled="{Binding CanIdentify}" ToolTip="{Binding IdentificationHint}" ToolTipService.ShowOnDisabled="True" AutomationProperties.Name="{loc:Loc Vfx.Layer.Identify}"
+                                            Visibility="{Binding CanPreview, Converter={StaticResource BoolVisibility}}"
+                                            PreviewMouseLeftButtonDown="IdentifyMouseDown" PreviewMouseLeftButtonUp="IdentifyMouseUp"
+                                            MouseLeave="IdentifyMouseLeave" LostMouseCapture="IdentifyLostMouseCapture"
+                                            PreviewKeyDown="IdentifyKeyDown" PreviewKeyUp="IdentifyKeyUp" LostKeyboardFocus="IdentifyLostKeyboardFocus">
+                                        <StackPanel Orientation="Horizontal">
+                                            <icons:MaterialIcon Kind="CrosshairsGps" Width="16" Height="16" Margin="0,0,4,0" />
+                                            <TextBlock Text="{loc:Loc Vfx.Layer.Identify}" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+                                    <Button Command="{Binding EditLayerCommand}" Content="{loc:Loc Vfx.Layer.Edit}" Style="{StaticResource AeButton.Quiet}"
+                                            ToolTip="{loc:Loc Vfx.Layer.EditHint}" AutomationProperties.Name="{loc:Loc Vfx.Layer.Edit}" />
+                                </StackPanel>
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -334,17 +285,126 @@
                 </StackPanel>
             </Grid>
                 </TabItem>
+                <TabItem x:Name="ParametersTab" Header="{loc:Loc Vfx.Parameters}">
+            <Grid x:Name="ParameterPanel" Background="{DynamicResource AeBrush.Surface1}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel Margin="12,8,12,4">
+                    <TextBlock Text="{Binding SelectedLayerSource}" Style="{StaticResource AeText.Technical}" TextTrimming="CharacterEllipsis" ToolTip="{Binding SelectedLayerSource}" />
+                    <TextBlock Text="{Binding SelectedLayerScope}" Style="{StaticResource AeText.Caption}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                    <TextBlock Text="{Binding SelectedLayerReference}" TextTrimming="CharacterEllipsis" ToolTip="{Binding SelectedLayerReference}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource AeText.Technical}">
+                                <Setter Property="Margin" Value="0,4,0,0" />
+                                <Style.Triggers><DataTrigger Binding="{Binding SelectedLayerReference}" Value=""><Setter Property="Visibility" Value="Collapsed" /></DataTrigger></Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+                <Grid Grid.Row="1" Margin="8,4,8,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox ItemsSource="{Binding Layers}" SelectedItem="{Binding SelectedLayer}" DisplayMemberPath="Label" AutomationProperties.Name="{loc:Loc Vfx.Layers}" ToolTip="{loc:Loc Vfx.LayerHint}" />
+                    <Grid Grid.Column="1" Width="144" Margin="8,0,0,0">
+                        <TextBox Text="{Binding Search, UpdateSourceTrigger=PropertyChanged}" ToolTip="{loc:Loc Vfx.SearchHint}" AutomationProperties.Name="{loc:Loc Vfx.SearchHint}" Padding="28,2,8,2" />
+                        <icons:MaterialIcon Kind="Magnify" Width="16" Height="16" HorizontalAlignment="Left" Margin="8,0,0,0" Foreground="{DynamicResource AeBrush.TextMuted}" IsHitTestVisible="False" />
+                        <TextBlock Text="{loc:Loc Vfx.SearchPlaceholder}" Margin="28,0,8,0" VerticalAlignment="Center" IsHitTestVisible="False">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource AeText.Caption}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Search}" Value="">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </Grid>
+                </Grid>
+                <StackPanel Grid.Row="2" Margin="8,0,8,4">
+                    <ComboBox ItemsSource="{Binding Categories}" DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding Category}"
+                              AutomationProperties.Name="{loc:Loc Vfx.CategoryLabel}" ToolTip="{Binding CategoryHint}" />
+                    <DockPanel Margin="4,4,4,0">
+                        <ComboBox DockPanel.Dock="Right" Width="144" ItemsSource="{Binding Qualities}" DisplayMemberPath="Label" SelectedValuePath="Key" SelectedValue="{Binding Quality}" AutomationProperties.Name="{loc:Loc Vfx.QualityLabel}" ToolTip="{loc:Loc Vfx.QualityHint}" />
+                        <TextBlock Text="{Binding FieldCount}" Style="{StaticResource AeText.Caption}" VerticalAlignment="Center" />
+                    </DockPanel>
+                </StackPanel>
+                <ListBox x:Name="FieldList" Grid.Row="3" ItemsSource="{Binding VisibleFields}" SelectedItem="{Binding SelectedField}" Margin="8,0,8,8" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.CanContentScroll="True" AutomationProperties.Name="{loc:Loc Vfx.Parameters}">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem" BasedOn="{StaticResource AeList.Item}">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="Margin" Value="0,0,0,4" />
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Expander Header="{Binding}" IsExpanded="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}, Mode=TwoWay}" HorizontalContentAlignment="Stretch">
+                                <Expander.HeaderTemplate>
+                                    <DataTemplate>
+                                        <Grid Margin="4,4,8,4" ToolTip="{Binding ToolTip}">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Label}" Style="{StaticResource AeText.Label}" TextWrapping="Wrap" />
+                                                <Border Style="{StaticResource AeTag.Container}" HorizontalAlignment="Left" Margin="0,4,0,0" ToolTip="{Binding PreviewStateHint}">
+                                                    <TextBlock Text="{Binding PreviewStateText}" Style="{StaticResource AeTag.Text}" />
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="{Binding Summary}" Style="{StaticResource AeText.Caption}" TextTrimming="CharacterEllipsis" MaxWidth="180" Margin="16,0,0,0" VerticalAlignment="Center" />
+                                            <icons:MaterialIcon Grid.Column="2" Kind="AlertCircleOutline" Width="16" Height="16" Margin="8,0,0,0" Foreground="{DynamicResource AeBrush.Danger}" ToolTip="{loc:Loc Vfx.Status.Invalid}" AutomationProperties.Name="{loc:Loc Vfx.Status.Invalid}" Visibility="{Binding HasErrors, Converter={StaticResource BoolVisibility}}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </Expander.HeaderTemplate>
+                                <Expander.Style>
+                                    <Style TargetType="Expander" BasedOn="{StaticResource {x:Type Expander}}">
+                                        <Setter Property="Background" Value="Transparent" />
+                                        <Setter Property="ContentTemplate" Value="{StaticResource FieldDetails}" />
+                                        <Style.Triggers>
+                                            <Trigger Property="IsExpanded" Value="True">
+                                                <Setter Property="Content" Value="{Binding}" />
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Expander.Style>
+                            </Expander>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Grid.Row="3" Text="{loc:Loc Vfx.NoFields}" Style="{StaticResource AeText.Caption}" Margin="16" TextWrapping="Wrap" Visibility="{Binding HasNoFields, Converter={StaticResource BoolVisibility}}" />
+            </Grid>
+                </TabItem>
                 <TabItem Header="{loc:Loc Vfx.Preview.Diagnostics}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Margin="8">
-                            <TextBlock Text="{Binding ScenePreviewStatus}" Style="{StaticResource AeText.Caption}" TextWrapping="Wrap" Margin="0,0,0,8" />
-                            <ItemsControl x:Name="PreviewDiagnostics" ItemsSource="{Binding ScenePreviewDiagnostics}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource AeText.Caption}" TextWrapping="Wrap" Margin="0,0,0,8" /></DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </ScrollViewer>
+                    <Grid Margin="8">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <TextBlock Text="{Binding ScenePreviewStatus}" Style="{StaticResource AeText.Caption}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <ListBox x:Name="PreviewDiagnostics" Grid.Row="1" ItemsSource="{Binding ScenePreviewDiagnostics}"
+                                 Style="{StaticResource AeList.View}" BorderThickness="0" Background="Transparent" SelectionMode="Extended"
+                                 ScrollViewer.CanContentScroll="True" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                 VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel">
+                            <ListBox.CommandBindings>
+                                <CommandBinding Command="ApplicationCommands.Copy" CanExecute="CopyDiagnosticsCanExecute" Executed="CopyDiagnosticsExecuted" />
+                            </ListBox.CommandBindings>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem" BasedOn="{StaticResource AeList.Item}">
+                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Padding" Value="0" />
+                                    <Setter Property="Margin" Value="0" /><Setter Property="MinHeight" Value="0" />
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate>
+                                <DataTemplate><TextBlock Text="{Binding}" Style="{StaticResource AeText.Caption}" TextWrapping="Wrap" Margin="0,0,0,8" /></DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
                 </TabItem>
             </TabControl>
         </Grid>

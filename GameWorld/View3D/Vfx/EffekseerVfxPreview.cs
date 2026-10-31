@@ -1,19 +1,20 @@
-using System.Security.Cryptography;
-using GameWorld.Core.Rendering;
-using GameWorld.Core.Utility;
+﻿using GameWorld.Core.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Shared.Core.ErrorHandling;
 
 namespace GameWorld.Core.Vfx;
 
-public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
+public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
 {
     private EffekseerHandle? _handle;
     private PlaybackResources? _resources;
     private VfxConversion? _conversion;
     private TotalWarVfxSimulation? _simulation;
+    private VfxPreviewLayerIdentity? _identification;
+    private bool[]? _identifiedEmitters;
     private bool _interactivePrewarmEnabled;
+    private bool _interactiveSeekHistoryConstant;
     private VfxInteractivePrewarm? _interactivePrewarm;
     private VfxInteractiveBounds? _interactiveBounds;
     private bool _interactiveRestartPending;
@@ -29,17 +30,28 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
     private bool _disposed;
     private VfxPreviewDiagnostic? _spriteSpinRangeDiagnostic;
     public IReadOnlyList<VfxPreviewDiagnostic> Diagnostics { get; private set; } = [];
+    public VfxPreviewEditorInfo EditorInfo => _conversion?.EditorInfo ?? VfxPreviewEditorInfo.Empty;
     public int EmitterCount => _handle == null ? 0 : _conversion?.Emitters.Count(e => !e.IsEventTemplate) ?? 0;
     public int TotalEmitterCount => _conversion?.TotalEmitterCount ?? 0;
     public int ParticleCount => _simulation?.ParticleCount ?? 0;
     public int DisabledEmitterCount => _conversion?.DisabledEmitterCount ?? 0;
     public float CycleDuration => _simulation?.CycleDuration ?? 8;
-    public bool HasInfiniteEmitters => _conversion?.Emitters.Any(emitter => !emitter.IsEventTemplate && emitter.Infinite) == true;
+    public bool HasInfiniteEmitters => (_preparedReload?.Conversion ?? _conversion)?.Emitters
+        .Any(emitter => !emitter.IsEventTemplate && emitter.Infinite) == true;
     public bool HasMotionTrailEmitters => _simulation?.HasMotionTrailEmitters == true;
     public void EnableInteractivePrewarm() => _interactivePrewarmEnabled = true;
-    public bool IsPreparing => _interactivePrewarm != null && (_simulation == null || _interactiveRestartPending);
+    public void ConfigureInteractiveSeekHistory(bool isConstant)
+    {
+        if (_interactiveSeekHistoryConstant != isConstant) CancelNormalFrameSeek();
+        _interactiveSeekHistoryConstant = isConstant;
+        if (!isConstant) _simulation?.DisableSeekCheckpoints();
+        else if (_interactivePrewarmEnabled) _simulation?.EnableSeekCheckpoints();
+    }
+    public bool IsPreparing => _reloadUploaded && !_reloadRetainsPlayback && HasPendingInteractiveReload
+        || _interactivePrewarm != null && (_simulation == null || _interactiveRestartPending);
     public void PrepareInteractiveFrame(Matrix attachment, Func<float, Matrix>? attachmentAtTime)
     {
+        PrepareNormalFrameSeek(attachment, attachmentAtTime);
         if (_interactiveBounds is { } bounds)
         {
             if (bounds.TryTake(out var preparedBounds))
@@ -56,19 +68,28 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
                 _interactiveBounds = null;
             }
         }
-        if (_interactivePrewarm == null) return;
+        if (IsSeekingFrame || _interactivePrewarm == null) return;
         var key = PrewarmKey(attachment, attachmentAtTime);
         if (!_interactivePrewarm.Request(key))
         {
             _interactivePrewarm.Dispose(); _interactivePrewarm = null; _interactiveRestartPending = false;
-            _simulation ??= new(_conversion!) { EmissionEndTimeSeconds = _emissionEndTimeSeconds };
+            _simulation ??= CreateSimulation(_conversion!);
             return;
         }
         if (IsPreparing && _interactivePrewarm.TryTake(key, out var prepared))
         {
+            if (_interactiveRestartPending && _interactiveFrameSeekEnabled)
+            {
+                _normalSeekInitializeDuration = false;
+                _normalSeekInitializationKnown = true;
+            }
             _simulation = prepared!.Simulation;
-            PreviewBounds = prepared.Bounds;
-            _resources?.PublishBounds(prepared.Bounds);
+            if (!_interactiveSeekHistoryConstant) _simulation.DisableSeekCheckpoints();
+            if (prepared.Bounds is { } preparedBounds)
+            {
+                PreviewBounds = preparedBounds;
+                _resources?.PublishBounds(preparedBounds);
+            }
             _interactiveRestartPending = false;
         }
     }
@@ -80,9 +101,17 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
     {
         if (_interactivePrewarm == null) return true;
         if (!_interactiveRestartPending && _simulation != null && seconds + .00001f >= _simulation.Time) return true;
+        if (_interactiveSeekHistoryConstant && _simulation?.HasSeekCheckpoint(seconds) == true) return true;
         _interactiveRestartPending = true;
         PrepareInteractiveFrame(attachment, history);
         return !IsPreparing;
+    }
+
+    private TotalWarVfxSimulation CreateSimulation(VfxConversion conversion)
+    {
+        var simulation = new TotalWarVfxSimulation(conversion) { EmissionEndTimeSeconds = _emissionEndTimeSeconds };
+        if (_interactivePrewarmEnabled && _interactiveSeekHistoryConstant) simulation.EnableSeekCheckpoints();
+        return simulation;
     }
     public float? EmissionEndTimeSeconds
     {
@@ -92,11 +121,12 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (value is { } end && !float.IsFinite(end)) throw new ArgumentOutOfRangeException(nameof(value));
             if (_interactivePrewarm != null && _emissionEndTimeSeconds != value) _interactiveRestartPending = true;
+            if (_emissionEndTimeSeconds != value) CancelNormalFrameSeek();
             _emissionEndTimeSeconds = value;
             if (_simulation != null) _simulation.EmissionEndTimeSeconds = value;
         }
     }
-    public bool IsDrained => _simulation?.IsDrained ?? true;
+    public bool IsDrained => !IsSeekingFrame && (_simulation?.IsDrained ?? true);
     private BoundingBox? _previewBounds;
     public BoundingBox? PreviewBounds { get => _previewBounds ?? _resources?.Bounds; private set => _previewBounds = value; }
     internal int DrawCallCount => _handle == null ? 0 : EffekseerNative.AecnVfxDrawCalls(_handle);
@@ -127,247 +157,49 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
     public void Reload(VfxPreviewSnapshot snapshot)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        ReleaseResources();
-        _renderLayers = [];
-        _opaqueLayers.Clear();
-        _spriteSpinRangeDiagnostic = null;
-        _sourcePath = snapshot.SourcePath;
-        PreviewBounds = null;
-        _conversion = TotalWarVfxConverter.Convert(snapshot);
-        _simulation = new(_conversion) { EmissionEndTimeSeconds = _emissionEndTimeSeconds };
-        Diagnostics = _conversion.Diagnostics;
-        if (_conversion.Emitters.Count == 0)
-        {
-            if (!Diagnostics.Any(diagnostic => diagnostic.ReasonKey == "Vfx.Preview.MissingResource"))
-                _resources = new(null, _conversion, _renderLayers, [], null, Diagnostics, _sourcePath);
-            return;
-        }
+        CancelInteractiveReload();
+        CancelPreparation();
+        VfxConversion conversion;
+        string? resourceIdentity;
         try
         {
-            if (EffekseerNative.AecnVfxAbi(System.Runtime.InteropServices.Marshal.SizeOf<EffekseerLayer>(),
-                System.Runtime.InteropServices.Marshal.SizeOf<EffekseerParticle>(), System.Runtime.InteropServices.Marshal.SizeOf<EffekseerVertex>(),
-                System.Runtime.InteropServices.Marshal.SizeOf<EffekseerLighting>()) != 1)
-                throw new InvalidOperationException("Effekseer ABI mismatch");
-            var nativeDevice = (SharpDX.Direct3D11.Device)device.Handle;
-            var handle = EffekseerNative.AecnVfxCreate(nativeDevice.NativePointer, nativeDevice.ImmediateContext.NativePointer);
-            try
-            {
-                EffekseerNative.Check(handle.IsInvalid ? 0 : 1);
-                var failedTextures = new HashSet<int>();
-                var uploadedTextures = new Dictionary<(VfxTextureUsage Usage, string Hash), (int Index, bool Mipmaps, byte? Alpha)>();
-                var constantAlphas = new byte?[_conversion.Textures.Count];
-                var identities = _conversion.Textures.Select((bytes, index) =>
-                    (_conversion.TextureUsages[index], Convert.ToHexStringLower(SHA256.HashData(bytes)))).ToArray();
-                var maskIdentities = _conversion.MeshMaterials.SelectMany(m =>
-                    m.TextureIndexes.Length == 7 && m.Parameters.Length == 36 ? m.TextureIndexes.Skip(3).Take(2)
-                    : m.TextureIndexes.Length == 10 && m.Parameters.Length == 60 ? new[] { m.TextureIndexes[1], m.TextureIndexes[2], m.TextureIndexes[4] } : [])
-                    .Select(index => identities[index]).ToHashSet();
-                var maskImages = new Dictionary<(VfxTextureUsage Usage, string Hash), (byte[] Pixels, int Width, int Height)>();
-                var srgbMasks = new HashSet<(VfxTextureUsage Usage, string Hash)>();
-                for (var index = 0; index < _conversion.Textures.Count; ++index)
-                {
-                    try
-                    {
-                        var identity = identities[index];
-                        bool mipmaps;
-                        if (uploadedTextures.TryGetValue(identity, out var uploaded))
-                        {
-                            EffekseerNative.Check(EffekseerNative.AecnVfxTextureAlias(handle, uploaded.Index));
-                            mipmaps = uploaded.Mipmaps;
-                            constantAlphas[index] = uploaded.Alpha;
-                        }
-                        else
-                        {
-                            var image = DecodeTexture(_conversion.Textures[index], _conversion.TextureUsages[index]);
-                            EffekseerNative.Check(EffekseerNative.AecnVfxTextureRgbaMipChain(handle, image.Pixels, image.Pixels.Length, image.Width, image.Height, image.Srgb ? 1 : 0, image.MipLevels));
-                            mipmaps = image.MipLevels > 1;
-                            constantAlphas[index] = ConstantAlpha(image.Pixels);
-                            uploadedTextures.Add(identity, (index, mipmaps, constantAlphas[index]));
-                            if (maskIdentities.Contains(identity))
-                            {
-                                maskImages.Add(identity, (image.Pixels[..(image.Width * image.Height * 4)], image.Width, image.Height));
-                                if (image.Srgb) srgbMasks.Add(identity);
-                            }
-                        }
-                        if (mipmaps)
-                            Diagnostics = [.. Diagnostics, new(snapshot.SourcePath, "", _conversion.TexturePaths[index], "Vfx.Preview.MipmapsUnsupported")];
-                    }
-                    catch (Exception exception) when (exception is not OutOfMemoryException)
-                    {
-                        if (_conversion.TextureUsages[index] == VfxTextureUsage.ShadingNormal)
-                        {
-                            EffekseerNative.Check(EffekseerNative.AecnVfxTextureRgba(handle, [0, 128, 0, 128], 4, 1, 1, 0));
-                            foreach (var emitter in _conversion.Emitters.Where(x => x.Render.NormalIndex == index))
-                            {
-                                var fallback = emitter.Render; fallback.LightingMode = 0; emitter.Render = fallback;
-                                Diagnostics = [.. Diagnostics, new(snapshot.SourcePath, emitter.Name, _conversion.TexturePaths[index], "Vfx.Preview.ShadingNormalUnsupported")];
-                            }
-                            continue;
-                        }
-                        Diagnostics = [.. Diagnostics, new(snapshot.SourcePath, "", _conversion.TexturePaths[index], "Vfx.Preview.TextureUnsupported")];
-                        // Preserve resource indexes while excluding every emitter that needs this texture.
-                        EffekseerNative.Check(EffekseerNative.AecnVfxTextureRgba(handle, [0, 0, 0, 0], 4, 1, 1, 0));
-                        failedTextures.Add(index);
-                    }
-                }
-                if (failedTextures.Count > 0)
-                {
-                    bool UsesFailedTexture(VfxPreviewEmitter emitter) => Enumerable.Range(0, emitter.ModelVariants.Count + 1)
-                        .SelectMany(emitter.RenderParts).Any(part => failedTextures.Contains(part.TextureIndex) || failedTextures.Contains(part.GradientIndex)
-                            || failedTextures.Contains(part.DistortionMaskIndex)
-                            || part.MeshMaterialIndex >= 0 && _conversion.MeshMaterials[part.MeshMaterialIndex].TextureIndexes.Any(failedTextures.Contains));
-                    foreach (var emitter in _conversion.Emitters.Where(UsesFailedTexture))
-                        Diagnostics = [.. Diagnostics, new(snapshot.SourcePath, emitter.Name, "texture", "Vfx.Preview.LayerTextureUnavailable")];
-                    _conversion.Emitters.RemoveAll(UsesFailedTexture);
-                    _simulation = new(_conversion) { EmissionEndTimeSeconds = _emissionEndTimeSeconds };
-                    if (_conversion.Emitters.Count == 0) { handle.Dispose(); return; }
-                }
-                var packedMasks = new Dictionary<((VfxTextureUsage, string), (VfxTextureUsage, string)), (int Index, float[] Rectangles)>();
-                var packedRigidMasks = new Dictionary<((VfxTextureUsage, string), (VfxTextureUsage, string), (VfxTextureUsage, string)), (int Index, float[] Rectangles)>();
-                var nextPackedIndex = _conversion.Textures.Count;
-                var failedMaterials = new HashSet<int>();
-                for (var index = 0; index < _conversion.MeshMaterials.Count; ++index)
-                {
-                    var material = _conversion.MeshMaterials[index];
-                    var textures = material.TextureIndexes; var parameters = material.Parameters;
-                    if (textures.Length == 7 && parameters.Length == 36)
-                    {
-                        var packedIndex = textures[0]; parameters = (float[])parameters.Clone();
-                        if (!textures.Any(failedTextures.Contains))
-                        {
-                            try
-                            {
-                                var key = (identities[textures[3]], identities[textures[4]]);
-                                if (!packedMasks.TryGetValue(key, out var packed))
-                                {
-                                    var first = maskImages[key.Item1]; var second = maskImages[key.Item2];
-                                    var atlas = VfxMaterialMaskAtlas.Pack(first.Pixels, first.Width, first.Height, second.Pixels, second.Width, second.Height);
-                                    EffekseerNative.Check(EffekseerNative.AecnVfxTextureRgba(handle, atlas.Pixels, atlas.Pixels.Length, atlas.Width, atlas.Height, 0));
-                                    packed = (nextPackedIndex++, atlas.Rectangles); packedMasks.Add(key, packed);
-                                }
-                                packedIndex = packed.Index; packed.Rectangles.CopyTo(parameters, 28);
-                            }
-                            catch (Exception exception) when (exception is NotSupportedException or InvalidOperationException)
-                            {
-                                failedMaterials.Add(index);
-                            }
-                        }
-                        textures = [textures[0], textures[1], textures[2], packedIndex, textures[5], textures[6]];
-                    }
-                    else if (textures.Length == 12 && parameters.Length == VfxTidecallMaterial.ParameterCount)
-                    {
-                        parameters = (float[])parameters.Clone();
-                        var palette = new List<int>();
-                        var aliases = new Dictionary<(VfxTextureUsage, string), int>();
-                        for (var logical = 0; logical < textures.Length; ++logical)
-                        {
-                            // Keep the original mip chains; extra PS resources and VS displacement use separate bindings.
-                            if (logical == 2) continue;
-                            var identity = identities[textures[logical]];
-                            if (!aliases.TryGetValue(identity, out var alias))
-                            {
-                                alias = palette.Count;
-                                aliases.Add(identity, alias); palette.Add(textures[logical]);
-                            }
-                            parameters[VfxTidecallMaterial.SourceParameterCount + logical] = alias;
-                        }
-                        if (palette.Count > 11)
-                        {
-                            failedMaterials.Add(index);
-                            palette.Clear(); palette.Add(textures[0]);
-                            Array.Clear(parameters, VfxTidecallMaterial.SourceParameterCount, 12);
-                        }
-                        while (palette.Count < 11) palette.Add(palette[0]);
-                        palette.Add(textures[2]);
-                        textures = palette.ToArray();
-                    }
-                    else if (textures.Length == 10 && parameters.Length == 60)
-                    {
-                        var packedIndex = textures[0]; parameters = (float[])parameters.Clone();
-                        Array.Clear(parameters, 46, 12);
-                        for (var rectangle = 46; rectangle < 58; rectangle += 4)
-                            parameters[rectangle + 2] = parameters[rectangle + 3] = 1;
-                        if (!textures.Any(failedTextures.Contains))
-                        {
-                            try
-                            {
-                                var key = (identities[textures[1]], identities[textures[2]], identities[textures[4]]);
-                                if (!packedRigidMasks.TryGetValue(key, out var packed))
-                                {
-                                    var srgb = srgbMasks.Contains(key.Item1);
-                                    if (srgbMasks.Contains(key.Item2) != srgb || srgbMasks.Contains(key.Item3) != srgb)
-                                        throw new NotSupportedException("VFX packed masks require matching sampling colour spaces");
-                                    var atlas = VfxMaterialMaskAtlas.PackThree(maskImages[key.Item1], maskImages[key.Item2], maskImages[key.Item3]);
-                                    EffekseerNative.Check(EffekseerNative.AecnVfxTextureRgba(handle, atlas.Pixels, atlas.Pixels.Length, atlas.Width, atlas.Height, srgb ? 1 : 0));
-                                    packed = (nextPackedIndex++, atlas.Rectangles); packedRigidMasks.Add(key, packed);
-                                }
-                                packedIndex = packed.Index; packed.Rectangles.CopyTo(parameters, 46);
-                            }
-                            catch (Exception exception) when (exception is NotSupportedException or InvalidOperationException)
-                            {
-                                failedMaterials.Add(index);
-                            }
-                        }
-                        textures = [textures[0], textures[3], textures[7], textures[6], textures[5], packedIndex];
-                    }
-                    EffekseerNative.Check(EffekseerNative.AecnVfxMeshMaterial(handle, textures, textures.Length, parameters, parameters.Length));
-                }
-                if (failedMaterials.Count > 0)
-                {
-                    bool UsesFailedMaterial(VfxPreviewEmitter emitter) => Enumerable.Range(0, emitter.ModelVariants.Count + 1)
-                        .SelectMany(emitter.RenderParts).Any(part => failedMaterials.Contains(part.MeshMaterialIndex));
-                    foreach (var emitter in _conversion.Emitters.Where(UsesFailedMaterial))
-                        Diagnostics = [.. Diagnostics, new(snapshot.SourcePath, emitter.Name, "material masks", "Vfx.Preview.TextureUnsupported")];
-                    _conversion.Emitters.RemoveAll(UsesFailedMaterial);
-                    _simulation = new(_conversion) { EmissionEndTimeSeconds = _emissionEndTimeSeconds };
-                    if (_conversion.Emitters.Count == 0) { handle.Dispose(); return; }
-                }
-                var uploadedModels = new Dictionary<VfxPreviewModel, int>(ReferenceEqualityComparer.Instance);
-                for (var index = 0; index < _conversion.Models.Count; ++index)
-                {
-                    var model = _conversion.Models[index];
-                    if (uploadedModels.TryGetValue(model, out var sourceIndex))
-                        EffekseerNative.Check(EffekseerNative.AecnVfxModelAlias(handle, sourceIndex));
-                    else
-                    {
-                        if (model.AnimationVertices is { } frames)
-                            EffekseerNative.Check(EffekseerNative.AecnVfxModelFrames(handle, frames, frames.Length, model.Vertices.Length,
-                                model.AnimationFrameCount, model.Indices, model.Indices.Length, model.AnimationCycles));
-                        else EffekseerNative.Check(EffekseerNative.AecnVfxModel(handle, model.Vertices, model.Vertices.Length, model.Indices, model.Indices.Length));
-                        uploadedModels.Add(model, index);
-                    }
-                }
-                var configuration = BuildRenderLayers(constantAlphas);
-                if (configuration.Layers.Length > 0)
-                    EffekseerNative.Check(EffekseerNative.AecnVfxConfigure(handle, configuration.Layers, configuration.Layers.Length));
-                if ((configuration.HalfLayers.Length > 0 || configuration.FullLayers.Length > 0)
-                    && System.Runtime.InteropServices.Marshal.SizeOf<EffekseerHalfLayer>() != EffekseerHalfLayer.Bytes)
-                    throw new InvalidOperationException("Unexpected raw-alpha layer configuration size.");
-                if (configuration.HalfLayers.Length > 0)
-                {
-                    EffekseerNative.Check(EffekseerNative.AecnVfxConfigureHalf(handle, configuration.HalfLayers,
-                        configuration.HalfLayers.Length, EffekseerHalfLayer.Bytes));
-                }
-                if (configuration.FullLayers.Length > 0)
-                    EffekseerNative.Check(EffekseerNative.AecnVfxConfigureFull(handle, configuration.FullLayers,
-                        configuration.FullLayers.Length, EffekseerHalfLayer.Bytes));
-                if (_interactivePrewarmEnabled && VfxInteractivePrewarm.CanPrepare(_conversion))
-                {
-                    _interactivePrewarm = new(_conversion);
-                    _simulation = null;
-                }
-                else if (_interactivePrewarmEnabled) _interactiveBounds = new(_conversion);
-                else PreviewBounds = VfxPreviewBounds.Estimate(_conversion);
-                _resources = new(handle, _conversion, _renderLayers, _opaqueLayers.ToArray(), PreviewBounds, Diagnostics, _sourcePath);
-                _handle = handle;
-            }
-            catch { handle.Dispose(); throw; }
+            conversion = TotalWarVfxConverter.Convert(snapshot, collectEditorInfo: _interactivePrewarmEnabled);
+            resourceIdentity = conversion.Emitters.Count > 0 && VfxPlaybackResourceIdentity.CanReuse(conversion)
+                ? VfxPlaybackResourceIdentity.Create(conversion) : null;
         }
-        catch (Exception exception) when (exception is DllNotFoundException or EntryPointNotFoundException or BadImageFormatException or InvalidOperationException)
+        catch { ReleaseResources(); throw; }
+        ReloadConverted(snapshot, conversion, resourceIdentity);
+    }
+
+    private void CompleteReload(EffekseerHandle handle, byte?[] constantAlphas, string? resourceIdentity, bool reused = false)
+    {
+        UpdateIdentificationMask();
+        var configuration = BuildRenderLayers(constantAlphas);
+        if (reused && configuration.Layers.Length == 0)
+            throw new InvalidOperationException("An empty configuration requires a fresh native playback handle.");
+        if (configuration.Layers.Length > 0)
+            EffekseerNative.Check(EffekseerNative.AecnVfxConfigure(handle, configuration.Layers, configuration.Layers.Length));
+        if ((configuration.HalfLayers.Length > 0 || configuration.FullLayers.Length > 0)
+            && System.Runtime.InteropServices.Marshal.SizeOf<EffekseerHalfLayer>() != EffekseerHalfLayer.Bytes)
+            throw new InvalidOperationException("Unexpected raw-alpha layer configuration size.");
+        if (configuration.HalfLayers.Length > 0)
+            EffekseerNative.Check(EffekseerNative.AecnVfxConfigureHalf(handle, configuration.HalfLayers,
+                configuration.HalfLayers.Length, EffekseerHalfLayer.Bytes));
+        if (configuration.FullLayers.Length > 0)
+            EffekseerNative.Check(EffekseerNative.AecnVfxConfigureFull(handle, configuration.FullLayers,
+                configuration.FullLayers.Length, EffekseerHalfLayer.Bytes));
+        if (_applyingInteractiveReload) { }
+        else if (_interactivePrewarmEnabled && VfxInteractivePrewarm.CanPrepare(_conversion!))
         {
-            Logging.Create<EffekseerVfxPreview>().Error(exception, "Effekseer preview load failed for {Path}", snapshot.SourcePath);
-            Diagnostics = [.. Diagnostics, new(snapshot.SourcePath, "", "", "Vfx.Preview.RuntimeUnavailable")];
+            _interactivePrewarm = new(_conversion!, enableSeekCheckpoints: _interactiveSeekHistoryConstant);
+            _interactiveBounds = new(_conversion!);
+            _simulation = null;
         }
+        else if (_interactivePrewarmEnabled) _interactiveBounds = new(_conversion!);
+        else PreviewBounds = VfxPreviewBounds.Estimate(_conversion!);
+        _resources = new(handle, _conversion!, _renderLayers, _opaqueLayers.ToArray(), PreviewBounds, Diagnostics, _sourcePath,
+            resourceIdentity, constantAlphas);
+        _handle = handle;
     }
 
     internal (EffekseerLayer[] Layers, EffekseerHalfLayer[] HalfLayers, EffekseerHalfLayer[] FullLayers) BuildRenderLayers(byte?[] constantAlphas)
@@ -441,74 +273,8 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
         return (layers.ToArray(), halfLayers.ToArray(), fullLayers.ToArray());
     }
 
-    private static byte? ConstantAlpha(byte[] pixels)
-    {
-        var alpha = pixels[3];
-        if (alpha is not (0 or 255)) return null;
-        for (var index = 7; index < pixels.Length; index += 4)
-            if (pixels[index] != alpha) return null;
-        return alpha;
-    }
-
     private static (byte[] Pixels, int Width, int Height, bool Srgb, int MipLevels) DecodeTexture(byte[] gameBytes, VfxTextureUsage usage)
-    {
-        if (usage == VfxTextureUsage.SolidWhite)
-        {
-            if (gameBytes.Length != 4 || gameBytes.Any(value => value != 255)) throw new InvalidOperationException("Invalid untextured VFX identity");
-            return (gameBytes, 1, 1, false, 1);
-        }
-        if (usage == VfxTextureUsage.GradientValue)
-        {
-            if (gameBytes.Length != VfxPreviewGradient.Width * 4) throw new InvalidOperationException("Invalid VFX gradient lookup");
-            return (gameBytes, VfxPreviewGradient.Width, 1, false, 1);
-        }
-        using var image = ImageLoader.LoadImageFromBytes(gameBytes, out var information);
-        if (image.Format != Pfim.ImageFormat.Rgba32 || image.Width is < 1 or > 4096 || image.Height is < 1 or > 4096
-            || image.Stride < image.Width * 4 || (long)image.Stride * image.Height > image.DataLen)
-            throw new NotSupportedException("Unsupported decoded VFX image layout");
-        var layouts = new List<(int Width, int Height, int Stride, int Offset)> { (image.Width, image.Height, image.Stride, 0) };
-        var width = image.Width; var height = image.Height;
-        foreach (var mip in image.MipMaps)
-        {
-            if (width == 1 && height == 1) throw new NotSupportedException("Invalid decoded VFX mip count");
-            width = Math.Max(1, width / 2); height = Math.Max(1, height / 2);
-            if (mip.Width != width || mip.Height != height || mip.Stride < width * 4 || mip.DataOffset < 0
-                || (long)mip.Stride * height > mip.DataLen || (long)mip.DataOffset + mip.DataLen > image.Data.Length)
-                throw new NotSupportedException("Unsupported decoded VFX mip layout");
-            layouts.Add((width, height, mip.Stride, mip.DataOffset));
-        }
-        var pixels = new byte[layouts.Sum(layout => checked(layout.Width * layout.Height * 4))];
-        var target = 0;
-        // Pfim keeps block padding in the smallest mips. Upload only each level's actual texels.
-        foreach (var layout in layouts)
-            for (var row = 0; row < layout.Height; ++row)
-                for (var column = 0; column < layout.Width; ++column)
-                {
-                    var source = layout.Offset + row * layout.Stride + column * 4;
-                    pixels[target] = image.Data[source + 2]; pixels[target + 1] = image.Data[source + 1];
-                    pixels[target + 2] = image.Data[source]; pixels[target + 3] = usage == VfxTextureUsage.OpaqueDiffuse ? (byte)255 : image.Data[source + 3];
-                    target += 4;
-                }
-        // ps_texture samples diffuse colour as sRGB, including legacy DDS files without a colour-space tag.
-        // Numeric material slots stay linear for legacy DDS, but explicit sRGB formats retain their native sampling.
-        var srgb = usage is VfxTextureUsage.Diffuse or VfxTextureUsage.OpaqueDiffuse
-            || usage == VfxTextureUsage.MaterialValue && information.Header10_DxgiFormat is
-                Pfim.DxgiFormat.R8G8B8A8_UNORM_SRGB or Pfim.DxgiFormat.B8G8R8A8_UNORM_SRGB
-                or Pfim.DxgiFormat.B8G8R8X8_UNORM_SRGB or Pfim.DxgiFormat.BC1_UNORM_SRGB
-                or Pfim.DxgiFormat.BC2_UNORM_SRGB or Pfim.DxgiFormat.BC3_UNORM_SRGB or Pfim.DxgiFormat.BC7_UNORM_SRGB;
-        if (usage == VfxTextureUsage.DistortionNormal)
-        {
-            if (information.IsDdsImage && information.Header_PixelFormat.FourCC == Pfim.CompressionAlgorithm.D3DFMT_DXT5)
-                TotalWarVfxMaterial.ConvertDxt5Normal(pixels);
-            else
-                throw new NotSupportedException("Unconfirmed game distortion normal encoding");
-            srgb = false;
-        }
-        if (usage == VfxTextureUsage.ShadingNormal && (!information.IsDdsImage
-            || information.Header_PixelFormat.FourCC is not (Pfim.CompressionAlgorithm.D3DFMT_DXT5 or 0)))
-            throw new NotSupportedException("Unconfirmed game shading normal encoding");
-        return (pixels, image.Width, image.Height, srgb, layouts.Count);
-    }
+        => VfxPreparedResources.DecodeTexture(gameBytes, usage);
 
     public void Advance(float seconds, Matrix attachment)
     {
@@ -521,6 +287,7 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
     public void Seek(float seconds, Matrix attachment)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!PrepareNormalFrameSeek(seconds, attachment, null, false)) return;
         if (!PrepareInteractiveSeek(seconds, attachment, null)) return;
         _simulation?.Seek(seconds, attachment);
         ReportCapacity();
@@ -528,6 +295,7 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
     public void Seek(float seconds, Matrix attachment, Func<float, Matrix> attachmentAtTime)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!PrepareNormalFrameSeek(seconds, attachment, attachmentAtTime, false)) return;
         if (!PrepareInteractiveSeek(seconds, attachment, attachmentAtTime)) return;
         _simulation?.Seek(seconds, attachment, attachmentAtTime);
         ReportCapacity();
@@ -536,6 +304,7 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
     public void Seek(float seconds, Matrix attachment, Func<float, Matrix> attachmentAtTime, bool useCurrentAttachmentForFrame)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!PrepareNormalFrameSeek(seconds, attachment, attachmentAtTime, useCurrentAttachmentForFrame)) return;
         if (!PrepareInteractiveSeek(seconds, attachment, attachmentAtTime)) return;
         if (useCurrentAttachmentForFrame) _simulation?.SeekWithCurrentAttachment(seconds, attachment, attachmentAtTime);
         else _simulation?.Seek(seconds, attachment, attachmentAtTime);
@@ -549,8 +318,34 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
         Func<float, float?>? nextAttachmentSample)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        CancelNormalFrameSeek();
         _simulation?.SeekContinuousTrail(seconds, attachment, attachmentAtTime, nextAttachmentSample);
         ReportCapacity();
+    }
+
+    public void Identify(VfxPreviewLayerIdentity? layer)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_identification == layer) return;
+        _identification = layer;
+        UpdateIdentificationMask();
+    }
+
+    private void UpdateIdentificationMask()
+    {
+        if (_identification is not { } selected || _conversion == null)
+        {
+            _identifiedEmitters = null;
+            return;
+        }
+        var included = new bool[_conversion.Emitters.Count];
+        for (var index = 0; index < included.Length; index++)
+        {
+            var emitter = _conversion.Emitters[index];
+            included[index] = emitter.PreviewRootKind == selected.Kind && emitter.PreviewRootName == selected.Name
+                && emitter.PreviewRootOccurrence == selected.Occurrence;
+        }
+        _identifiedEmitters = included;
     }
 
     public void Draw(CommonShaderParameters parameters) => DrawCore(parameters, null);
@@ -558,7 +353,9 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
     private void DrawCore(CommonShaderParameters parameters, SceneScope? scene)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        if (_handle == null || _simulation == null) return;
+        if (_handle == null || _simulation == null || _reloadUploaded && !_reloadRetainsPlayback && HasPendingInteractiveReload) return;
+        if (IsSeekingFrame && _simulation.NeedsGroundReplay(parameters.VfxGroundHeight))
+            parameters = parameters with { VfxGroundHeight = _simulation.CurrentGroundHeight };
         parameters = parameters with
         {
             ViewportWidth = float.IsFinite(parameters.ViewportWidth) && parameters.ViewportWidth > 0
@@ -579,22 +376,41 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
             Diagnostics = [.. Diagnostics, new(_sourcePath, "", "post_processing", "Vfx.Preview.Unmapped")];
         else if (weather?.UnsupportedPostProcessing != true && postDiagnostic)
             Diagnostics = Diagnostics.Where(x => x.Field != "post_processing" || x.ReasonKey != "Vfx.Preview.Unmapped").ToArray();
+        _simulation.ProjectionMemoEnabled = _interactiveFrameSeekEnabled || _interactivePrewarmEnabled;
         var frame = _projectedParticles;
         _simulation!.FillProjectedFrame(parameters, frame);
+        if (_identifiedEmitters is { } included)
+        {
+            var visible = 0;
+            for (var index = 0; index < frame.Count; index++)
+            {
+                var particle = frame[index];
+                if ((uint)particle.Render.Layer < (uint)included.Length && included[particle.Render.Layer])
+                    frame[visible++] = particle;
+            }
+            if (visible < frame.Count) frame.RemoveRange(visible, frame.Count - visible);
+        }
         var needsGroundDepth = parameters.VfxWriteGroundDepth
-            || frame.Any(p => _conversion!.Emitters[p.Render.Layer] is { RequiresFlatTerrain: true, Kind: not 2 });
+            || frame.Any(p => p.RequiresGroundDepth || _conversion!.Emitters[p.Render.Layer] is { RequiresFlatTerrain: true, Kind: not 2 });
         var groundDepthUnavailable = false;
         if (needsGroundDepth)
         {
             _flatGroundDepth ??= new(device);
             groundDepthUnavailable = !_flatGroundDepth.Draw(parameters);
             if (groundDepthUnavailable)
-                frame.RemoveAll(p => _conversion!.Emitters[p.Render.Layer].RequiresFlatTerrain && _conversion.Emitters[p.Render.Layer].Kind != 2);
+                frame.RemoveAll(p => p.RequiresGroundDepth
+                    || _conversion!.Emitters[p.Render.Layer].RequiresFlatTerrain && _conversion.Emitters[p.Render.Layer].Kind != 2);
         }
         if (groundDepthUnavailable && !Diagnostics.Any(x => x.ReasonKey == "Vfx.Preview.FlatTerrainDepthUnavailable"))
             Diagnostics = [.. Diagnostics, new(_sourcePath, "", "terrain depth", "Vfx.Preview.FlatTerrainDepthUnavailable")];
         else if (!groundDepthUnavailable && Diagnostics.Any(x => x.ReasonKey == "Vfx.Preview.FlatTerrainDepthUnavailable"))
             Diagnostics = Diagnostics.Where(x => x.ReasonKey != "Vfx.Preview.FlatTerrainDepthUnavailable").ToArray();
+        const string modelTerrainFallback = "Vfx.Preview.ModelTerrainBirthUnsupported";
+        var hasModelTerrainFallback = Diagnostics.Any(x => x.Field == "model ground birth" && x.ReasonKey == modelTerrainFallback);
+        if (_simulation.ModelTerrainBirthUnsupported && !hasModelTerrainFallback)
+            Diagnostics = [.. Diagnostics, new(_sourcePath, "", "model ground birth", modelTerrainFallback)];
+        else if (!_simulation.ModelTerrainBirthUnsupported && hasModelTerrainFallback)
+            Diagnostics = Diagnostics.Where(x => x.Field != "model ground birth" || x.ReasonKey != modelTerrainFallback).ToArray();
         var terrainDiagnostic = Diagnostics.Any(x => x.ReasonKey == "Vfx.Preview.TerrainDecalBasisUnsupported");
         if (_simulation.TerrainBasisUnsupported && !terrainDiagnostic)
             Diagnostics = [.. Diagnostics, new(_sourcePath, "", "ParticleRelativeSpawnOrientation", "Vfx.Preview.TerrainDecalBasisUnsupported")];
@@ -620,6 +436,7 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
         }
         else if (Diagnostics.Any(x => x.ReasonKey == "Vfx.Preview.FlatGroundReceiver"))
             Diagnostics = Diagnostics.Where(x => x.ReasonKey != "Vfx.Preview.FlatGroundReceiver").ToArray();
+        if (scene != null) scene.Retain(_resources!);
         EffekseerNative.Check(scene == null
             ? EffekseerNative.AecnVfxDraw(_handle, Values(parameters.View), Values(parameters.Projection), particles, particleCount, in lighting,
                 parameters.VfxSoftDepth?.NativePointer ?? 0)
@@ -693,34 +510,56 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
     public IDisposable? BeginScene(CommonShaderParameters parameters)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        return _handle == null || ParticleCount == 0 ? null : new SceneScope(_handle, CreateLighting(parameters));
+        return _handle == null || ParticleCount == 0 ? null : new SceneScope(_resources!, CreateLighting(parameters));
     }
 
     private sealed class SceneScope : IDisposable
     {
         private EffekseerHandle? _owner;
+        private readonly List<PlaybackResources> _resources = [];
+        private bool _disposed;
         internal nint NativeOwner => _owner?.DangerousGetHandle() ?? throw new ObjectDisposedException(nameof(SceneScope));
-        public SceneScope(EffekseerHandle owner, EffekseerLighting lighting)
+        public SceneScope(PlaybackResources resources, EffekseerLighting lighting)
         {
+            Retain(resources);
+            var owner = resources.Handle!;
             var held = false;
-            owner.DangerousAddRef(ref held);
             try
             {
+                owner.DangerousAddRef(ref held);
                 EffekseerNative.Check(EffekseerNative.AecnVfxBeginScene(owner, in lighting));
                 _owner = owner;
             }
             catch
             {
                 if (held) owner.DangerousRelease();
+                foreach (var resource in _resources) resource.Release();
                 throw;
             }
         }
+        internal void Retain(PlaybackResources resources)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_resources.Contains(resources)) return;
+            if (!resources.TryRetain()) throw new InvalidOperationException("VFX scene resources have already been released.");
+            try { _resources.Add(resources); }
+            catch { resources.Release(); throw; }
+        }
         public void Dispose()
         {
+            _disposed = true;
             var owner = Interlocked.Exchange(ref _owner, null);
             if (owner == null) return;
             try { EffekseerNative.Check(EffekseerNative.AecnVfxEndScene(owner.DangerousGetHandle())); }
-            finally { owner.DangerousRelease(); }
+            finally
+            {
+                try { owner.DangerousRelease(); }
+                finally
+                {
+                    foreach (var resource in _resources) resource.Release();
+                    _resources.Clear();
+                }
+            }
         }
     }
 
@@ -794,10 +633,15 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
 
     // Only complete, immutable uploads are shared. Timing, simulation and diagnostics remain instance-local.
     private sealed class PlaybackResources(EffekseerHandle? handle, VfxConversion conversion, RenderLayers[][] renderLayers,
-        int[] opaqueLayers, BoundingBox? bounds, IReadOnlyList<VfxPreviewDiagnostic> diagnostics, string sourcePath)
+        int[] opaqueLayers, BoundingBox? bounds, IReadOnlyList<VfxPreviewDiagnostic> diagnostics, string sourcePath,
+        string? resourceIdentity = null, byte?[]? constantAlphas = null)
     {
         private int _references = 1;
-        public EffekseerHandle? Handle { get; } = handle;
+        private EffekseerHandle? _handle = handle;
+        public EffekseerHandle? Handle => _handle;
+        public bool HasExclusiveHandle => Volatile.Read(ref _references) == 1 && _handle is { IsInvalid: false, IsClosed: false };
+        public string? ResourceIdentity { get; } = resourceIdentity;
+        public byte?[] ConstantAlphas { get; } = constantAlphas ?? [];
         public VfxConversion Conversion { get; } = conversion;
         public RenderLayers[][] RenderLayers { get; } = renderLayers;
         public int[] OpaqueLayers { get; } = opaqueLayers;
@@ -819,32 +663,50 @@ public sealed class EffekseerVfxPreview(GraphicsDevice device) : IVfxPreview
         }
         public void Release()
         {
-            if (Interlocked.Decrement(ref _references) == 0) Handle?.Dispose();
+            if (Interlocked.Decrement(ref _references) == 0) Interlocked.Exchange(ref _handle, null)?.Dispose();
+        }
+        public bool TryTakeExclusiveHandle(out EffekseerHandle? value)
+        {
+            value = null;
+            if (_handle is not { IsInvalid: false, IsClosed: false }
+                || Interlocked.CompareExchange(ref _references, 0, 1) != 1) return false;
+            value = Interlocked.Exchange(ref _handle, null);
+            return value != null;
         }
     }
 
     private void ReleaseResources()
     {
-        _interactiveBounds?.Dispose();
-        _interactiveBounds = null;
-        _interactivePrewarm?.Dispose();
-        _interactivePrewarm = null;
-        _interactiveRestartPending = false;
+        CancelPreparation();
         var resources = _resources;
         _resources = null;
         _handle = null;
         resources?.Release();
     }
 
+    private void CancelPreparation()
+    {
+        CancelNormalFrameSeek();
+        _normalSeekInitializationKnown = false;
+        _interactiveBounds?.Dispose();
+        _interactiveBounds = null;
+        _interactivePrewarm?.Dispose();
+        _interactivePrewarm = null;
+        _interactiveRestartPending = false;
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
+        CancelInteractiveReload();
         ReleaseResources();
         _flatGroundDepth?.Dispose();
         _flatGroundDepth = null;
         _conversion = null;
         _simulation = null;
+        _identification = null;
+        _identifiedEmitters = null;
         _projectedParticles.Clear(); _projectedParticles.Capacity = 0;
         _renderedParticles.Clear(); _renderedParticles.Capacity = 0;
         _opaqueParticles.Clear(); _opaqueParticles.Capacity = 0;

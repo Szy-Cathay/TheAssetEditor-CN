@@ -15,7 +15,7 @@ using Shared.GameFormats.Vfx;
 
 namespace Editors.VfxEditor;
 
-public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFileEditor, ISaveableEditor
+public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFileEditor, ISaveableEditor, IDisposable
 {
     private readonly IPackFileService _files;
     private readonly IFileSaveService _saveService;
@@ -29,11 +29,18 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
     private readonly object _scenePreviewDependencyGate = new();
     private readonly HashSet<object> _scenePreviewDependencies = new(ReferenceEqualityComparer.Instance);
     private bool _updatingPreviewSelection;
+    private bool _updatingCategories;
+    private volatile bool _closed;
     private bool? _playbackBeforeValidationError;
+    private (float Time, string Quality, HashSet<(string Kind, string Name)> Selection)? _previewBeforeValidationError;
+    private bool _resetScenePlayback = true;
     private string _scenePreviewStatus = "";
     private IReadOnlyList<string> _scenePreviewDiagnostics = [];
+    private IReadOnlyList<VfxPreviewDiagnostic>? _presentedPreviewDiagnostics;
     private readonly Stack<Edit> _undo = new();
     private readonly Stack<Edit> _redo = new();
+    private readonly Dictionary<VfxFieldViewModel, VfxLayerViewModel> _fieldOwners = new();
+    private readonly HashSet<VfxFieldViewModel> _invalidFields = new();
     private VfxDocument? _document;
     private byte[] _loadedBytes = [];
     private int _revision;
@@ -48,11 +55,14 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
     private VfxLayerViewModel? _selectedLayer;
     private VfxFieldViewModel? _selectedField;
     private bool _hasUnsavedChanges;
+    private int _inspectorTabIndex;
+    private VfxLayerViewModel? _identifyingLayer;
+    private VfxPreviewEditorInfo? _appliedEditorInfo;
 
     public LocalizationManager Localization { get; }
     public ObservableCollection<VfxLayerViewModel> Layers { get; } = [];
     public ObservableCollection<VfxFieldViewModel> VisibleFields { get; } = [];
-    public IReadOnlyList<VfxChoice> Categories { get; }
+    public IReadOnlyList<VfxChoice> Categories { get; private set; }
     public ObservableCollection<VfxChoice> Qualities { get; } = [];
     public IReadOnlyList<VfxChoice> PreviewQualities { get; }
     public PackFile CurrentFile { get; private set; } = null!;
@@ -66,20 +76,37 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
     public string Status { get => _status; private set => SetProperty(ref _status, value); }
     public string DisplayName { get => _displayName; set => SetProperty(ref _displayName, value); }
     public bool HasUnsavedChanges { get => _hasUnsavedChanges; set => SetProperty(ref _hasUnsavedChanges, value); }
-    public bool HasErrors => Layers.Any(x => x.Fields.Any(f => f.HasErrors));
+    public bool HasErrors => _invalidFields.Count != 0;
+    internal bool LastNotifiedHasErrors { get; private set; }
     public string Summary => Localization.GetFormat("Vfx.Summary", Layers.Count(x => x.Model.Kind == "Emitter"), Layers.Count(x => x.Model.Kind == "Reference"));
     public string FieldCount => Localization.GetFormat("Vfx.FieldCount", VisibleFields.Count, SelectedLayer?.Fields.Count ?? 0);
     public string CategoryHint => Localization.Get(string.IsNullOrWhiteSpace(Search) ? "Vfx.GoalHint." + Category : "Vfx.SearchAllHint");
+    public int InspectorTabIndex { get => _inspectorTabIndex; set => SetProperty(ref _inspectorTabIndex, value); }
+    public string SelectedLayerSource => HasDocument ? Localization.GetFormat("Vfx.Scope.Source", FilePath) : "";
+    public string SelectedLayerReference => SelectedLayer?.Model.Reference is { Length: > 0 } reference
+        ? Localization.GetFormat("Vfx.Scope.ReferenceFile", reference) : "";
+    public string SelectedLayerScope => SelectedLayer?.Model is { } layer ? layer.Kind switch
+    {
+        "Emitter" => Localization.GetFormat("Vfx.Scope.Emitter", layer.Name),
+        "Reference" => Localization.GetFormat("Vfx.Scope.Reference", layer.Name),
+        "Override" => Localization.GetFormat("Vfx.Scope.Override", layer.Type, layer.Name),
+        "Settings" => Localization.Get("Vfx.Scope.Settings"),
+        _ => "",
+    } : "";
     public string Search { get => _search; set { if (SetProperty(ref _search, value)) FilterFields(); } }
-    public string Category { get => _category; set { if (SetProperty(ref _category, value)) FilterFields(); } }
-    public string Quality { get => _quality; set { if (SetProperty(ref _quality, value)) FilterFields(); } }
+    public string Category { get => _category; set { if (!_updatingCategories && value != null && SetProperty(ref _category, value)) FilterFields(); } }
+    public string Quality { get => _quality; set { if (value != null && SetProperty(ref _quality, value)) FilterFields(); } }
     public string PreviewQuality
     {
         get => _previewQuality;
         set
         {
             if (PreviewQualities.Any(choice => choice.Key == value) && SetProperty(ref _previewQuality, value))
+            {
+                foreach (var layer in Layers.Where(layer => layer.Model.Kind == "Emitter")) layer.RefreshStatus();
+                InvalidatePreviewFeedback();
                 ScheduleScenePreview();
+            }
         }
     }
     public IWpfGame? PreviewWorld => _scenePreview?.Game;
@@ -119,6 +146,9 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
             OpenReferenceCommand.NotifyCanExecuteChanged();
             DuplicateLayerCommand.NotifyCanExecuteChanged();
             RemoveLayerCommand.NotifyCanExecuteChanged();
+            OnPropertyChanged(nameof(SelectedLayerSource));
+            OnPropertyChanged(nameof(SelectedLayerReference));
+            OnPropertyChanged(nameof(SelectedLayerScope));
         }
     }
     public VfxFieldViewModel? SelectedField
@@ -176,8 +206,7 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
         ResetEmitterCommand = new RelayCommand(() => _scenePreview?.ResetTransform(), () => _scenePreview?.Preview.IsLoaded == true);
         Localization = localization;
         _displayName = localization.Get("Vfx.Title");
-        Categories = new[] { "Common", "Appearance", "Size", "Emission", "Lifetime", "Motion", "Resources", "Advanced", "All" }
-            .Select(x => new VfxChoice(x, localization.Get("Vfx.Category." + x))).ToArray();
+        Categories = [new("All", localization.Get("Vfx.Category.All"))];
         PreviewQualities = new[] { "0", "1", "2" }
             .Select(x => new VfxChoice(x, localization.GetFormat("Vfx.Quality", x))).ToArray();
         OpenCommand = new RelayCommand(Open);
@@ -288,6 +317,9 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
             CurrentFile = file;
             _loadedBytes = bytes;
             _document = document;
+            _resetScenePlayback = true;
+            _playbackBeforeValidationError = null;
+            _previewBeforeValidationError = null;
             DisplayName = file.Name;
             _undo.Clear();
             _redo.Clear();
@@ -427,11 +459,12 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
 
     private void WeatherChanged()
     {
+        if (_closed) return;
         _weatherError = "";
         OnPropertyChanged(nameof(WeatherStatus));
     }
 
-    internal void Apply(Action apply, Action restore)
+    internal void Apply(Action apply, Action restore, VfxFieldViewModel? field = null)
     {
         apply();
         var after = ++_nextRevision;
@@ -439,12 +472,14 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
         _redo.Clear();
         _revision = after;
         Status = Localization.Get("Vfx.Status.Modified");
+        if (field != null) RefreshValidation(field, field.HasErrors);
         Changed();
     }
 
     internal void Changed()
     {
-        HasUnsavedChanges = _revision != _savedRevision || HasErrors;
+        LastNotifiedHasErrors = HasErrors;
+        HasUnsavedChanges = _revision != _savedRevision || LastNotifiedHasErrors;
         OnPropertyChanged(nameof(HasErrors));
         SaveCommand.NotifyCanExecuteChanged();
         HistoryChanged();
@@ -453,6 +488,19 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
         DuplicateLayerCommand.NotifyCanExecuteChanged();
         RemoveLayerCommand.NotifyCanExecuteChanged();
         ScheduleScenePreview();
+    }
+
+    internal void RefreshLayerStatus(VfxFieldViewModel field)
+    {
+        if (field.Model.Name is not ("Enable" or "enable")) return;
+        if (_fieldOwners.TryGetValue(field, out var layer)) layer.RefreshStatus();
+    }
+
+    internal void RefreshValidation(VfxFieldViewModel field, bool hasErrors)
+    {
+        if (!_fieldOwners.ContainsKey(field)) return;
+        if (hasErrors) _invalidFields.Add(field);
+        else _invalidFields.Remove(field);
     }
 
     private void Undo()
@@ -485,6 +533,7 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
 
     private void PreviewTransformCommitted(Matrix before, Matrix after)
     {
+        if (_closed) return;
         if (_document == null || _scenePreview == null || before == after) return;
         _undo.Push(new Edit(() => _scenePreview.SetTransform(after), () => _scenePreview.SetTransform(before),
             _revision, _revision, ChangesDocument: false));
@@ -500,22 +549,40 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
 
     private void RebuildLayers(bool retainSelection = false)
     {
+        EndIdentification();
+        _appliedEditorInfo = null;
         var included = Layers.Where(layer => layer.IsIncludedInPreview).Select(layer => (layer.Model.Kind, layer.Model.Name)).ToHashSet();
         var previous = Layers.Where(layer => layer.CanPreview).Select(layer => (layer.Model.Kind, layer.Model.Name)).ToHashSet();
         var layerIndex = retainSelection && SelectedLayer != null ? Layers.IndexOf(SelectedLayer) : 0;
         var fieldIndex = retainSelection && SelectedField != null ? SelectedLayer!.Fields.IndexOf(SelectedField) : 0;
         var quality = _quality;
+        var category = _category;
+        _fieldOwners.Clear();
+        _invalidFields.Clear();
         Layers.Clear();
         var models = _document!.Layers;
         var complete = (string?)_document.Root.Element("vfx")?.Attribute("construction_type") == "2"
             || models.Count(layer => layer.Kind is "Emitter" or "Reference") <= 1;
         var extendCompleteSelection = previous.Count == 0 ? complete : previous.SetEquals(included);
+        var occurrences = new Dictionary<(string Kind, string Name), int>();
         foreach (var layer in models)
-            Layers.Add(new VfxLayerViewModel(layer, this, retainSelection
+        {
+            var key = (layer.Kind, layer.Name);
+            var occurrence = occurrences.GetValueOrDefault(key);
+            occurrences[key] = occurrence + 1;
+            var viewModel = new VfxLayerViewModel(layer, this, retainSelection
                 ? included.Contains((layer.Kind, layer.Name)) || extendCompleteSelection && !previous.Contains((layer.Kind, layer.Name))
-                : complete));
+                : complete, occurrence);
+            Layers.Add(viewModel);
+            foreach (var ownedField in viewModel.Fields)
+            {
+                _fieldOwners.Add(ownedField, viewModel);
+                RefreshValidation(ownedField, ownedField.HasErrors);
+            }
+        }
         SelectedLayer = Layers.ElementAtOrDefault(Math.Clamp(layerIndex, 0, Layers.Count - 1));
         if (retainSelection && Qualities.Any(x => x.Key == quality)) Quality = quality;
+        if (retainSelection && Categories.Any(x => x.Key == category)) Category = category;
         var field = SelectedLayer?.Fields.ElementAtOrDefault(Math.Max(0, fieldIndex));
         if (field != null && VisibleFields.Contains(field)) SelectedField = field;
         OnPropertyChanged(nameof(Summary));
@@ -524,6 +591,28 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
     }
 
     internal void PreviewOnly(VfxLayerViewModel selected) => SetPreviewSelection(layer => ReferenceEquals(layer, selected));
+
+    internal void EditLayer(VfxLayerViewModel layer)
+    {
+        if (_closed || !Layers.Contains(layer)) return;
+        SelectedLayer = layer;
+        InspectorTabIndex = 1;
+    }
+
+    internal void BeginIdentification(VfxLayerViewModel layer)
+    {
+        if (_closed || !layer.CanIdentify || !Layers.Contains(layer) || ReferenceEquals(_identifyingLayer, layer)) return;
+        EndIdentification();
+        _identifyingLayer = layer;
+        _scenePreview?.Preview.BeginIdentification(layer.Identity);
+    }
+
+    internal void EndIdentification()
+    {
+        if (_identifyingLayer == null) return;
+        _identifyingLayer = null;
+        _scenePreview?.Preview.EndIdentification();
+    }
 
     private void SetPreviewSelection(Func<VfxLayerViewModel, bool> include)
     {
@@ -536,6 +625,8 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
     internal void PreviewSelectionChanged()
     {
         if (_updatingPreviewSelection) return;
+        EndIdentification();
+        InvalidatePreviewFeedback();
         OnPropertyChanged(nameof(HasPreviewOptions));
         OnPropertyChanged(nameof(HasPreviewSelection));
         OnPropertyChanged(nameof(PreviewSelectionSummary));
@@ -547,34 +638,67 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
     private void FilterFields()
     {
         var selected = SelectedField;
-        VisibleFields.Clear();
-        foreach (var field in SelectedLayer?.Fields ?? [])
+        var fields = (SelectedLayer?.Fields ?? []).Where(field => _quality == "All"
+            || field.Model.Quality.Length == 0 || field.Model.Quality == _quality).ToArray();
+        UpdateCategories(fields);
+        var visible = new List<VfxFieldViewModel>(fields.Length);
+        foreach (var field in fields)
         {
-            if (_quality != "All" && field.Model.Quality.Length > 0 && field.Model.Quality != _quality) continue;
             if (string.IsNullOrWhiteSpace(_search))
             {
                 if (_category == "Common" && !field.IsCommon) continue;
                 if (_category is not ("All" or "Common") && field.Category != _category) continue;
             }
             else if (!field.SearchText.Contains(_search.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
-            VisibleFields.Add(field);
+            visible.Add(field);
         }
+        // Feedback can change adjacent fields while an inline control is being edited.
+        for (var index = 0; index < visible.Count; index++)
+        {
+            if (index < VisibleFields.Count && ReferenceEquals(VisibleFields[index], visible[index])) continue;
+            var previous = VisibleFields.IndexOf(visible[index]);
+            if (previous >= 0) VisibleFields.Move(previous, index);
+            else VisibleFields.Insert(index, visible[index]);
+        }
+        while (VisibleFields.Count > visible.Count) VisibleFields.RemoveAt(VisibleFields.Count - 1);
         SelectedField = selected != null && VisibleFields.Contains(selected) ? selected : VisibleFields.FirstOrDefault();
         OnPropertyChanged(nameof(HasNoFields));
         OnPropertyChanged(nameof(FieldCount));
         OnPropertyChanged(nameof(CategoryHint));
     }
 
+    private void UpdateCategories(IReadOnlyList<VfxFieldViewModel> fields)
+    {
+        var keys = new[] { "Common", "Appearance", "Size", "Emission", "Lifetime", "Motion", "Resources", "Advanced", "All" }
+            .Where(key => key == "All" || (key == "Common" ? fields.Any(field => field.IsCommon)
+                : fields.Any(field => field.Category == key))).ToArray();
+        var category = keys.Contains(_category) ? _category : keys.Contains("Common") ? "Common" : "All";
+        _updatingCategories = true;
+        try
+        {
+            var changed = _category != category;
+            _category = category;
+            if (!Categories.Select(choice => choice.Key).SequenceEqual(keys))
+            {
+                Categories = keys.Select(key => new VfxChoice(key, Localization.Get("Vfx.Category." + key))).ToArray();
+                OnPropertyChanged(nameof(Categories));
+                changed = true;
+            }
+            if (changed) OnPropertyChanged(nameof(Category));
+        }
+        finally { _updatingCategories = false; }
+    }
+
     private void ScheduleScenePreview()
     {
-        if (_scenePreview == null && _livePreviews == null) return;
-        _scenePreviewTimer.Stop();
-        _scenePreviewTimer.Start();
+        if (_closed || (_scenePreview == null && _livePreviews == null)) return;
+        // Publish continuous edits at the merge interval instead of waiting for input to stop.
+        if (!_scenePreviewTimer.IsEnabled) _scenePreviewTimer.Start();
     }
 
     private void OnSharedPreviewChanged(object file)
     {
-        if (_scenePreview == null || ReferenceEquals(file, CurrentFile)) return;
+        if (_closed || _scenePreview == null || ReferenceEquals(file, CurrentFile)) return;
         lock (_scenePreviewDependencyGate)
             if (!_scenePreviewDependencies.Contains(file)) return;
         ScheduleScenePreview();
@@ -582,29 +706,45 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
 
     private void RefreshScenePreview(object? sender, EventArgs args)
     {
+        if (_closed) return;
         _scenePreviewTimer.Stop();
         if (_document == null) return;
         if (HasErrors)
         {
             if (CurrentFile != null) _livePreviews?.Publish(this, CurrentFile, null);
-            if (_scenePreview != null) _playbackBeforeValidationError ??= Playback.PlayingIntent;
+            if (_scenePreview != null && _playbackBeforeValidationError == null)
+            {
+                _playbackBeforeValidationError = Playback.PlayingIntent;
+                _previewBeforeValidationError = (_scenePreview.Preview.CurrentTime, PreviewQuality,
+                    Layers.Where(layer => layer.CanPreview && layer.IsIncludedInPreview)
+                        .Select(layer => (layer.Model.Kind, layer.Model.Name)).ToHashSet());
+            }
             _scenePreview?.Stop(); ScenePreviewStatus = Localization.Get("Vfx.Status.Invalid");
             return;
         }
         var containers = new[] { CurrentFile == null ? null : _files.GetPackFileContainer(CurrentFile), _files.GetEditablePack() }
             .Concat(_files.GetAllPackfileContainers().AsEnumerable().Reverse()).Where(x => x != null).Cast<PackFileContainer>().Distinct().ToArray();
         lock (_scenePreviewDependencyGate) _scenePreviewDependencies.Clear();
-        var snapshot = new VfxPreviewSnapshot(_document.Write(), FilePath, path =>
+        PackFile? Find(string path)
         {
             foreach (var container in containers)
             {
                 var file = _files.FindFile(path, container);
                 if (file == null) continue;
                 lock (_scenePreviewDependencyGate) _scenePreviewDependencies.Add(file);
-                return _livePreviews?.ReadResource(file) ?? file.DataSource.ReadData();
+                return file;
             }
             return null;
-        }, PreviewQuality);
+        }
+        byte[]? Resolve(string path) => Find(path) is { } file
+            ? _livePreviews?.ReadResource(file) ?? file.DataSource.ReadData() : null;
+        Func<byte[]?>? CaptureRead(string path)
+        {
+            if (Find(path) is not { } file) return null;
+            return _livePreviews?.CaptureResourceRead(file) ?? VfxPreviewDocumentStore.CaptureDataSourceRead(file.DataSource);
+        }
+        var snapshot = new VfxPreviewSnapshot(_document.Write(), FilePath, Resolve, PreviewQuality)
+            { CaptureResourceRead = CaptureRead };
         if (CurrentFile != null) _livePreviews?.Publish(this, CurrentFile, snapshot);
         else _livePreviews?.Remove(this);
         if (_scenePreview == null) { ScenePreviewStatus = Localization.Get("Vfx.Preview.RuntimeUnavailable"); return; }
@@ -618,20 +758,31 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
         var selection = selected.Length == selectable.Length ? null : new VfxPreviewRootSelection(
             selected.Where(layer => layer.Model.Kind == "Emitter").Select(layer => layer.Model.Name).ToArray(),
             selected.Where(layer => layer.Model.Kind == "Reference").Select(layer => layer.Model.Name).ToArray());
-        _scenePreview.Preview.Reload(snapshot with { RootSelection = selection });
+        _scenePreview.Preview.Reload(snapshot with { RootSelection = selection }, preservePlaybackState: !_resetScenePlayback);
+        _resetScenePlayback = false;
+        if (_previewBeforeValidationError is { } previous && previous.Quality == PreviewQuality
+            && previous.Selection.SetEquals(selected.Select(layer => (layer.Model.Kind, layer.Model.Name))))
+            _scenePreview.Preview.Seek(previous.Time);
+        _previewBeforeValidationError = null;
     }
 
     private void ScenePreviewReloaded()
     {
-        if (_scenePreview == null) return;
+        if (_closed || _scenePreview == null) return;
+        if (!_scenePreviewTimer.IsEnabled) ApplyPreviewFeedback(_scenePreview.Preview.EditorInfo);
         FrameSceneCommand.NotifyCanExecuteChanged();
         SelectEmitterCommand.NotifyCanExecuteChanged();
         MoveEmitterCommand.NotifyCanExecuteChanged();
         RotateEmitterCommand.NotifyCanExecuteChanged();
         ScaleEmitterCommand.NotifyCanExecuteChanged();
         ResetEmitterCommand.NotifyCanExecuteChanged();
-        ScenePreviewDiagnostics = _scenePreview.Preview.Diagnostics.Select(x =>
-            Localization.GetFormat("Vfx.Preview.Diagnostic", x.Layer, x.Field, Localization.Get(x.ReasonKey))).ToArray();
+        var diagnostics = _scenePreview.Preview.Diagnostics;
+        if (_presentedPreviewDiagnostics == null || !_presentedPreviewDiagnostics.SequenceEqual(diagnostics))
+        {
+            _presentedPreviewDiagnostics = diagnostics.ToArray();
+            ScenePreviewDiagnostics = diagnostics.Select(x =>
+                Localization.GetFormat("Vfx.Preview.Diagnostic", x.Layer, x.Field, Localization.Get(x.ReasonKey))).ToArray();
+        }
         ScenePreviewStatus = !HasPreviewSelection && HasPreviewOptions ? Localization.Get("Vfx.Preview.SelectScope")
             : _scenePreview.Preview.EmitterCount == 0 ? Localization.Get("Vfx.Preview.None")
             : Localization.GetFormat("Vfx.Preview.Summary", _scenePreview.Preview.EmitterCount, _scenePreview.Preview.TotalEmitterCount, _scenePreview.Preview.DisabledEmitterCount);
@@ -639,6 +790,9 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
 
     public void Close()
     {
+        if (_closed) return;
+        EndIdentification();
+        _closed = true;
         Playback.Dispose();
         _scenePreviewTimer.Stop();
         _scenePreviewTimer.Tick -= RefreshScenePreview;
@@ -653,6 +807,63 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
             _scenePreview.Stop();
         }
     }
+
+    public void Dispose() => Close();
+
+    private void ApplyPreviewFeedback(VfxPreviewEditorInfo info)
+    {
+        if (_closed || ReferenceEquals(info, _appliedEditorInfo)) return;
+        var previous = _appliedEditorInfo;
+        _appliedEditorInfo = info;
+        if (SamePreviewFeedback(previous, info)) return;
+        var layers = info.Layers.ToDictionary(layer => (layer.Kind, layer.Name, layer.Occurrence));
+        var selectedChanged = false;
+        foreach (var layer in Layers)
+        {
+            layers.TryGetValue((layer.Model.Kind, layer.Model.Name, layer.Identity.Occurrence), out var feedback);
+            var fields = feedback?.Fields.ToDictionary(field => field.Key);
+            foreach (var field in layer.Fields)
+            {
+                var changed = field.SetPreviewFeedback(fields?.GetValueOrDefault(field.PreviewKey), feedback != null);
+                selectedChanged |= changed && ReferenceEquals(layer, SelectedLayer);
+            }
+        }
+        if (selectedChanged) FilterFields();
+    }
+
+    private static bool SamePreviewFeedback(VfxPreviewEditorInfo? previous, VfxPreviewEditorInfo current)
+    {
+        if (previous == null || previous.Layers.Count != current.Layers.Count) return false;
+        for (var layerIndex = 0; layerIndex < current.Layers.Count; layerIndex++)
+        {
+            var before = previous.Layers[layerIndex];
+            var after = current.Layers[layerIndex];
+            if (before.Kind != after.Kind || before.Name != after.Name || before.Key != after.Key
+                || before.Occurrence != after.Occurrence || before.State != after.State || before.Fields.Count != after.Fields.Count) return false;
+            for (var fieldIndex = 0; fieldIndex < after.Fields.Count; fieldIndex++)
+            {
+                var oldField = before.Fields[fieldIndex];
+                var field = after.Fields[fieldIndex];
+                if (oldField.Key != field.Key || oldField.Name != field.Name || oldField.Context != field.Context
+                    || oldField.Quality != field.Quality || oldField.State != field.State
+                    || oldField.ReasonKeys.Count != field.ReasonKeys.Count) return false;
+                for (var reason = 0; reason < field.ReasonKeys.Count; reason++)
+                    if (oldField.ReasonKeys[reason] != field.ReasonKeys[reason]) return false;
+            }
+        }
+        return true;
+    }
+
+    private void InvalidatePreviewFeedback()
+    {
+        if (_appliedEditorInfo == null) return;
+        _appliedEditorInfo = null;
+        var selectedChanged = false;
+        foreach (var layer in Layers)
+            foreach (var field in layer.Fields)
+                selectedChanged |= field.SetPreviewFeedback(null, false) && ReferenceEquals(layer, SelectedLayer);
+        if (selectedChanged) FilterFields();
+    }
     private sealed record Edit(Action Apply, Action Restore, int Before, int After, bool ChangesDocument = true);
 }
 
@@ -663,28 +874,59 @@ public sealed class VfxLayerViewModel : ObservableObject
     private readonly VfxEditorViewModel _editor;
     private bool _isIncludedInPreview;
     public bool CanPreview => Model.Kind is "Emitter" or "Reference";
+    public bool CanIdentify => CanPreview && IsIncludedInPreview;
+    public string IdentificationHint => _editor.Localization.Get(CanIdentify ? "Vfx.Layer.IdentifyHint" : "Vfx.Layer.IdentifyUnavailable");
+    public string GroupLabel => _editor.Localization.Get(CanPreview ? "Vfx.Layer.Group.Effects" : "Vfx.Layer.Group.Configuration");
     public bool IsIncludedInPreview
     {
         get => _isIncludedInPreview;
-        set { if (CanPreview && SetProperty(ref _isIncludedInPreview, value)) _editor.PreviewSelectionChanged(); }
+        set
+        {
+            if (!CanPreview || !SetProperty(ref _isIncludedInPreview, value)) return;
+            OnPropertyChanged(nameof(CanIdentify));
+            OnPropertyChanged(nameof(IdentificationHint));
+            _editor.PreviewSelectionChanged();
+        }
     }
     public RelayCommand PreviewOnlyCommand { get; }
+    public RelayCommand EditLayerCommand { get; }
+    public VfxPreviewLayerIdentity Identity { get; }
     public VfxLayer Model { get; }
     public string Label { get; }
-    public string Subtitle { get; }
+    public string Subtitle => _editor.Localization.Get("Vfx.Layer." + Model.Kind)
+        + (Model.Kind == "Emitter" && Model.Type.Length > 0 ? " · " + _editor.Localization.GetOrDefault("Vfx.EmitterType." + Model.Type, Model.Type) : "")
+        + (IsDisabledAtPreviewQuality ? " · " + _editor.Localization.Get("Vfx.Layer.DisabledAtQuality") : "");
     public List<VfxFieldViewModel> Fields { get; }
 
-    public VfxLayerViewModel(VfxLayer model, VfxEditorViewModel editor, bool includedInPreview = false)
+    public VfxLayerViewModel(VfxLayer model, VfxEditorViewModel editor, bool includedInPreview = false, int occurrence = 0)
     {
         _editor = editor;
         Model = model;
+        Identity = new(model.Kind, model.Name, occurrence);
         _isIncludedInPreview = CanPreview && includedInPreview;
         PreviewOnlyCommand = new RelayCommand(() => editor.PreviewOnly(this), () => CanPreview);
+        EditLayerCommand = new RelayCommand(() => editor.EditLayer(this));
         Label = model.Kind == "Settings" ? editor.Localization.Get("Vfx.Layer.Settings")
+            : model.Kind == "Override" ? editor.Localization.GetFormat("Vfx.Layer.OverrideLabel", model.Type, model.Name)
             : model.Kind == "Reference" && model.Name.StartsWith("vfxref_", StringComparison.OrdinalIgnoreCase)
                 ? Path.GetFileName(model.Reference.Replace('/', '\\')) : model.Name;
-        Subtitle = editor.Localization.Get("Vfx.Layer." + model.Kind)
-            + (model.Kind == "Emitter" && model.Type.Length > 0 ? " · " + editor.Localization.GetOrDefault("Vfx.EmitterType." + model.Type, model.Type) : "");
         Fields = model.Fields.Select(x => new VfxFieldViewModel(x, editor)).OrderBy(x => VfxFieldGuidance.CommonOrder(x.Model.Name)).ToList();
+    }
+
+    internal void RefreshStatus() => OnPropertyChanged(nameof(Subtitle));
+
+    private bool IsDisabledAtPreviewQuality
+    {
+        get
+        {
+            if (Model.Kind == "Override") return (string?)Model.Element.Attribute("enable") == "false";
+            if (Model.Kind != "Emitter") return false;
+            var enabled = Model.Element.Elements().Where(element => (string?)element.Attribute("name") == "Enable")
+                .Where(element => (string?)element.Attribute("quality") is null or "0"
+                    || (string?)element.Attribute("quality") == _editor.PreviewQuality)
+                .OrderBy(element => (string?)element.Attribute("quality") == _editor.PreviewQuality ? 1 : 0).LastOrDefault();
+            var value = (string?)enabled?.Attribute("value");
+            return bool.TryParse(value, out var flag) ? !flag : VfxCurve.TryNumber(value ?? "", out var number) && number == 0;
+        }
     }
 }

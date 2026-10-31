@@ -41,19 +41,32 @@ public class VfxInteractiveBoundsTests
     }
 
     [Test]
-    public async Task BoundsAndPlaybackPreparationShareTheExistingSingleWorkerPermit()
+    public async Task BoundsHaveOneIndependentPermitWithoutBlockingPlaybackPreparation()
     {
         var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var occupied = VfxInteractivePrewarm.RunPreparation(_ => release.Task, CancellationToken.None);
+        var boundsRelease = new TaskCompletionSource<BoundingBox?>(TaskCreationOptions.RunContinuationsAsynchronously);
         var starts = 0;
-        using var queued = new VfxInteractiveBounds(Plan(), _ => { starts++; return Task.FromResult<BoundingBox?>(DelayedBoundsPreview.Expected); });
-        Assert.That(starts, Is.Zero);
-        Assert.That(queued.TryTake(out _), Is.False);
-        release.SetResult(true);
-        await occupied;
-        Assert.That(await Take(queued), Is.EqualTo(DelayedBoundsPreview.Expected));
-        Assert.That(starts, Is.EqualTo(1));
-        await queued.StopAsync();
+        using var first = new VfxInteractiveBounds(Plan(), _ => { Interlocked.Increment(ref starts); return boundsRelease.Task; });
+        using var second = new VfxInteractiveBounds(Plan(), _ => { Interlocked.Increment(ref starts); return Task.FromResult<BoundingBox?>(DelayedBoundsPreview.Expected); });
+        try
+        {
+            Assert.That(starts, Is.EqualTo(1), "One bounds job may run beside the one occupied playback preparation; a second bounds job must remain queued.");
+            Assert.That(first.TryTake(out _), Is.False);
+            Assert.That(second.TryTake(out _), Is.False);
+            boundsRelease.SetResult(DelayedBoundsPreview.Expected);
+            Assert.That(await Take(first), Is.EqualTo(DelayedBoundsPreview.Expected));
+            Assert.That(await Take(second), Is.EqualTo(DelayedBoundsPreview.Expected));
+            Assert.That(starts, Is.EqualTo(2));
+            Assert.That(occupied.IsCompleted, Is.False, "Bounds completion must not require the playback permit.");
+        }
+        finally
+        {
+            boundsRelease.TrySetResult(DelayedBoundsPreview.Expected);
+            release.TrySetResult(true);
+            await occupied;
+            await first.StopAsync(); await second.StopAsync();
+        }
     }
 
     [Test]
@@ -96,7 +109,7 @@ public class VfxInteractiveBoundsTests
         var constructor = resourcesType.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).Single();
         var layers = Array.CreateInstance(constructor.GetParameters()[2].ParameterType.GetElementType()!, 0);
         var plan = Plan();
-        var resources = constructor.Invoke([null, plan, layers, Array.Empty<int>(), null, plan.Diagnostics, "DIAG-immutable-bounds.xml"]);
+        var resources = constructor.Invoke([null, plan, layers, Array.Empty<int>(), null, plan.Diagnostics, "DIAG-immutable-bounds.xml", Type.Missing, Type.Missing]);
         using var preview = new EffekseerVfxPreview(null!);
         type.GetField("_resources", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(preview, resources);
         var completion = new TaskCompletionSource<BoundingBox?>(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -25,6 +25,8 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
 {
     public interface IMetaDataBuilder
     {
+        bool EnableInteractiveVfxPreview { get => false; set { } }
+
         MetaDataBuildResult Build(
             ParsedMetadataFile? persistent,
             ParsedMetadataFile? metaData,
@@ -46,6 +48,11 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
     {
         private readonly MetaDataPreviewBuilder _previewBuilder;
         private readonly MetaDataRuleBuilder _ruleBuilder;
+        public bool EnableInteractiveVfxPreview
+        {
+            get => _previewBuilder.EnableInteractiveVfxPreview;
+            set => _previewBuilder.EnableInteractiveVfxPreview = value;
+        }
 
         public MetaDataBuilder(
             ComplexMeshLoader complexMeshLoader,
@@ -150,6 +157,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
         private readonly IVfxPreviewFactory? _vfxFactory;
         private readonly IDeviceResolver? _devices;
         private readonly VfxPreviewDocumentStore? _liveDocuments;
+        public bool EnableInteractiveVfxPreview { get; set; }
 
         private static Color s_color = Color.Black;
         private static Color s_selectedColor = Color.Red;
@@ -1504,12 +1512,21 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
             {
                 var documentSource = new VfxPreviewDocumentSource(_resourceResolver.Files, resource, _liveDocuments);
                 // The SuperView grid is a world-Y0 preview receiver, independent of animated bones.
-                var particles = new VfxPreviewSceneNode(_vfxFactory, _devices, documentSource) { FlatGroundHeight = 0 };
+                var particles = new VfxPreviewSceneNode(_vfxFactory, _devices, documentSource)
+                {
+                    FlatGroundHeight = 0,
+                    EnableInteractiveReload = EnableInteractiveVfxPreview,
+                };
                 var scale = GetEffectScale(effect);
                 particles.ModelMatrix = Matrix.CreateScale(scale);
                 particles.IsVisible = scale != 0;
                 var start = GetActiveTimeRange(source)?.StartTime ?? 0;
                 var attachmentSamples = new Dictionary<float, Matrix>();
+                var sourceName = source.Name;
+                var stableFields = source.GetType().GetProperties()
+                    .Where(property => property.Name is not ("Position" or "Orientation" or "Scale")
+                        && property.GetCustomAttributes(typeof(MetaDataTagAttribute), true).Length != 0)
+                    .Select(property => (Property: property, Value: property.GetValue(source))).ToArray();
                 AnimationClip? sampledClip = null;
                 particles.LocalAttachmentAtTime = seconds =>
                 {
@@ -1528,7 +1545,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                     var snapshot = documentSource.Read();
                     IReadOnlyList<VfxPreviewDiagnostic> previewDiagnostics = snapshot == null
                         ? [new VfxPreviewDiagnostic(documentSource.Path, "", "", "Vfx.Preview.LiveDocumentInvalid")]
-                        : VfxPreviewInspector.Inspect(snapshot).Diagnostics;
+                        : EnableInteractiveVfxPreview ? [] : VfxPreviewInspector.Inspect(snapshot).Diagnostics;
                     foreach (var diagnostic in previewDiagnostics.DistinctBy(x => x.ReasonKey))
                         diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, diagnostic.ReasonKey, documentSource.Path));
                 }
@@ -1537,7 +1554,17 @@ namespace Editors.AnimationMeta.SuperView.Visualisation
                     diagnostics.Add(MetaDataDiagnosticFactory.Create(source, owner, "Vfx.Preview.InvalidData", documentSource.Path));
                 }
                 rootPlayer.ContinuePlaybackTimeAfterAnimationEnd = true;
-                return new EffectMetaInstance(instance, particles, GetActiveTimeRange(source), owner == MetaDataDocumentOwner.Persistent, rootPlayer);
+                return new EffectMetaInstance(instance, particles, GetActiveTimeRange(source), owner == MetaDataDocumentOwner.Persistent, rootPlayer,
+                    refreshTransform: () =>
+                    {
+                        // Any other serialized field change must take the normal rebuild/diagnostic path.
+                        if (source.Name != sourceName || stableFields.Any(field => !Equals(field.Value, field.Property.GetValue(source)))) return false;
+                        var currentScale = GetEffectScale(effect);
+                        particles.ModelMatrix = Matrix.CreateScale(currentScale);
+                        particles.IsVisible = currentScale != 0;
+                        attachmentSamples.Clear();
+                        return true;
+                    });
             }
             return instance;
         }

@@ -8,6 +8,7 @@ namespace Shared.Core.PackFiles.Models
     public class FileSystemSource : IDataSource
     {
         public long Size { get; private set; } = 0;
+        public string FilePath => _filepath;
 
         protected string _filepath;
 

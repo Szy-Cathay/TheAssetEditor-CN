@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 
 namespace GameWorld.Core.Vfx;
 
@@ -17,16 +17,36 @@ internal sealed class VfxInteractivePrewarm : IDisposable
     private CancellationTokenSource? _cancellation;
     private BoundingBox? _bounds;
     private bool _boundsReady, _playbackTransferred, _disposed;
+    private bool _prepareSuccessor = true;
+    private readonly bool _enableSeekCheckpoints;
     internal bool Supported { get; }
     internal Exception? Failure { get; private set; }
 
     internal VfxInteractivePrewarm(VfxConversion conversion,
-        Func<VfxInteractivePrewarmKey, bool, BoundingBox?, CancellationToken, Task<VfxPreparedPlayback>>? start = null)
+        Func<VfxInteractivePrewarmKey, bool, BoundingBox?, CancellationToken, Task<VfxPreparedPlayback>>? start = null,
+        bool enableSeekCheckpoints = false)
     {
         _conversion = conversion;
+        _enableSeekCheckpoints = enableSeekCheckpoints;
         Supported = CanPrepare(conversion);
         _start = start ?? Start;
     }
+
+    internal static VfxInteractivePrewarm AfterPlayback(VfxConversion conversion, BoundingBox? bounds, bool enableSeekCheckpoints)
+        => new(conversion, enableSeekCheckpoints: enableSeekCheckpoints)
+        {
+            _playbackTransferred = true,
+            _boundsReady = true,
+            _bounds = bounds,
+        };
+
+    internal static VfxInteractivePrewarm ForReload(VfxConversion conversion, bool initializeDuration, bool enableSeekCheckpoints)
+        => new(conversion, enableSeekCheckpoints: enableSeekCheckpoints)
+        {
+            _playbackTransferred = !initializeDuration,
+            _boundsReady = true, // The reload publishes its exact bounds independently.
+            _prepareSuccessor = false,
+        };
 
     internal static bool CanPrepare(VfxConversion conversion)
     {
@@ -79,7 +99,7 @@ internal sealed class VfxInteractivePrewarm : IDisposable
         _ready = null;
         _playbackTransferred = true;
         // Keep at most the current playback and one independently prepared successor.
-        Schedule(key);
+        if (_prepareSuccessor) Schedule(key);
         return true;
     }
 
@@ -106,28 +126,15 @@ internal sealed class VfxInteractivePrewarm : IDisposable
         {
             token.ThrowIfCancellationRequested();
             var simulation = new TotalWarVfxSimulation(_conversion) { EmissionEndTimeSeconds = key.EmissionEnd };
+            if (_enableSeekCheckpoints) simulation.EnableSeekCheckpoints();
             // The component's first duration read resets before its first attachment seek; later rewinds reset inside Seek.
             if (initializeCycleDuration) _ = simulation.CycleDuration;
             simulation.SeekForPreparation(0, key.RootAtZero, token);
             return simulation;
         }
-        async Task<VfxPreparedPlayback> PrepareInitialTogether()
-        {
-            // RunExclusive retains the one global permit until both independent CPU tasks finish.
-            var bounds = Task.Run(() => VfxPreviewBounds.Estimate(_conversion, token), token);
-            var simulation = Task.Run(PrepareSimulation, token);
-            await Task.WhenAll(bounds, simulation).ConfigureAwait(false);
-            return new(key, simulation.Result, bounds.Result);
-        }
-        if (!boundsReady && Environment.ProcessorCount >= 4) return PrepareInitialTogether();
-        return Task.Run(() =>
-        {
-            token.ThrowIfCancellationRequested();
-            var bounds = boundsReady ? cachedBounds : VfxPreviewBounds.Estimate(_conversion, token);
-            return new VfxPreparedPlayback(key, PrepareSimulation(), bounds);
-        }, token);
+        // Accurate bounds have an independent owner/permit and must never delay exact playback readiness.
+        return Task.Run(() => new VfxPreparedPlayback(key, PrepareSimulation(), cachedBounds), token);
     }
-
     private static bool Finite(VfxInteractivePrewarmKey key)
     {
         static bool MatrixFinite(Matrix matrix)

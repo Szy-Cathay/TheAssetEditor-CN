@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using System.Xml.Linq;
 using System.Collections;
 using System.Reflection;
@@ -46,17 +46,58 @@ public class VfxInteractivePrewarmTests
     }
 
     [Test]
-    public async Task PreparedBoundsRetainEveryOriginalSynchronousEstimateStage()
+    public async Task ExactInitialPlaybackReleasesItsPermitWithoutWaitingForOccupiedOptionalBounds()
+    {
+        var plan = Convert(Source(-.5f, life: 2));
+        var release = new TaskCompletionSource<BoundingBox?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var occupiedBounds = new VfxInteractiveBounds(plan, _ => release.Task);
+        using var preparation = new VfxInteractivePrewarm(plan);
+        var key = new VfxInteractivePrewarmKey(Matrix.Identity, Matrix.Identity, 0, null);
+        try
+        {
+            preparation.Request(key);
+            VfxPreparedPlayback? prepared = null;
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (!preparation.TryTake(key, out prepared) && DateTime.UtcNow < deadline) await Task.Delay(1);
+            Assert.That(prepared, Is.Not.Null, "An occupied optional bounds worker must not prevent the exact zero-time simulation from being published.");
+            Assert.That(prepared!.Bounds, Is.Null, "Pending optional bounds are not an accurate or inherited result.");
+            var reference = new TotalWarVfxSimulation(plan);
+            _ = reference.CycleDuration;
+            reference.Seek(0, Matrix.Identity);
+            Assert.That(ParticleRecords(prepared.Simulation), Is.EqualTo(ParticleRecords(reference)));
+            Assert.That(RandomRecords(prepared.Simulation), Is.EqualTo(RandomRecords(reference)));
+            var entered = false;
+            await VfxInteractivePrewarm.RunPreparation(_ => { entered = true; return Task.FromResult(true); }, CancellationToken.None)
+                .WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.That(entered, Is.True, "Exact playback readiness must release the global permit for the next preview.");
+            Assert.That(release.Task.IsCompleted, Is.False, "Playback readiness must not finish or cancel unrelated bounds.");
+        }
+        finally
+        {
+            await preparation.StopAsync();
+            release.TrySetResult(new BoundingBox(Vector3.Zero, Vector3.One));
+            await occupiedBounds.StopAsync();
+        }
+    }
+    [Test]
+    public async Task IndependentBoundsRetainEveryOriginalSynchronousEstimateStage()
     {
         var plan = Convert(Source(-25));
         var expected = VfxPreviewBounds.Estimate(plan);
         var key = new VfxInteractivePrewarmKey(Matrix.Identity, Matrix.Identity, 0, null);
         using var preparation = new VfxInteractivePrewarm(plan);
+        using var bounds = new VfxInteractiveBounds(plan);
         var prepared = await Take(preparation, key);
-        Assert.That(prepared.Bounds, Is.Not.Null.And.EqualTo(expected));
+        Assert.That(prepared.Bounds, Is.Null, "The playback worker cannot claim an independently computed result.");
+        BoundingBox? actual = null;
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        var ready = false;
+        while (!(ready = bounds.TryTake(out actual)) && DateTime.UtcNow < deadline) await Task.Delay(1);
+        Assert.That(ready, Is.True);
+        Assert.That(actual, Is.Not.Null.And.EqualTo(expected));
         await preparation.StopAsync();
+        await bounds.StopAsync();
     }
-
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(2)]
@@ -87,6 +128,73 @@ public class VfxInteractivePrewarmTests
             }
             reference.SeekWithCurrentAttachment(duration, root, _ => root);
             // A natural loop resets inside Seek after the attachment/history has been installed.
+        }
+        await preparation.StopAsync();
+    }
+
+    [TestCase(false, false)]
+    [TestCase(false, true)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public async Task ReloadPrewarmThenOwnerReplayPreservesDirectSeekWithNonidentityAndMovingHistory(bool initializeDuration, bool movingHistory)
+    {
+        // DIAG: the worker receives one captured time-zero root; the owner retains the actual moving history.
+        var plan = Convert(Source(-.5f, life: 2));
+        Assert.That(VfxInteractivePrewarm.CanPrepare(plan), Is.True);
+        var origin = Matrix.CreateRotationY(.4f) * Matrix.CreateTranslation(7, 1, -3);
+        Matrix History(float time) => movingHistory
+            ? Matrix.CreateRotationY(time * .6f) * origin * Matrix.CreateTranslation(time * 3, time * .25f, -time)
+            : origin;
+        const float phase = .717f;
+        var attachment = History(phase);
+        var key = new VfxInteractivePrewarmKey(History(0), attachment, attachment.Translation.Y, .93f);
+        using var preparation = VfxInteractivePrewarm.ForReload(plan, initializeDuration, false);
+        var prepared = await Take(preparation, key);
+        var reference = new TotalWarVfxSimulation(plan) { EmissionEndTimeSeconds = key.EmissionEnd };
+        if (initializeDuration) _ = reference.CycleDuration;
+        var camera = new CommonShaderParameters(Matrix.Identity, Matrix.Identity, new(0, 0, 10), Vector3.Zero, 0, 0, 0, 1, Vector3.One, []);
+        var calls = 0;
+        while (!prepared.Simulation.PrepareInteractiveSeek(phase, attachment, History, useCurrentAttachmentForFrame: true, budget: TimeSpan.Zero))
+            if (++calls > 10000) Assert.Fail("The owner replay did not finish its exact original ticks.");
+        reference.SeekWithCurrentAttachment(phase, attachment, History);
+        Assert.That(calls, Is.GreaterThan(10));
+        Assert.That(prepared.Simulation.ParticleCount, Is.GreaterThan(0));
+        foreach (var time in new[] { phase, 1.137f, .137f, .917f, 1.317f })
+        {
+            var root = History(time);
+            reference.SeekWithCurrentAttachment(time, root, History);
+            prepared.Simulation.SeekWithCurrentAttachment(time, root, History);
+            Assert.Multiple(() =>
+            {
+                Assert.That(prepared.Simulation.ProjectedFrame(camera, false), Is.EqualTo(reference.ProjectedFrame(camera, false)), $"Complete projection at {time}s.");
+                Assert.That(ParticleRecords(prepared.Simulation), Is.EqualTo(ParticleRecords(reference)), $"Complete particle state at {time}s.");
+                Assert.That(RandomRecords(prepared.Simulation), Is.EqualTo(RandomRecords(reference)), $"Unused random channels at {time}s.");
+            });
+        }
+        await preparation.StopAsync();
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public async Task SharedRestartPrewarmKeepsCachedBoundsAndDirectSeekOrder(bool movingHistory)
+    {
+        var plan = Convert(Source(-.5f, life: 2));
+        var origin = Matrix.CreateRotationY(.7f) * Matrix.CreateTranslation(-5, 2, 4);
+        Matrix History(float time) => movingHistory ? origin * Matrix.CreateTranslation(time * 2, 0, -time * 3) : origin;
+        var cachedBounds = new BoundingBox(new(-7, -8, -9), new(7, 8, 9));
+        var key = new VfxInteractivePrewarmKey(History(0), History(.717f), 2, null);
+        using var preparation = VfxInteractivePrewarm.AfterPlayback(plan, cachedBounds, false);
+        var prepared = await Take(preparation, key);
+        Assert.That(prepared.Bounds, Is.EqualTo(cachedBounds), "An inherited playback must reuse its published bounds instead of estimating them a second time.");
+        var reference = new TotalWarVfxSimulation(plan);
+        var camera = new CommonShaderParameters(Matrix.Identity, Matrix.Identity, new(0, 0, 10), Vector3.Zero, 0, 0, 0, 1, Vector3.One, []);
+        foreach (var time in new[] { .717f, .137f, 1.137f })
+        {
+            reference.SeekWithCurrentAttachment(time, History(time), History);
+            prepared.Simulation.SeekWithCurrentAttachment(time, History(time), History);
+            Assert.That(prepared.Simulation.ProjectedFrame(camera, false), Is.EqualTo(reference.ProjectedFrame(camera, false)));
+            Assert.That(ParticleRecords(prepared.Simulation), Is.EqualTo(ParticleRecords(reference)));
+            Assert.That(RandomRecords(prepared.Simulation), Is.EqualTo(RandomRecords(reference)));
         }
         await preparation.StopAsync();
     }

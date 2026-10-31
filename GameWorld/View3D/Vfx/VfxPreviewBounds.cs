@@ -25,23 +25,25 @@ internal static class VfxPreviewBounds
                     .Skip(frame * model.Vertices.Length).Take(model.Vertices.Length).Select(vertex => vertex.Position));
             }).ToArray();
         }).ToArray();
+        var projected = new List<VfxPreviewParticle>();
         BoundingBox? colour = null, ground = null, fallback = null;
         foreach (var time in new[] { 0f, 1f/120, 1f/60, .033f, .05f, .1f, .2f, .35f, .5f, .75f, 1f, 1.5f, 2f, 3f, 4f, 6f, 8f }.Where(t => t <= end))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (cancellationToken.CanBeCanceled) simulation.SeekForPreparation(time, Matrix.Identity, cancellationToken);
             else simulation.Seek(time, Matrix.Identity);
-            var bounds = Current(conversion, simulation, models);
+            simulation.FillProjectedFrame(Camera, projected, applyCameraCulling: false);
+            var bounds = Current(conversion, projected, models);
             Merge(ref colour, bounds.Colour); Merge(ref ground, bounds.Ground); Merge(ref fallback, bounds.All);
         }
         return colour ?? ground ?? fallback;
     }
 
     private static (BoundingBox? Colour, BoundingBox? Ground, BoundingBox? All) Current(
-        VfxConversion conversion, TotalWarVfxSimulation simulation, BoundingBox[][] models)
+        VfxConversion conversion, IReadOnlyList<VfxPreviewParticle> particles, BoundingBox[][] models)
     {
         BoundingBox? colour = null, ground = null, fallback = null;
-        foreach (var projected in simulation.ProjectedFrame(Camera, applyCameraCulling: false))
+        foreach (var projected in particles)
         {
             var particle = projected.Render;
             var emitter = conversion.Emitters[particle.Layer];

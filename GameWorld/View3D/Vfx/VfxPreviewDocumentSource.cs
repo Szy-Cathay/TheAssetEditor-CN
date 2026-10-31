@@ -37,6 +37,37 @@ public sealed class VfxPreviewDocumentStore
             return snapshot?.GameBytes ?? throw new InvalidDataException("A referenced VFX has invalid unsaved values.");
         return file.DataSource.ReadData();
     }
+    public Func<byte[]> CaptureResourceRead(PackFile file)
+    {
+        if (TryGet(file, out var snapshot))
+        {
+            var bytes = snapshot?.GameBytes ?? throw new InvalidDataException("A referenced VFX has invalid unsaved values.");
+            return () => bytes;
+        }
+        return CaptureDataSourceRead(file.DataSource);
+    }
+    public static Func<byte[]> CaptureDataSourceRead(IDataSource source)
+    {
+        // Unknown implementations may own editor state. Their reads must remain on the caller.
+        if (source.GetType() == typeof(PackedFileSource))
+        {
+            var packed = (PackedFileSource)source;
+            var captured = packed with { };
+            var path = packed.Parent.FilePath;
+            return () =>
+            {
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                return captured.ReadData(stream);
+            };
+        }
+        if (source.GetType() == typeof(FileSystemSource))
+        {
+            var path = ((FileSystemSource)source).FilePath;
+            return () => File.ReadAllBytes(path);
+        }
+        var bytes = source.ReadData();
+        return () => bytes;
+    }
     public void Remove(object owner)
     {
         object? file = null;
@@ -67,22 +98,34 @@ public sealed class VfxPreviewDocumentSource : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         lock (_gate) { _dependencies.Clear(); _dependencies.Add(_file); }
-        if (_live.TryGet(_file, out var snapshot)) return snapshot == null ? null : snapshot with { Resolve = Resolve, Quality = quality };
-        return new(_file.DataSource.ReadData(), Path, Resolve, quality);
-    }
-    private byte[]? Resolve(string path)
-    {
-        if (_files.GetPackFileContainer(_file) == null && _files.FindFile(path) is { } globalFile)
-            return ReadResource(globalFile);
-        var containers = new[] { _files.GetPackFileContainer(_file), _files.GetEditablePack() }
-            .Concat(_files.GetAllPackfileContainers().AsEnumerable().Reverse()).Where(x => x != null).Distinct();
-        foreach (var container in containers)
+        PackFileContainer? owner = null;
+        PackFileContainer?[]? containers = null;
+        PackFile? Find(string path)
         {
-            var file = _files.FindFile(path, container!);
-            if (file == null) continue;
-            return ReadResource(file);
+            if (containers == null)
+            {
+                owner = _files.GetPackFileContainer(_file);
+                containers = new[] { owner, _files.GetEditablePack() }
+                    .Concat(_files.GetAllPackfileContainers().AsEnumerable().Reverse()).Where(x => x != null).Distinct().ToArray();
+            }
+            if (owner == null && _files.FindFile(path) is { } globalFile) return globalFile;
+            foreach (var container in containers)
+            {
+                var file = _files.FindFile(path, container!);
+                if (file != null) return file;
+            }
+            return null;
         }
-        return null;
+        byte[]? Resolve(string path) => Find(path) is { } file ? ReadResource(file) : null;
+        Func<byte[]?>? CaptureRead(string path)
+        {
+            if (Find(path) is not { } file) return null;
+            lock (_gate) _dependencies.Add(file);
+            return _live.CaptureResourceRead(file);
+        }
+        if (_live.TryGet(_file, out var snapshot)) return snapshot == null ? null
+            : snapshot with { Resolve = Resolve, Quality = quality, CaptureResourceRead = CaptureRead };
+        return new(_file.DataSource.ReadData(), Path, Resolve, quality) { CaptureResourceRead = CaptureRead };
     }
     private byte[] ReadResource(PackFile file)
     {

@@ -8,6 +8,7 @@ public sealed class VfxAttachmentHistory
     private readonly List<(float Time, Matrix Matrix)> _samples = [];
     public float EndTime => _samples.Count == 0 ? 0 : _samples[^1].Time;
     public int Count => _samples.Count;
+    public bool IsConstant => _samples.Count <= 1 || _samples.All(sample => sample.Matrix == _samples[0].Matrix);
     public void Reset(Matrix matrix)
     {
         _samples.Clear();

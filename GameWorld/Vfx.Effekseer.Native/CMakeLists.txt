@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.21)
 set(CMAKE_C_FLAGS_DEBUG "/Z7 /Ob0 /Od /RTC1" CACHE STRING "Debug C flags" FORCE)
 set(CMAKE_CXX_FLAGS_DEBUG "/Z7 /Ob0 /Od /RTC1" CACHE STRING "Debug C++ flags" FORCE)
 project(AssetEditorCNEffekseer LANGUAGES C CXX)
+option(AECN_VFX_NATIVE_TIMINGS "Compile native profiling scopes for an isolated diagnostic artifact" OFF)
+set(AECN_VFX_DIAGNOSTIC_OUTPUT_DIRECTORY "" CACHE PATH "Explicit artifact directory for timing-enabled native binaries")
 set(CMAKE_C_FLAGS_DEBUG "/Z7 /Ob0 /Od /RTC1" CACHE STRING "Debug C flags" FORCE)
 set(CMAKE_CXX_FLAGS_DEBUG "/Z7 /Ob0 /Od /RTC1" CACHE STRING "Debug C++ flags" FORCE)
 
@@ -63,13 +65,15 @@ set(material_headers
     "${CMAKE_CURRENT_SOURCE_DIR}/RigidBasicDitherMaterial.h")
 # Localized MSVC include output must not leave the generator or embedded shaders stale.
 set_source_files_properties(CompileMaterials.cpp PROPERTIES OBJECT_DEPENDS "${material_headers}")
-set_source_files_properties(Bridge.cpp PROPERTIES OBJECT_DEPENDS
-    "${compiled_materials};${compiled_scene_shaders};${CMAKE_CURRENT_SOURCE_DIR}/Bridge.h;${CMAKE_CURRENT_SOURCE_DIR}/FloatSceneTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/WeightedDistortionTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/SpriteUploadCache.h;${CMAKE_CURRENT_SOURCE_DIR}/BulkSpriteQueue.h;${CMAKE_CURRENT_SOURCE_DIR}/HalfResolutionScene.h")
 add_custom_command(OUTPUT "${compiled_materials}"
     COMMAND $<TARGET_FILE:AecnVfxMaterialCompiler> "${compiled_materials}"
     DEPENDS AecnVfxMaterialCompiler ${material_headers}
     VERBATIM)
-add_library(AssetEditor.CN.Effekseer SHARED Bridge.cpp "${compiled_materials}" "${compiled_scene_shaders}")
+add_custom_target(AecnVfxCompiledResources DEPENDS "${compiled_materials}" "${compiled_scene_shaders}")
+add_subdirectory(Runtime)
+add_dependencies(AssetEditor.CN.Effekseer AecnVfxCompiledResources)
+set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/Bridge.cpp" TARGET_DIRECTORY AssetEditor.CN.Effekseer PROPERTIES OBJECT_DEPENDS
+    "${compiled_materials};${compiled_scene_shaders};${CMAKE_CURRENT_SOURCE_DIR}/Bridge.h;${CMAKE_CURRENT_SOURCE_DIR}/FloatSceneTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/WeightedDistortionTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/SpriteUploadCache.h;${CMAKE_CURRENT_SOURCE_DIR}/BulkSpriteQueue.h;${CMAKE_CURRENT_SOURCE_DIR}/VfxRenderTiming.h;${CMAKE_CURRENT_SOURCE_DIR}/HalfResolutionScene.h")
 target_include_directories(AssetEditor.CN.Effekseer PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}"
     "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/Effekseer"
@@ -77,9 +81,26 @@ target_include_directories(AssetEditor.CN.Effekseer PRIVATE
     "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/EffekseerRendererDX11/EffekseerRenderer"
     "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/EffekseerRendererCommon")
 target_link_libraries(AssetEditor.CN.Effekseer PRIVATE EffekseerRendererDX11 d3d11 d3dcompiler)
-set_target_properties(AssetEditor.CN.Effekseer PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
+set(aecn_runtime_output "${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}")
+if(AECN_VFX_NATIVE_TIMINGS)
+    if(NOT AECN_VFX_DIAGNOSTIC_OUTPUT_DIRECTORY)
+        message(FATAL_ERROR "Timing-enabled builds require an explicit artifact output directory")
+    endif()
+    get_filename_component(aecn_artifacts "${CMAKE_CURRENT_SOURCE_DIR}/../../artifacts" ABSOLUTE)
+    get_filename_component(aecn_diagnostic_output "${AECN_VFX_DIAGNOSTIC_OUTPUT_DIRECTORY}" ABSOLUTE)
+    file(TO_CMAKE_PATH "${aecn_artifacts}/" aecn_artifacts_prefix)
+    file(TO_CMAKE_PATH "${aecn_diagnostic_output}/" aecn_diagnostic_prefix)
+    string(TOLOWER "${aecn_artifacts_prefix}" aecn_artifacts_prefix)
+    string(TOLOWER "${aecn_diagnostic_prefix}" aecn_diagnostic_prefix)
+    string(FIND "${aecn_diagnostic_prefix}" "${aecn_artifacts_prefix}" aecn_prefix_position)
+    if(NOT aecn_prefix_position EQUAL 0)
+        message(FATAL_ERROR "Timing-enabled output must remain in this repository's artifacts")
+    endif()
+    set(aecn_runtime_output "${aecn_diagnostic_output}")
+    target_compile_definitions(AssetEditor.CN.Effekseer PRIVATE AECN_VFX_NATIVE_TIMINGS=1)
+endif()
+set_target_properties(AssetEditor.CN.Effekseer PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${aecn_runtime_output}")
 configure_file("${EFFEKSEER_SOURCE_DIR}/LICENSE_RUNTIME_DIRECTX"
-    "${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}/Effekseer.LICENSE.txt" COPYONLY)
+    "${aecn_runtime_output}/Effekseer.LICENSE.txt" COPYONLY)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/Effekseer.stb.LICENSE.txt"
-    "${CMAKE_CURRENT_SOURCE_DIR}/bin/${CMAKE_BUILD_TYPE}/Effekseer.stb.LICENSE.txt" COPYONLY)
+    "${aecn_runtime_output}/Effekseer.stb.LICENSE.txt" COPYONLY)

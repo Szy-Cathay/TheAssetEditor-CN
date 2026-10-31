@@ -1,9 +1,10 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Xml.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Xna.Framework;
+using GameWorld.Core.Vfx;
 using Shared.GameFormats.Vfx;
 using Shared.Ui.BaseDialogs.ColourPickerButton;
 
@@ -12,6 +13,11 @@ namespace Editors.VfxEditor;
 public sealed class VfxFieldViewModel : ObservableObject
 {
     private readonly VfxEditorViewModel _editor;
+    private bool _lastHasErrors;
+    private bool _hasPreviewFeedback;
+    private readonly string _guidanceCategory;
+    private IReadOnlyList<string> _previewReasons = [];
+    private VfxPreviewFieldState _previewState;
     public VfxField Model { get; }
     public string Label { get; }
     public string Description { get; }
@@ -20,10 +26,16 @@ public sealed class VfxFieldViewModel : ObservableObject
     public string RelatedHint { get; }
     public bool HasRelatedHint => RelatedHint.Length > 0;
     public bool HasGuidance { get; }
-    public bool IsCommon => HasGuidance && VfxFieldGuidance.CommonOrder(Model.Name) != int.MaxValue;
+    public bool IsCommon => (!_hasPreviewFeedback || IsPreviewRead) && HasGuidance && VfxFieldGuidance.CommonOrder(Model.Name) != int.MaxValue;
+    public string PreviewKey { get; }
+    public VfxPreviewFieldState PreviewState => _previewState;
+    public bool IsPreviewRead => _previewState is VfxPreviewFieldState.Connected or VfxPreviewFieldState.PendingConfirmation;
+    public string PreviewStateText => _editor.Localization.Get("Vfx.Field.State." + _previewState);
+    public string PreviewStateHint => string.Join("\n", new[] { _editor.Localization.Get("Vfx.Field.StateHint") }
+        .Concat(_previewReasons.Select(reason => _editor.Localization.Get(reason))));
     public string SearchText => $"{Label} {Model.Name} {Description} {AdjustmentHint} {RelatedHint} {Model.Context} {_editor.Localization.GetOrDefault("Vfx.Search." + Model.Name, "")}";
     public string GestureHint => _editor.Localization.GetOrDefault("Vfx.Gesture." + Model.Name, _editor.Localization.Get("Vfx.Gesture.Generic"));
-    public string Category { get; }
+    public string Category => _hasPreviewFeedback && !IsPreviewRead ? "Advanced" : _guidanceCategory;
     public string Context { get; }
     public string Summary => Curve != null ? _editor.Localization.GetFormat("Vfx.Curve.Summary", Curve.Channels.Count)
         : IsOpaque ? _editor.Localization.Get("Vfx.Preserved")
@@ -59,6 +71,7 @@ public sealed class VfxFieldViewModel : ObservableObject
     public VfxFieldViewModel(VfxField model, VfxEditorViewModel editor)
     {
         Model = model;
+        PreviewKey = VfxPreviewFieldIdentity.GetKey(model);
         _editor = editor;
         BrowseCommand = new RelayCommand(() =>
         {
@@ -73,7 +86,7 @@ public sealed class VfxFieldViewModel : ObservableObject
         }, () => CanBrowse);
         var loc = editor.Localization;
         Label = loc.GetOrDefault("Vfx.Field." + model.Name, loc.GetFormat("Vfx.UnknownField", model.Name));
-        Category = loc.GetOrDefault("Vfx.Group." + model.Name, "Advanced");
+        _guidanceCategory = loc.GetOrDefault("Vfx.Group." + model.Name, "Advanced");
         HasGuidance = loc.GetOrDefault("Vfx.Help." + model.Name, "").Length > 0;
         Description = loc.GetOrDefault("Vfx.Help." + model.Name, loc.Get("Vfx.Help.Unknown"));
         AdjustmentHint = loc.GetOrDefault("Vfx.Tune." + model.Name, loc.Get("Vfx.Tune.Unknown"));
@@ -133,13 +146,33 @@ public sealed class VfxFieldViewModel : ObservableObject
                     && model.Attributes.All(x => x.Name.LocalName is "x" or "y" or "z" or "w");
             BuildTintColour();
         }
+        _lastHasErrors = HasErrors;
     }
 
     private void WriteAttribute(XAttribute attribute, string value)
     {
         var before = attribute.Value;
         if (before == value) return;
-        _editor.Apply(() => attribute.Value = value, () => attribute.Value = before);
+        _editor.Apply(() => attribute.Value = value, () => attribute.Value = before, this);
+    }
+
+    internal bool SetPreviewFeedback(VfxPreviewEditorFieldInfo? feedback, bool available)
+    {
+        var state = feedback?.State ?? VfxPreviewFieldState.Unknown;
+        var reasons = feedback?.ReasonKeys ?? [];
+        if (_hasPreviewFeedback == available && _previewState == state && _previewReasons.SequenceEqual(reasons)) return false;
+        var wasCommon = IsCommon;
+        var category = Category;
+        _hasPreviewFeedback = available;
+        _previewState = state;
+        _previewReasons = reasons;
+        OnPropertyChanged(nameof(PreviewState));
+        OnPropertyChanged(nameof(PreviewStateText));
+        OnPropertyChanged(nameof(PreviewStateHint));
+        OnPropertyChanged(nameof(IsPreviewRead));
+        if (wasCommon != IsCommon) OnPropertyChanged(nameof(IsCommon));
+        if (category != Category) OnPropertyChanged(nameof(Category));
+        return wasCommon != IsCommon || category != Category;
     }
 
     internal void Changed()
@@ -149,7 +182,13 @@ public sealed class VfxFieldViewModel : ObservableObject
         OnPropertyChanged(nameof(Error));
         OnPropertyChanged(nameof(HasErrors));
         foreach (var colour in Colours) colour.Refresh();
-        _editor.Changed();
+        _editor.RefreshLayerStatus(this);
+        var hasErrors = HasErrors;
+        if (_lastHasErrors == hasErrors) return;
+        _lastHasErrors = hasErrors;
+        _editor.RefreshValidation(this, hasErrors);
+        // Apply already notified source changes; text-only error recovery still needs editor validation.
+        if (_editor.HasErrors != _editor.LastNotifiedHasErrors) _editor.Changed();
     }
 
     private void BuildTintColour()
@@ -165,7 +204,7 @@ public sealed class VfxFieldViewModel : ObservableObject
                 var before = rgb.Select(x => x.Value).ToArray();
                 var after = new[] { colour.X, colour.Y, colour.Z }.Select(x => x.ToString("G9", CultureInfo.InvariantCulture)).ToArray();
                 if (before.SequenceEqual(after)) return;
-                _editor.Apply(() => Set(after), () => Set(before));
+                _editor.Apply(() => Set(after), () => Set(before), this);
                 for (var i = 0; i < 3; i++) Values[i].Refresh(rgb[i].Value);
                 Changed();
 
@@ -190,7 +229,7 @@ public sealed class VfxFieldViewModel : ObservableObject
                     var beforeText = Model.Element.Value;
                     Set(after);
                     var afterText = curve.ToString();
-                    _editor.Apply(() => Model.Element.Value = afterText, () => Model.Element.Value = beforeText);
+                    _editor.Apply(() => Model.Element.Value = afterText, () => Model.Element.Value = beforeText, this);
                     Curve!.Refresh();
                     Changed();
 
@@ -252,7 +291,11 @@ public sealed class VfxValueViewModel : ObservableObject, IDataErrorInfo
             _changed();
         }
     }
-    public double Number => VfxCurve.TryNumber(Text, out var value) ? value : 0;
+    public double Number
+    {
+        get => VfxCurve.TryNumber(Text, out var value) ? value : 0;
+        set { if (value != Number) SetNumber(value); }
+    }
     public bool Boolean { get => bool.TryParse(Text, out var result) && result; set => Text = value ? "true" : "false"; }
 
     public VfxValueViewModel(string label, string value, bool number, bool integer, Action<string> write,
@@ -369,7 +412,7 @@ public sealed class VfxCurveViewModel : ObservableObject
         var beforeText = _field.Model.Element.Value;
         channel.MovePoint(index, time, value);
         var afterText = _curve.ToString();
-        _editor.Apply(() => _field.Model.Element.Value = afterText, () => _field.Model.Element.Value = beforeText);
+        _editor.Apply(() => _field.Model.Element.Value = afterText, () => _field.Model.Element.Value = beforeText, _field);
         Changed();
     }
 
