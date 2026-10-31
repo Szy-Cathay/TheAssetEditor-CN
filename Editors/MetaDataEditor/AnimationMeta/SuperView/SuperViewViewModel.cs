@@ -10,6 +10,7 @@ using Editors.Shared.Core.Common;
 using Editors.Shared.Core.Common.BaseControl;
 using Editors.Shared.Core.Common.ReferenceModel;
 using GameWorld.Core.SceneNodes;
+using GameWorld.Core.Vfx;
 using Microsoft.Xna.Framework;
 using Shared.Core.Events;
 using Shared.Core.Events.Scoped;
@@ -21,7 +22,6 @@ using Shared.GameFormats.AnimationMeta.Parsing;
 using Shared.GameFormats.Animation;
 using Shared.Core.PackFiles.Models;
 using GameWorld.Core.Animation;
-using GameWorld.Core.Vfx;
 using GameWorld.Core.WpfWindow;
 using Editors.AnimationMeta.SuperView.Visualisation.Instances;
 
@@ -40,7 +40,6 @@ namespace Editors.AnimationMeta.SuperView
         private readonly CombatMetaDataEditSession _combatEditSession;
         private readonly CombatMetaDataGizmoComponent _combatGizmo;
         private readonly MetaDataMarkerPickerComponent _markerPicker;
-        private readonly VfxPreviewDocumentStore? _vfxDocuments;
         private CombatMetaDataPoint _selectedSplashPoint =
             CombatMetaDataPoint.SplashStart;
         private CombatMetaDataTransformMode _selectedTransformMode =
@@ -392,11 +391,15 @@ namespace Editors.AnimationMeta.SuperView
             IMetaDataBuilder metaDataFactory,
             CombatMetaDataEditSession combatEditSession,
             CombatMetaDataGizmoComponent combatGizmo,
-            MetaDataMarkerPickerComponent markerPicker,
-            VfxPreviewDocumentStore? vfxDocuments = null)
+            MetaDataMarkerPickerComponent markerPicker)
             : base(editorHostParameters)
         {
-            if (GameWorld is D3D11Host host) host.SuspendWhenHidden = true;
+            if (GameWorld is D3D11Host host)
+            {
+                host.SuspendWhenHidden = true;
+                host.UseAsynchronousPresentation = true;
+                host.RenderingPreparation = VfxRuntimePreparation.PrepareAsync(GetType());
+            }
             EditorContentVerticalScrollBarVisibility =
                 ScrollBarVisibility.Auto;
             LeftColumnWidth = new System.Windows.GridLength(3, System.Windows.GridUnitType.Star);
@@ -408,11 +411,10 @@ namespace Editors.AnimationMeta.SuperView
             _sceneObjectBuilder = sceneObjectBuilder;
             _metaDataFileParser = metaDataFileParser;
             _metaDataFactory = metaDataFactory;
+            _metaDataFactory.EnableInteractiveVfxPreview = true;
             _combatEditSession = combatEditSession;
             _combatGizmo = combatGizmo;
             _markerPicker = markerPicker;
-            _vfxDocuments = vfxDocuments;
-            if (_vfxDocuments != null) _vfxDocuments.Changed += OnLiveVfxChanged;
             MetaDataTimeline = new MetaDataTimelineViewModel(
                 SelectMetaDataInspectionItem);
             MetaDataProblems = new MetaDataProblemListViewModel(
@@ -638,6 +640,16 @@ namespace Editors.AnimationMeta.SuperView
             if (!TryGetDocumentOwner(attribute, out var owner))
                 return false;
 
+            var currentIndex = _asset.Data.MetaDataItems.FindIndex(item =>
+                item is IMetaDataPreview preview &&
+                ReferenceEquals(preview.Source, attribute));
+            if (currentIndex >= 0 && _asset.Data.MetaDataItems[currentIndex] is EffectMetaInstance existingEffect
+                && existingEffect.TryRefreshTransform())
+            {
+                RebuildMetaDataInspectionIndex();
+                return true;
+            }
+
             var buildResult = _metaDataFactory.BuildPreview(
                 attribute,
                 owner,
@@ -650,9 +662,6 @@ namespace Editors.AnimationMeta.SuperView
 
             var replacement = buildResult.Instance;
 
-            var currentIndex = _asset.Data.MetaDataItems.FindIndex(item =>
-                item is IMetaDataPreview preview &&
-                ReferenceEquals(preview.Source, attribute));
             if (currentIndex >= 0)
             {
                 _asset.Data.MetaDataItems[currentIndex].CleanUp();
@@ -680,14 +689,6 @@ namespace Editors.AnimationMeta.SuperView
             OnPropertyChanged(nameof(CanFocusSelectedMetaData));
             OnPropertyChanged(nameof(CanConfigureSelectedMetaDataDisplayTime));
             return true;
-        }
-
-        private void OnLiveVfxChanged(object file)
-        {
-            if (_asset?.Data == null) return;
-            var affected = _asset.Data.MetaDataItems.OfType<EffectMetaInstance>()
-                .Where(effect => effect.DependsOn(file)).Select(effect => effect.Source).ToArray();
-            foreach (var source in affected) RefreshMetaDataPreview(source);
         }
 
         private void OnVfxDiagnosticsChanged(EffectMetaInstance effect)
@@ -1291,7 +1292,6 @@ namespace Editors.AnimationMeta.SuperView
 
         public override void Close()
         {
-            if (_vfxDocuments != null) _vfxDocuments.Changed -= OnLiveVfxChanged;
             _markerPicker.Disconnect();
             _asset.FragAndSlotSelection.PropertyChanged -=
                 OnFragmentSelectionPropertyChanged;

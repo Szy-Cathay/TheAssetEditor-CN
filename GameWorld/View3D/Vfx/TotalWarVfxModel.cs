@@ -1,4 +1,4 @@
-using Microsoft.Xna.Framework;
+﻿using Microsoft.Xna.Framework;
 using Shared.GameFormats.Vfx;
 
 namespace GameWorld.Core.Vfx;
@@ -17,7 +17,7 @@ internal readonly record struct VfxRange(float Min, float Max)
 // Authored channels remain separate: a particle retains its random interpolation weight for its entire life.
 internal sealed class VfxPreviewCurve
 {
-    private readonly IReadOnlyList<SampleChannel> _channels;
+    private readonly SampleChannel[] _channels;
     private readonly Dictionary<string, (SampleChannel Min, SampleChannel Max)> _bindings = new(StringComparer.Ordinal);
     private readonly float _fallback;
     private readonly string _field;
@@ -69,12 +69,16 @@ internal sealed class VfxPreviewCurve
             return new SampleChannel(channel.Name, points);
         }).ToArray();
         _omittedScaleAxes = (field is "ParticleScale" or "ParticleInitialScale")
-            && _channels.Count > 0 && _channels.All(channel => channel.Name is "x" or "x_min" or "x_max");
+            && _channels.Length > 0 && _channels.All(channel => channel.Name is "x" or "x_min" or "x_max");
         foreach (var axis in _channels.Select(channel => channel.Name.EndsWith("_min", StringComparison.Ordinal)
             || channel.Name.EndsWith("_max", StringComparison.Ordinal) ? channel.Name[..^4] : channel.Name).Distinct(StringComparer.Ordinal))
         {
             var min = _channels.FirstOrDefault(channel => channel.Name == axis + "_min" || channel.Name == axis);
-            if (min != null) _bindings.Add(axis, (min, _channels.FirstOrDefault(channel => channel.Name == axis + "_max") ?? min));
+            if (min != null)
+            {
+                var max = _channels.FirstOrDefault(channel => channel.Name == axis + "_max") ?? min;
+                _bindings.Add(axis, (min, ExactChannel(min, max) ? min : max));
+            }
         }
         bool Single(string axis) => _bindings.TryGetValue(axis, out var binding)
             && binding.Min.SingleValue is { } min && binding.Max.SingleValue is { } max
@@ -89,7 +93,7 @@ internal sealed class VfxPreviewCurve
     {
         range = default;
         if (_nativeScale != null) return false;
-        if (_channels.Count == 0 || _omittedScaleAxes && axis is "y" or "z")
+        if (_channels.Length == 0 || _omittedScaleAxes && axis is "y" or "z")
         {
             range = new(_fallback, _fallback);
             return true;
@@ -97,7 +101,7 @@ internal sealed class VfxPreviewCurve
         if (!_bindings.TryGetValue(axis, out var binding)) return false;
         static bool Constant(SampleChannel channel)
         {
-            for (var index = 1; index < channel.Points.Count; ++index)
+            for (var index = 1; index < channel.Points.Length; ++index)
                 if (channel.Points[index].Value != channel.Points[0].Value) return false;
             return true;
         }
@@ -105,9 +109,9 @@ internal sealed class VfxPreviewCurve
         range = new((float)binding.Min.Points[0].Value, (float)binding.Max.Points[0].Value);
         return true;
     }
-    public bool IsZero => _channels.Count == 0 ? _fallback == 0 : _channels.All(x => x.Points.All(p => p.Value == 0));
-    public float Maximum => _channels.Count == 0 ? _fallback : (float)_channels.Max(x => x.Points.Max(p => p.Value));
-    public float Minimum => _channels.Count == 0 ? _fallback : (float)_channels.Min(x => x.Points.Min(p => p.Value));
+    public bool IsZero => _channels.Length == 0 ? _fallback == 0 : _channels.All(x => x.Points.All(p => p.Value == 0));
+    public float Maximum => _channels.Length == 0 ? _fallback : (float)_channels.Max(x => x.Points.Max(p => p.Value));
+    public float Minimum => _channels.Length == 0 ? _fallback : (float)_channels.Min(x => x.Points.Min(p => p.Value));
     public bool HasAnalyticSegments => _channels.Any(x => x.Points.Zip(x.Points.Skip(1)).Any(pair =>
         IsAnalyticMode(pair.First.OutMode) && IsAnalyticMode(pair.Second.InMode)
         && (pair.First.OutMode != "linear" || pair.Second.InMode != "linear")));
@@ -127,7 +131,7 @@ internal sealed class VfxPreviewCurve
     }
     public void RequireChannels(params string[] names)
     {
-        if (_channels.Count == 0) return;
+        if (_channels.Length == 0) return;
         foreach (var name in names)
             if (!_channels.Any(x => x.Name == name || x.Name == name + "_min") && !(_omittedScaleAxes && name is "y" or "z"))
                 throw new VfxMappingException(_field, "Vfx.Preview.InvalidData");
@@ -136,7 +140,7 @@ internal sealed class VfxPreviewCurve
     public VfxRange Range(string axis, double time)
     {
         if (_nativeScale != null) return _nativeScale.Range(axis, time);
-        if (_channels.Count == 0) return new(_fallback, _fallback);
+        if (_channels.Length == 0) return new(_fallback, _fallback);
         if (!_bindings.TryGetValue(axis, out var binding))
         {
             if (_omittedScaleAxes && axis is "y" or "z") return new(_fallback, _fallback);
@@ -155,7 +159,7 @@ internal sealed class VfxPreviewCurve
     {
         var points = channel.Points;
         if (time <= points[0].Time) return (float)points[0].Value;
-        for (var index = 1; index < points.Count; ++index)
+        for (var index = 1; index < points.Length; ++index)
         {
             var right = points[index];
             if (time > right.Time) continue;
@@ -203,12 +207,30 @@ internal sealed class VfxPreviewCurve
         return Bezier(left.Value, y1, y2, right.Value, (low + high) * 0.5);
     }
 
-    private sealed record SampleChannel(string Name, IReadOnlyList<SamplePoint> Points)
+    private sealed record SampleChannel(string Name, SamplePoint[] Points)
     {
-        public float? SingleValue { get; } = Points.Count == 1 ? (float)Points[0].Value : null;
+        public float? SingleValue { get; } = Points.Length == 1 ? (float)Points[0].Value : null;
     }
     private readonly record struct SamplePoint(double Time, double Value, string InMode, string OutMode,
         (double Time, double Value) Incoming, (double Time, double Value) Outgoing, bool HasHandles);
+
+    private static bool ExactChannel(SampleChannel lower, SampleChannel upper)
+    {
+        if (ReferenceEquals(lower, upper)) return true;
+        if (lower.Points.Length != upper.Points.Length) return false;
+        static bool Bits(double left, double right) => BitConverter.DoubleToInt64Bits(left) == BitConverter.DoubleToInt64Bits(right);
+        for (var index = 0; index < lower.Points.Length; index++)
+        {
+            var left = lower.Points[index]; var right = upper.Points[index];
+            if (!Bits(left.Time, right.Time) || !Bits(left.Value, right.Value)
+                || !string.Equals(left.InMode, right.InMode, StringComparison.Ordinal)
+                || !string.Equals(left.OutMode, right.OutMode, StringComparison.Ordinal)
+                || !Bits(left.Incoming.Time, right.Incoming.Time) || !Bits(left.Incoming.Value, right.Incoming.Value)
+                || !Bits(left.Outgoing.Time, right.Outgoing.Time) || !Bits(left.Outgoing.Value, right.Outgoing.Value)
+                || left.HasHandles != right.HasHandles) return false;
+        }
+        return true;
+    }
 
     private static double Bezier(double p0, double p1, double p2, double p3, double t)
     {
@@ -260,7 +282,10 @@ internal sealed record VfxPreviewReference(VfxRange Scale, Vector3 Position, Vec
     public object InstanceKey { get; init; } = new();
 }
 
-internal readonly record struct VfxPreviewParticle(EffekseerParticle Render, int ModelVariant);
+internal readonly record struct VfxPreviewParticle(EffekseerParticle Render, int ModelVariant)
+{
+    public bool RequiresGroundDepth { get; init; }
+}
 
 internal sealed record VfxPreviewParticleEvent(string Path, bool OnDeath, float Delay, bool TrackPosition,
     bool TrackScale, bool TrackColour, bool TrackAlpha, bool TrackLifetime, string Orientation)
@@ -272,10 +297,15 @@ internal sealed record VfxPreviewParticleEvent(string Path, bool OnDeath, float 
 internal sealed class VfxPreviewEmitter
 {
     public required string Name { get; init; }
-    public required EffekseerLayer Render { get; set; }
+    public string PreviewRootKind { get; set; } = "";
+    public string PreviewRootName { get; set; } = "";
+    public int PreviewRootOccurrence { get; set; }
+    private EffekseerLayer _render;
+    public required EffekseerLayer Render { get => _render; set => _render = value; }
     public required VfxPreviewCurve Emission { get; init; }
     public required VfxPreviewCurve Life { get; init; }
     public required VfxPreviewCurve Scale { get; init; }
+    public VfxModelNativeScale? ModelScaleTable { get; init; }
     public required VfxPreviewCurve InitialScale { get; init; }
     public required VfxPreviewCurve InitialAlpha { get; init; }
     public VfxSpriteNativeScaleCurve? SpriteScaleTable { get; init; }
@@ -305,6 +335,8 @@ internal sealed class VfxPreviewEmitter
     public float CalibratedVerticalAcceleration { get; init; }
     public float? ConstantForceDamping { get; init; }
     public bool ParticleForceCurve { get; init; }
+    public bool ModelConstantForce { get; init; }
+    public bool DestroyOnExplicitStop { get; init; }
     public VfxRange Start { get; init; }
     public VfxRange Duration { get; init; } = new(1, 1);
     public bool HasExplicitDuration { get; init; }
@@ -338,6 +370,7 @@ internal sealed class VfxPreviewEmitter
     public bool RelativeOrientation { get; init; }
     public bool RequiresFlatTerrain { get; init; }
     public bool SpawnOnTerrain { get; init; }
+    public bool ModelTerrainBirth { get; init; }
     public int TerrainSpawnDirection { get; init; } = 2;
     public Vector4? ParticleCullDistances { get; init; }
     public VfxRange SpawnAngle { get; init; }
@@ -372,6 +405,6 @@ internal sealed class VfxPreviewEmitter
     public int RenderLayerCount => (IsEventHelper ? 0 : 1 + AdditionalModelParts.Count + ModelVariants.Sum(variant => variant.Count))
         * (PremultipliedAlpha && AdditiveMultiplier > 0 ? 2 : 1);
     public Vector2? MeshLoop { get; init; }
-    public int Kind => Render.Kind;
-    public float Distortion => Render.Distortion;
+    public int Kind => _render.Kind;
+    public float Distortion => _render.Distortion;
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Input;
@@ -166,12 +166,19 @@ namespace GameWorld.Core.WpfWindow
         /// </summary>
         /// <param name="time"></param>
         protected sealed override void Render(GameTime time)
+            => RenderFrame(time, draw: true);
+
+        protected sealed override bool SupportsFrameUpdatesWithoutDrawing => true;
+        protected sealed override void UpdateFrameWithoutDrawing(GameTime time)
+            => RenderFrame(time, draw: false);
+
+        private void RenderFrame(GameTime time, bool draw)
         {
             try
             {
                 // just run as fast as possible, WPF itself is limited to 60 FPS so that's the max we will get
                 Update(time);
-                Draw(time);
+                if (draw) Draw(time);
             }
 
             catch(Exception ex) 

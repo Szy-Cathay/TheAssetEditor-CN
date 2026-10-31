@@ -23,6 +23,7 @@ namespace GameWorld.Core.WpfWindow.Internals
         private static int _referenceCount;
 
         private Texture _backBuffer;
+        private SharedSurface? _registeredBackBuffer;
         private bool _disposed;
 
         /// <summary>
@@ -66,8 +67,59 @@ namespace GameWorld.Core.WpfWindow.Internals
         {
             ThrowIfDisposed();
 
-            if (_backBuffer != null)
+            if (_backBuffer != null || _registeredBackBuffer != null)
                 AddDirtyRect(new Int32Rect(0, 0, PixelWidth, PixelHeight));
+        }
+
+        internal sealed class SharedSurface : IDisposable
+        {
+            private readonly Texture _texture;
+            internal readonly Surface Surface;
+
+            internal SharedSurface(Texture texture)
+            {
+                _texture = texture;
+                Surface = texture.GetSurfaceLevel(0);
+            }
+
+            public void Dispose()
+            {
+                Surface.Dispose();
+                _texture.Dispose();
+            }
+        }
+
+        internal SharedSurface CreateSharedSurface(Texture2D texture)
+        {
+            ThrowIfDisposed();
+            return new SharedSurface(_d3D9.GetSharedTexture(texture));
+        }
+
+        internal bool TryLockForPresentation()
+        {
+            ThrowIfDisposed();
+            var acquired = TryLock(new Duration(TimeSpan.Zero));
+            // WPF increments its nesting count even when TryLock times out.
+            if (!acquired) Unlock();
+            return acquired;
+        }
+
+        // The caller owns both the surface lifetime and the image lock.
+        internal void SetRegisteredBackBuffer(SharedSurface? surface)
+        {
+            ThrowIfDisposed();
+            SetBackBuffer(D3DResourceType.IDirect3DSurface9, surface?.Surface.NativePointer ?? nint.Zero);
+            _registeredBackBuffer = surface;
+            _backBuffer?.Dispose();
+            _backBuffer = null;
+        }
+
+        internal bool TryDetachBackBuffer()
+        {
+            if (!TryLockForPresentation()) return false;
+            try { SetRegisteredBackBuffer(null); }
+            finally { Unlock(); }
+            return true;
         }
 
         /// <summary>
@@ -99,6 +151,8 @@ namespace GameWorld.Core.WpfWindow.Internals
                 SetBackBuffer(D3DResourceType.IDirect3DSurface9, nint.Zero);
                 Unlock();
             }
+
+            _registeredBackBuffer = null;
 
             if (previousBackBuffer != null)
                 previousBackBuffer.Dispose();

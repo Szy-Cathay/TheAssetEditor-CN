@@ -7,16 +7,34 @@ namespace GameWorld.Core.Vfx;
 // Local preview scope; null keeps the authored composition and empty lists select no roots.
 public sealed record VfxPreviewRootSelection(IReadOnlyList<string> EmitterIds, IReadOnlyList<string> ReferenceNames);
 public sealed record VfxPreviewSnapshot(byte[] GameBytes, string SourcePath, Func<string, byte[]?> Resolve, string Quality = "0",
-    VfxPreviewRootSelection? RootSelection = null);
+    VfxPreviewRootSelection? RootSelection = null)
+{
+    // Only the owner locates resources; the returned reader must contain no live Pack/editor access.
+    public Func<string, Func<byte[]?>?>? CaptureResourceRead { get; init; }
+}
 public sealed record VfxPreviewDiagnostic(string Source, string Layer, string Field, string ReasonKey);
-public sealed record VfxPreviewInspection(int EmitterCount, int TotalEmitterCount, int DisabledEmitterCount, IReadOnlyList<VfxPreviewDiagnostic> Diagnostics);
+public sealed record VfxInteractiveReloadFrame(float Time, Matrix Attachment, Func<float, Matrix>? History = null,
+    bool InitializeDuration = false, bool UseCurrentAttachmentForFrame = false, bool ContinuousTrail = false,
+    Func<float, float?>? NextAttachmentSample = null, float? EmissionEnd = null, float? GroundHeight = null)
+{
+    public VfxInteractiveReloadFrame(float time, Matrix attachment, Func<float, Matrix>? history,
+        bool initializeDuration, bool useCurrentAttachmentForFrame, bool continuousTrail,
+        Func<float, float?>? nextAttachmentSample, float? emissionEnd)
+        : this(time, attachment, history, initializeDuration, useCurrentAttachmentForFrame, continuousTrail,
+            nextAttachmentSample, emissionEnd, null) { }
+}
+public sealed record VfxPreviewInspection(int EmitterCount, int TotalEmitterCount, int DisabledEmitterCount, IReadOnlyList<VfxPreviewDiagnostic> Diagnostics)
+{
+    public VfxPreviewEditorInfo EditorInfo { get; init; } = VfxPreviewEditorInfo.Empty;
+}
 
 public static class VfxPreviewInspector
 {
     public static VfxPreviewInspection Inspect(VfxPreviewSnapshot snapshot)
     {
         var conversion = TotalWarVfxConverter.Convert(snapshot);
-        return new(conversion.Emitters.Count(e => !e.IsEventTemplate), conversion.TotalEmitterCount, conversion.DisabledEmitterCount, conversion.Diagnostics);
+        return new(conversion.Emitters.Count(e => !e.IsEventTemplate), conversion.TotalEmitterCount, conversion.DisabledEmitterCount, conversion.Diagnostics)
+        { EditorInfo = conversion.EditorInfo };
     }
 }
 
@@ -24,6 +42,7 @@ public static class VfxPreviewInspector
 public interface IVfxPreview : IDisposable
 {
     IReadOnlyList<VfxPreviewDiagnostic> Diagnostics { get; }
+    VfxPreviewEditorInfo EditorInfo => VfxPreviewEditorInfo.Empty;
     int EmitterCount { get; }
     int TotalEmitterCount { get; }
     int DisabledEmitterCount => 0;
@@ -33,7 +52,12 @@ public interface IVfxPreview : IDisposable
     bool HasMotionTrailEmitters => false;
     // Only interactive owners opt in; synchronous/offscreen callers retain the existing contract.
     void EnableInteractivePrewarm() { }
+    // Only a caller owning the complete history can certify an unchanged external attachment.
+    void ConfigureInteractiveSeekHistory(bool isConstant) { }
     bool IsPreparing => false;
+    bool IsSeekingFrame => false;
+    // Owners explicitly provide ground and certify history before private exact frame preparation.
+    void ConfigureInteractiveSeekFrame(bool isHistoryConstant, float? groundHeight, bool initializeDuration = false, bool allowForwardReplay = true) { }
     void PrepareInteractiveFrame(Matrix attachment, Func<float, Matrix>? attachmentAtTime) { }
     // Instance-local root emission boundary; particles and their event tails keep their authored lifetime.
     float? EmissionEndTimeSeconds { get => null; set { } }
@@ -41,6 +65,13 @@ public interface IVfxPreview : IDisposable
     BoundingBox? PreviewBounds => null;
     IVfxPreview? CreatePlaybackInstance() => null;
     void Reload(VfxPreviewSnapshot snapshot);
+    // Interactive hosts pump owner-thread reads and exact replay; synchronous callers retain Reload.
+    bool BeginInteractiveReload(VfxPreviewSnapshot snapshot) { Reload(snapshot); return true; }
+    bool ContinueInteractiveReload(VfxInteractiveReloadFrame frame) => true;
+    bool BeginInteractiveRestart() => true;
+    bool HasPendingInteractiveReload => false;
+    // Identification only filters subsequent draws; null restores the loaded preview scope.
+    void Identify(VfxPreviewLayerIdentity? layer) { }
     void Advance(float seconds, Matrix attachment);
     void Seek(float seconds, Matrix attachment);
     void Seek(float seconds, Matrix attachment, Func<float, Matrix> attachmentAtTime) => Seek(seconds, attachment);

@@ -8,6 +8,25 @@ namespace AssetEditorTests;
 public class VfxAttachmentCadenceTests
 {
     [TestMethod]
+    public void ConstantHistoryCertification_RejectsMotionAndPausedTeleports()
+    {
+        var history = new VfxAttachmentHistory();
+        Assert.IsTrue(history.IsConstant);
+        history.Reset(Matrix.Identity);
+        history.Record(.1f, Matrix.Identity);
+        history.Record(.2f, Matrix.Identity);
+        Assert.IsTrue(history.IsConstant);
+        history.Record(.2f, Matrix.CreateTranslation(1, 0, 0));
+        Assert.IsFalse(history.IsConstant);
+        history.Truncate(.1f);
+        Assert.IsTrue(history.IsConstant);
+        history.Record(.3f, Matrix.CreateRotationY(.1f));
+        Assert.IsFalse(history.IsConstant);
+        history.Reset(Matrix.CreateTranslation(2, 0, 0));
+        Assert.IsTrue(history.IsConstant);
+    }
+
+    [TestMethod]
     public void ReplayEndpoints_KeepTurnsAndSkipDuplicatePausedTimes()
     {
         var history = new VfxAttachmentHistory();

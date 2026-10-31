@@ -89,6 +89,8 @@ internal static class EffekseerNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern void AecnVfxDestroy(nint preview);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxDepthAvailable(EffekseerHandle preview);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxDrawCalls(EffekseerHandle preview);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxSetTimings(EffekseerHandle preview, int enabled);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxReadTimings(EffekseerHandle preview, [Out] double[] values, int count);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxBeginScene(EffekseerHandle preview, in EffekseerLighting lighting);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxEndScene(EffekseerHandle preview);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxEndScene(nint preview);
@@ -98,6 +100,7 @@ internal static class EffekseerNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxModel(EffekseerHandle preview, EffekseerVertex[] vertices, int vertexCount, int[] indices, int indexCount);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxModelFrames(EffekseerHandle preview, EffekseerVertex[] vertices, int vertexLength, int verticesPerFrame, int frameCount, int[] indices, int indexCount, float cycles);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxModelAlias(EffekseerHandle preview, int sourceIndex);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxPrepareModel(EffekseerHandle preview, int modelIndex);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxMeshMaterial(EffekseerHandle preview, int[] textures, int textureCount, float[] parameters, int parameterCount);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxConfigure(EffekseerHandle preview, [In] EffekseerLayer[] layers, int count);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxConfigureHalf(EffekseerHandle preview, [In] EffekseerHalfLayer[] layers, int count, int configBytes);

@@ -102,7 +102,7 @@ public class VfxEditorTests
             foreach (var theme in new[] { ThemeType.DarkTheme, ThemeType.LightTheme, ThemeType.HighContrastDark, ThemeType.HighContrastLight })
             {
                 ThemesController.SetTheme(theme);
-                var view = new VfxEditorView { DataContext = editor };
+                var view = ParameterView(editor);
                 view.Measure(new Size(1440, 900));
                 view.Arrange(new Rect(0, 0, 1440, 900));
                 view.UpdateLayout();
@@ -515,7 +515,7 @@ public class VfxEditorTests
         var color = Field(editor, "curve_colour").Colours.Single();
         color.Picker.OnHandleColourChanged();
         Assert.IsFalse(editor.HasUnsavedChanges, "Displaying an 8-bit swatch must not quantize source float values.");
-        Assert.AreEqual("VFX 可视化编辑器", editor.Localization.Get("Vfx.Title"));
+        Assert.AreEqual("特效编辑器", editor.Localization.Get("Vfx.Title"));
     });
 
     [TestMethod]
@@ -550,7 +550,7 @@ public class VfxEditorTests
     [TestMethod]
     public void KeyboardShortcuts_UndoRedoAndSaveUseTheDocumentCommandsWithoutSystemInput() => WithEditor((editor, context) =>
     {
-        var view = new VfxEditorView { DataContext = editor };
+        var view = ParameterView(editor);
         var original = Field(editor, "LifeTime").Values[0].Text;
         Field(editor, "LifeTime").Values[0].Text = "1.5";
         Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control));
@@ -575,7 +575,7 @@ public class VfxEditorTests
     [DataRow(Key.G, ModifierKeys.Control)]
     public void KeyboardShortcuts_UnsupportedCombinationsDoNotConsumeOrEdit(Key key, ModifierKeys modifiers) => WithEditor((editor, context) =>
     {
-        var view = new VfxEditorView { DataContext = editor };
+        var view = ParameterView(editor);
         Field(editor, "LifeTime").Values[0].Text = "1.5";
         Assert.IsFalse(Shortcut(view, key, modifiers));
         Assert.AreEqual("1.5", Field(editor, "LifeTime").Values[0].Text);
@@ -587,7 +587,7 @@ public class VfxEditorTests
     [TestMethod]
     public void KeyboardShortcuts_SupportedEmptyHistoryIsConsumedButMissingEditorIsNot() => WithEditor((editor, _) =>
     {
-        var view = new VfxEditorView { DataContext = editor };
+        var view = ParameterView(editor);
         Assert.IsFalse(editor.UndoCommand.CanExecute(null));
         Assert.IsTrue(Shortcut(view, Key.Z, ModifierKeys.Control));
         Assert.IsTrue(Shortcut(view, Key.Y, ModifierKeys.Control));
@@ -603,7 +603,7 @@ public class VfxEditorTests
         {
             var scene = CreateTestScene(true, out var interaction);
             var context = new Context(scenePreview: scene); var editor = context.Editor;
-            var view = new VfxEditorView { DataContext = editor };
+            var view = ParameterView(editor);
             try
             {
                 editor.PreviewAllCommand.Execute(null); RefreshScene(editor);
@@ -695,7 +695,7 @@ public class VfxEditorTests
         {
             var scene = CreateTestScene(true, out var interaction);
             var context = new Context(scenePreview: scene); var editor = context.Editor;
-            var view = new VfxEditorView { DataContext = editor };
+            var view = ParameterView(editor);
             try
             {
                 interaction!.Select();
@@ -804,7 +804,7 @@ public class VfxEditorTests
                 foreach (var theme in Enum.GetValues<ThemeType>())
                 {
                     ThemesController.SetTheme(theme);
-                    var view = new VfxEditorView { DataContext = editor };
+                    var view = ParameterView(editor);
                     view.Dispatcher.Invoke(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                     view.Measure(new Size(1140, 800));
                     view.Arrange(new Rect(0, 0, 1140, 800));
@@ -852,6 +852,9 @@ public class VfxEditorTests
         var workspace = (Grid)view.FindName("Workspace");
         var scene = (Grid)view.FindName("ScenePreviewPanel");
         var inspector = (TabControl)view.FindName("Inspector");
+        Assert.AreEqual(0, inspector.SelectedIndex);
+        CollectionAssert.AreEqual(new[] { "效果", "属性", editor.Localization.Get("Vfx.Preview.Diagnostics") },
+            inspector.Items.Cast<TabItem>().Select(item => item.Header.ToString()).ToArray());
         Assert.AreEqual(3, workspace.ColumnDefinitions.Count, "There must be no extra layer column beside the global file tree.");
         Assert.AreEqual(0, Grid.GetColumn(scene)); Assert.AreEqual(2, Grid.GetColumn(inspector));
         var toolbar = (WrapPanel)view.FindName("SceneToolbar");
@@ -866,12 +869,15 @@ public class VfxEditorTests
         var field = Field(editor, "curve_alpha");
         Assert.IsTrue(field.ToolTip.Contains(field.Description)); Assert.IsTrue(field.ToolTip.Contains(field.AdjustmentHint));
         Assert.IsTrue(field.ToolTip.Contains(field.Model.Name));
+        inspector.SelectedIndex = 1; view.UpdateLayout();
         var source = Descendants(view).OfType<ComboBox>().Single(x => ReferenceEquals(x.ItemsSource, editor.Layers));
         source.SelectedItem = editor.Layers.Single(x => x.Model.Kind == "Reference");
         Assert.AreSame(source.SelectedItem, editor.SelectedLayer);
-        inspector.SelectedIndex = 1; view.UpdateLayout();
+        inspector.SelectedIndex = 0; view.UpdateLayout();
         Assert.IsTrue(((Grid)view.FindName("LayerPanel")).ActualWidth >= 360);
-        Assert.AreSame(editor.Layers, ((ListBox)view.FindName("LayerList")).ItemsSource);
+        var grouped = (System.ComponentModel.ICollectionView)((ListBox)view.FindName("LayerList")).ItemsSource;
+        Assert.AreSame(editor.Layers, grouped.SourceCollection);
+        Assert.AreEqual(2, grouped.Groups!.Count, "Effects and document configuration must be visually distinct.");
         CollectionAssert.AreEqual(original, context.File.DataSource.ReadData());
         Assert.IsFalse(editor.HasUnsavedChanges); Assert.IsFalse(editor.UndoCommand.CanExecute(null));
         context.Save.Verify(x => x.Save(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<bool>()), Times.Never);
@@ -879,9 +885,45 @@ public class VfxEditorTests
     });
 
     [TestMethod]
+    public void EffectsPageRendersRealEffectsAndConfigurationAcrossThemesAndDpi() => WithEditor((editor, context) =>
+    {
+        var previous = ThemesController.CurrentTheme;
+        var original = context.File.DataSource.ReadData();
+        try
+        {
+            foreach (var theme in new[] { ThemeType.DarkTheme, ThemeType.LightTheme, ThemeType.HighContrastDark, ThemeType.HighContrastLight })
+            {
+                ThemesController.SetTheme(theme);
+                foreach (var (width, scale) in new[] { (1440, 1d), (760, 1.5d) })
+                {
+                    var view = new VfxEditorView { DataContext = editor };
+                    view.Measure(new Size(width, 800)); view.Arrange(new Rect(0, 0, width, 800)); view.UpdateLayout();
+                    Assert.AreEqual(0, ((TabControl)view.FindName("Inspector")).SelectedIndex);
+                    foreach (var key in new[] { "Vfx.Layer.Group.Effects", "Vfx.Layer.Group.Configuration", "Vfx.Layer.Settings" })
+                        Assert.IsTrue(Descendants(view).OfType<TextBlock>().Any(text => text.Text == editor.Localization.Get(key) && text.ActualHeight > 0), $"{theme}, {width}, {key}");
+                    var bitmap = new RenderTargetBitmap((int)(width * scale), (int)(800 * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+                    bitmap.Render(view);
+                    var output = Environment.GetEnvironmentVariable("ASSETEDITOR_VFX_RENDER_OUTPUT");
+                    if (!string.IsNullOrWhiteSpace(output))
+                    {
+                        Directory.CreateDirectory(output);
+                        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+                        using var stream = File.Create(Path.Combine(output, $"vfx-effects-{theme}-{width}-{scale.ToString(CultureInfo.InvariantCulture)}.png"));
+                        encoder.Save(stream);
+                    }
+                    view.DataContext = null;
+                }
+            }
+            CollectionAssert.AreEqual(original, context.File.DataSource.ReadData());
+            Assert.IsFalse(editor.HasUnsavedChanges); Assert.IsFalse(editor.UndoCommand.CanExecute(null));
+        }
+        finally { ThemesController.SetTheme(previous); }
+    });
+
+    [TestMethod]
     public void InlineParameterEditor_KeepsEditsWhenSwitchingSearchingAndUndoing() => WithEditor((editor, context) =>
     {
-        var view = new VfxEditorView { DataContext = editor };
+        var view = ParameterView(editor);
         var fields = (ListBox)view.FindName("FieldList");
         var lifetime = Field(editor, "LifeTime");
         editor.SelectedField = lifetime;
@@ -947,7 +989,7 @@ public class VfxEditorTests
         foreach (var name in new[] { "curve_colour", "InfiniteLife", "LifeTime", "alpha_START_offset", "payload" })
         {
             editor.SelectedField = Field(editor, name);
-            var view = new VfxEditorView { DataContext = editor };
+            var view = ParameterView(editor);
             view.Measure(new Size(960, 700));
             view.Arrange(new Rect(0, 0, 960, 700));
             view.UpdateLayout();
@@ -1314,7 +1356,7 @@ public class VfxEditorTests
                 foreach (var theme in new[] { ThemeType.DarkTheme, ThemeType.LightTheme, ThemeType.HighContrastDark, ThemeType.HighContrastLight })
                 {
                     ThemesController.SetTheme(theme);
-                    var view = new VfxEditorView { DataContext = editor };
+                    var view = ParameterView(editor);
                     view.Measure(new Size(1440, 900)); view.Arrange(new Rect(0, 0, 1440, 900)); view.UpdateLayout();
                     var player = (AnimationEditor.Common.AnimationPlayer.AnimationPlayerView)view.FindName("PlaybackPanel");
                     Assert.AreSame(editor.Playback, player.DataContext);
@@ -1341,6 +1383,96 @@ public class VfxEditorTests
             finally { editor.Close(); scene.Dispose(); ThemesController.SetTheme(previous); }
         });
 
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void ParameterRefreshRetainsTheVisiblePhaseAndPlaybackIntent(bool playing) =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            using var scene = CreateTestScene();
+            var context = new Context(scenePreview: scene);
+            using var editor = context.Editor;
+            editor.PreviewAllCommand.Execute(null); RefreshScene(editor);
+            scene.Preview.Update(new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(3.25)));
+            scene.Preview.IsPlaying = playing;
+            Field(editor, "SpawnSpacing").Values[0].Text = "0.25";
+            RefreshScene(editor);
+            StringAssert.Contains(Encoding.UTF8.GetString(PendingScene(scene).GameBytes), "value=\"0.25\"");
+            scene.Preview.Update(new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(1)));
+            Assert.AreEqual(3.25f, scene.Preview.CurrentTime, "Content refresh must re-evaluate the phase the user was inspecting.");
+            Assert.AreEqual(playing, scene.Preview.IsPlaying);
+            scene.Preview.Update(new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(.5)));
+            Assert.AreEqual(playing ? 3.75f : 3.25f, scene.Preview.CurrentTime);
+            editor.LoadFile(context.File); RefreshScene(editor);
+            scene.Preview.Update(new Microsoft.Xna.Framework.GameTime());
+            Assert.AreEqual(0f, scene.Preview.CurrentTime, "Explicitly opening a document must retain the original restart behavior.");
+            CollectionAssert.AreEqual(Encoding.UTF8.GetBytes(Sample), context.File.DataSource.ReadData());
+            Assert.IsNull(context.Saved);
+        });
+
+    [DataTestMethod]
+    [DataRow(false)]
+    [DataRow(true)]
+    public void CorrectingAnInvalidInputRestoresItsPriorPhaseWithoutPlayingInvalidContent(bool playing) =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            using var scene = CreateTestScene();
+            var context = new Context(scenePreview: scene);
+            using var editor = context.Editor;
+            editor.PreviewAllCommand.Execute(null); RefreshScene(editor);
+            scene.Preview.Update(new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(3.25)));
+            scene.Preview.IsPlaying = playing;
+            var value = Field(editor, "SpawnSpacing").Values[0];
+            value.Text = "-"; RefreshScene(editor); RefreshScene(editor);
+            Assert.IsTrue(editor.HasErrors);
+            Assert.IsFalse(scene.Preview.IsLoaded);
+            value.Text = "0.25"; RefreshScene(editor);
+            scene.Preview.Update(new Microsoft.Xna.Framework.GameTime(TimeSpan.Zero, TimeSpan.FromSeconds(1)));
+            Assert.IsFalse(editor.HasErrors);
+            Assert.AreEqual(3.25f, scene.Preview.CurrentTime);
+            Assert.AreEqual(playing, scene.Preview.IsPlaying);
+            Assert.IsNull(context.Saved);
+        });
+
+    [TestMethod]
+    public void ContinuousParameterEditsPublishBeforeTheGestureEnds() =>
+        WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
+        {
+            var store = new VfxPreviewDocumentStore();
+            var context = new Context(store);
+            using var editor = context.Editor;
+            RefreshScene(editor);
+            var frame = new DispatcherFrame();
+            var edits = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(50) };
+            var deadline = new DispatcherTimer(DispatcherPriority.Send) { Interval = TimeSpan.FromSeconds(4) };
+            var steps = 0;
+            var publishedDuringEdits = false;
+            void Published(object file)
+            {
+                if (!ReferenceEquals(file, context.File)) return;
+                if (steps < 16) publishedDuringEdits = true;
+                else frame.Continue = false;
+            }
+            edits.Tick += (_, _) =>
+            {
+                Field(editor, "SpawnSpacing").Values[0].Text = (++steps / 10d).ToString(CultureInfo.InvariantCulture);
+                if (steps == 16) edits.Stop();
+            };
+            deadline.Tick += (_, _) => frame.Continue = false;
+            store.Changed += Published;
+            try
+            {
+                edits.Start(); deadline.Start(); Dispatcher.PushFrame(frame);
+                Assert.AreEqual(16, steps);
+                Assert.IsTrue(publishedDuringEdits, "Continuous slider or text changes must not postpone every refresh until editing stops.");
+                Assert.IsTrue(store.TryGet(context.File, out var snapshot));
+                Assert.AreEqual("1.6", VfxDocument.Read(snapshot!.GameBytes).Layers[0].Fields.Single(field => field.Name == "SpawnSpacing").RawValue);
+                CollectionAssert.AreEqual(Encoding.UTF8.GetBytes(Sample), context.File.DataSource.ReadData());
+                Assert.IsNull(context.Saved);
+            }
+            finally { edits.Stop(); deadline.Stop(); store.Changed -= Published; }
+        });
+
     private static void RefreshScene(VfxEditorViewModel editor) => typeof(VfxEditorViewModel)
         .GetMethod("RefreshScenePreview", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
         .Invoke(editor, [null, EventArgs.Empty]);
@@ -1357,6 +1489,9 @@ public class VfxEditorTests
         preview.SetupGet(value => value.CycleDuration).Returns(8);
         preview.SetupGet(value => value.EmitterCount).Returns(1);
         preview.SetupGet(value => value.TotalEmitterCount).Returns(1);
+        preview.Setup(value => value.BeginInteractiveReload(It.IsAny<VfxPreviewSnapshot>()))
+            .Callback<VfxPreviewSnapshot>(snapshot => preview.Object.Reload(snapshot)).Returns(true);
+        preview.Setup(value => value.ContinueInteractiveReload(It.IsAny<VfxInteractiveReloadFrame>())).Returns(true);
         var factory = new Mock<IVfxPreviewFactory>();
         factory.Setup(value => value.Create(It.IsAny<Microsoft.Xna.Framework.Graphics.GraphicsDevice>())).Returns(preview.Object);
         var component = new VfxPreviewComponent(factory.Object, Mock.Of<GameWorld.Core.Utility.IDeviceResolver>(), null!);
@@ -1365,6 +1500,13 @@ public class VfxEditorTests
         interaction = withInteraction ? new VfxEmitterInteractionComponent(mouse.Object, Mock.Of<GameWorld.Core.Components.Input.IKeyboardComponent>(), null!,
             Mock.Of<GameWorld.Core.Utility.IDeviceResolver>(), null!, component) : null;
         return new VfxScenePreview(Mock.Of<IWpfGame>(), Mock.Of<GameWorld.Core.Components.IComponentInserter>(), core, component, interaction);
+    }
+
+    private static VfxEditorView ParameterView(VfxEditorViewModel editor)
+    {
+        editor.InspectorTabIndex = 1;
+        var view = new VfxEditorView { DataContext = editor };
+        return view;
     }
 
     private static VfxFieldViewModel Field(VfxEditorViewModel editor, string name) =>

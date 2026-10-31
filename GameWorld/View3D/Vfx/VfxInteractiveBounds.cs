@@ -5,6 +5,7 @@ namespace GameWorld.Core.Vfx;
 // The conversion is immutable; the worker owns its simulation and never samples a live attachment.
 internal sealed class VfxInteractiveBounds : IDisposable
 {
+    private static readonly SemaphoreSlim Worker = new(1, 1);
     private readonly CancellationTokenSource _cancellation = new();
     private readonly Task<BoundingBox?> _pending;
     private bool _disposed, _taken;
@@ -13,9 +14,18 @@ internal sealed class VfxInteractiveBounds : IDisposable
     internal VfxInteractiveBounds(VfxConversion conversion,
         Func<CancellationToken, Task<BoundingBox?>>? prepare = null)
     {
-        _pending = VfxInteractivePrewarm.RunPreparation(
-            prepare ?? (token => Task.Run(() => VfxPreviewBounds.Estimate(conversion, token), token)),
-            _cancellation.Token);
+        _pending = prepare == null ? Estimate(conversion, _cancellation.Token)
+            : RunPreparation(prepare, _cancellation.Token);
+    }
+
+    internal static Task<BoundingBox?> Estimate(VfxConversion conversion, CancellationToken token)
+        => RunPreparation(current => Task.Run(() => VfxPreviewBounds.Estimate(conversion, current), current), token);
+
+    private static async Task<BoundingBox?> RunPreparation(Func<CancellationToken, Task<BoundingBox?>> prepare, CancellationToken token)
+    {
+        await Worker.WaitAsync(token).ConfigureAwait(false);
+        try { return await prepare(token).ConfigureAwait(false); }
+        finally { Worker.Release(); }
     }
 
     internal bool TryTake(out BoundingBox? bounds)

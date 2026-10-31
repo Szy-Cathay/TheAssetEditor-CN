@@ -169,6 +169,15 @@ class ScopedSprites : public EffekseerRenderer::SpriteRendererBase<RENDERER, fal
     size_t selected_ = size_t(-1);
     bool active_ = false;
     bool invalidate_ = false;
+    bool fixedDynamic_ = false;
+    uint64_t verifiedVertices_ = 0;
+    bool normalValid_ = false;
+    Effekseer::SIMD::Mat43f normalMatrix_;
+    Effekseer::Color packedNormal_, packedTangent_;
+    bool geometryValid_ = false;
+    std::array<EffekseerRenderer::DynamicVertex, 4> geometry_;
+    std::array<Effekseer::SIMD::Vec2f, 4> geometryCorners_;
+    Effekseer::RectF geometryUv_;
     bool BasicEligible(const Node& node, int count) const
     {
         auto basic = node.BasicParameterPtr;
@@ -222,11 +231,62 @@ class ScopedSprites : public EffekseerRenderer::SpriteRendererBase<RENDERER, fal
         state.SoftParticleDistanceFar = basic->SoftParticleDistanceFar;
         state.SoftParticleDistanceNear = basic->SoftParticleDistanceNear;
         state.SoftParticleDistanceNearOffset = basic->SoftParticleDistanceNearOffset;
-        for (size_t i = 0; i < 15; ++i) state.MaterialUniforms[i] = basic->MaterialRenderDataPtr->MaterialUniforms[i];
+        std::memcpy(state.MaterialUniforms.data(), basic->MaterialRenderDataPtr->MaterialUniforms.data(), 15 * sizeof(state.MaterialUniforms[0]));
+    }
+    void RenderFixedDynamic(const Effekseer::SpriteRenderer::InstanceParameter& instance)
+    {
+        AECN_VFX_TIMING_SCOPE(vertexTiming, AecnRenderTiming::SpriteVertex);
+        using namespace EffekseerRenderer;
+        static_assert(sizeof(DynamicVertex) == 40, "Pinned dynamic sprite layout changed");
+        static_assert(offsetof(Effekseer::SpriteRenderer::InstanceParameter, CustomData2)
+            == offsetof(Effekseer::SpriteRenderer::InstanceParameter, CustomData1) + sizeof(float) * 4, "Pinned custom sprite payload layout changed");
+        const auto& matrix = instance.SRTMatrix43;
+        if (!normalValid_ || std::memcmp(&normalMatrix_, &matrix, sizeof(matrix)))
+        {
+            const auto tangent = Effekseer::SIMD::Vec3f(matrix.X.GetX(), matrix.Y.GetX(), matrix.Z.GetX()).Normalize();
+            const auto normal = Effekseer::SIMD::Vec3f(matrix.X.GetZ(), matrix.Y.GetZ(), matrix.Z.GetZ()).Normalize();
+            packedNormal_ = PackVector3DF(normal); packedTangent_ = PackVector3DF(tangent);
+            normalMatrix_ = matrix; normalValid_ = true; geometryValid_ = false;
+        }
+        if (!geometryValid_ || std::memcmp(geometryCorners_.data(), instance.Positions, sizeof(geometryCorners_))
+            || std::memcmp(&geometryUv_, &instance.UV, sizeof(geometryUv_)))
+        {
+            // The original transform transposes this same matrix for each corner.
+            auto x = matrix.X, y = matrix.Y, z = matrix.Z, translation = Effekseer::SIMD::Float4::SetZero();
+            Effekseer::SIMD::Float4::Transpose(x, y, z, translation);
+            for (int index = 0; index < 4; ++index)
+            {
+                auto& vertex = geometry_[index];
+                vertex.Pos.X = instance.Positions[index].GetX(); vertex.Pos.Y = instance.Positions[index].GetY(); vertex.Pos.Z = 0;
+                vertex.Col = instance.Colors[index];
+                const bool right = index == 1 || index == 3, bottom = index < 2;
+                vertex.UV[0] = right ? instance.UV.X + instance.UV.Width : instance.UV.X;
+                vertex.UV[1] = bottom ? instance.UV.Y + instance.UV.Height : instance.UV.Y;
+                vertex.UV2[0] = right ? 1.0f : 0.0f; vertex.UV2[1] = bottom ? 1.0f : 0.0f;
+                const auto position = Effekseer::SIMD::Vec3f::Load(&vertex.Pos);
+                auto transformed = Effekseer::SIMD::Float4::MulAddLane<0>(translation, x, position.s);
+                transformed = Effekseer::SIMD::Float4::MulAddLane<1>(transformed, y, position.s);
+                transformed = Effekseer::SIMD::Float4::MulAddLane<2>(transformed, z, position.s);
+                Effekseer::SIMD::Vec3f::Store(&vertex.Pos, Effekseer::SIMD::Vec3f{transformed});
+                vertex.Normal = packedNormal_; vertex.Tangent = packedTangent_;
+            }
+            std::memcpy(geometryCorners_.data(), instance.Positions, sizeof(geometryCorners_));
+            geometryUv_ = instance.UV; geometryValid_ = true;
+        }
+        // Coverage and emission can share geometry, but never their colour or custom payload.
+        for (int index = 0; index < 4; ++index)
+        {
+            auto bytes = this->m_ringBufferData + index * this->stride_;
+            std::memcpy(bytes, &geometry_[index], sizeof(DynamicVertex));
+            reinterpret_cast<DynamicVertex*>(bytes)->Col = instance.Colors[index];
+            std::memcpy(bytes + sizeof(DynamicVertex), instance.CustomData1.data(), sizeof(float) * 8);
+        }
+        this->m_ringBufferData += this->stride_ * 4; this->m_spriteCount++;
     }
 public:
     explicit ScopedSprites(RENDERER* renderer) : Base(renderer) {}
-    void BeginScope() { entries_.clear(); selected_ = size_t(-1); invalidate_ = false; active_ = true; }
+    uint64_t VerifiedVertices() const { return verifiedVertices_; }
+    void BeginScope() { entries_.clear(); selected_ = size_t(-1); invalidate_ = false; normalValid_ = false; geometryValid_ = false; active_ = true; }
     void EndScope() { entries_.clear(); selected_ = size_t(-1); invalidate_ = false; active_ = false; }
     // A shader fallback can occur while the standard queue still reads the current state.
     void InvalidateOnNextUse() { invalidate_ = true; }
@@ -280,9 +340,39 @@ private:
         }
     }
 public:
+    void Rendering(const Node& node, const Effekseer::SpriteRenderer::InstanceParameter& instance, void* userData) override
+    {
+        if (!fixedDynamic_) { Base::Rendering(node, instance, userData); return; }
+        if (!this->m_ringBufferData || this->m_spriteCount == this->m_renderer->GetSquareMaxCount()) return;
+#ifdef _DEBUG
+        static const bool verify = std::getenv("AECN_VFX_VERIFY_FIXED_SPRITES") != nullptr;
+        if (verify)
+        {
+            auto target = this->m_ringBufferData; const auto count = this->m_spriteCount;
+            std::array<uint8_t, 144 * 4> expected;
+            Base::Rendering(node, instance, userData);
+            std::memcpy(expected.data(), target, this->stride_ * 4);
+            this->m_ringBufferData = target; this->m_spriteCount = count;
+            RenderFixedDynamic(instance);
+            if (std::memcmp(expected.data(), target, this->stride_ * 4)) throw std::runtime_error("Fixed sprite vertices differ from the pinned native renderer");
+            verifiedVertices_ += 4;
+            return;
+        }
+#endif
+        RenderFixedDynamic(instance);
+    }
     void BeginRendering(const Node& node, int32_t count, void* userData) override
     {
-        try { BeginCore(node, count, userData); }
+        try
+        {
+            BeginCore(node, count, userData);
+            fixedDynamic_ = BasicEligible(node, count) && node.IsRightHand && !node.EnableViewOffset
+                && node.DepthParameterPtr && node.DepthParameterPtr->DepthOffset == 0
+                && node.DepthParameterPtr->SuppressionOfScalingByDepth >= 1
+                && this->customData1Count_ == 4 && this->customData2Count_ == 4
+                && this->stride_ >= 72 && this->stride_ <= 144
+                && this->m_renderer->GetStandardRenderer()->GetState().Collector.ShaderType == EffekseerRenderer::RendererShaderType::Material;
+        }
         catch (...) { EndScope(); throw; }
     }
 };
@@ -312,6 +402,7 @@ public:
         preparedSprites_ = sprites.Get();
         return sprites;
     }
+    uint64_t VerifiedSpriteVertices() const { return preparedSprites_ ? preparedSprites_->VerifiedVertices() : 0; }
     VertexBinding* VertexBindingState() { return &vertexBinding_; }
     void InvalidateCachedVertexBinding()
     {

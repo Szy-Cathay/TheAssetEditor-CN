@@ -1,4 +1,5 @@
 #pragma once
+#include "VfxRenderTiming.h"
 #include <EffekseerRendererDX11.RenderState.h>
 #include <EffekseerRendererDX11.IndexBuffer.h>
 #include <GraphicsDevice.h>
@@ -95,6 +96,7 @@ public:
     }
     void Draw(EffekseerRendererDX11::RendererImplemented* renderer, const State& source, const uint8_t* data, size_t bytes)
     {
+        AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::BulkGpu);
         if (!bytes || bytes % (Stride * 4)) throw std::runtime_error("Invalid bulk sprite vertices");
         if (bytes > vertexCapacity_)
         {
@@ -105,8 +107,12 @@ public:
             vertices_ = vertices; vertexCapacity_ = bytes;
         }
         D3D11_MAPPED_SUBRESOURCE mapped{};
-        if (FAILED(context_->Map(vertices_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) throw std::runtime_error("Cannot map bulk sprite vertices");
+        {
+            AECN_VFX_TIMING_SCOPE(mapTiming, AecnRenderTiming::BulkMap);
+            if (FAILED(context_->Map(vertices_.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped))) throw std::runtime_error("Cannot map bulk sprite vertices");
+        }
         std::memcpy(mapped.pData, data, bytes); context_->Unmap(vertices_.Get(), 0);
+        AECN_VFX_TIMING_SCOPE(constantsTiming, AecnRenderTiming::BulkConstants);
         std::array<float, 104> vs{}; std::array<float, 92> ps{};
         const auto camera = renderer->GetCameraMatrix(), projection = renderer->GetProjectionMatrix();
         std::memcpy(vs.data(), camera.Values, 64); std::memcpy(vs.data() + 16, projection.Values, 64);
@@ -132,6 +138,7 @@ public:
         }
         context_->UpdateSubresource(vertexConstants_.Get(), 0, nullptr, vs.data(), 0, 0);
         context_->UpdateSubresource(pixelConstants_.Get(), 0, nullptr, ps.data(), 0, 0);
+        AECN_VFX_TIMING_FINISH(constantsTiming);
         struct Restore
         {
             EffekseerRendererDX11::OriginalState State;
@@ -162,6 +169,7 @@ public:
         context_->IASetIndexBuffer(renderer->GetIndexBuffer()->GetInterface(), DXGI_FORMAT_R16_UINT, 0);
         context_->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         const int quads = static_cast<int>(bytes / (Stride * 4));
+        AECN_VFX_TIMING_SCOPE(drawTiming, AecnRenderTiming::BulkDraw);
         context_->OMSetBlendState(colourBlend_.Get(), nullptr, 0xffffffff); context_->PSSetShader(colour_.Get(), nullptr, 0);
         renderer->DrawSprites(quads, 0);
         context_->OMSetBlendState(alphaBlend_.Get(), nullptr, 0xffffffff); context_->PSSetShader(alpha_.Get(), nullptr, 0);
@@ -195,14 +203,35 @@ class SpriteDispatchQueue
             && (state.AlphaBlend == Effekseer::AlphaBlendType::Blend || state.AlphaBlend == Effekseer::AlphaBlendType::Add)
             && state.Collector.TextureCount <= Effekseer::TextureSlotMax;
     }
+    // This path admits no gradients. Keep reference ownership, and copy only active float uniforms.
+    static void CopyEligibleState(State& target, const State& source, bool copyCollector)
+    {
+        target.DepthTest = source.DepthTest; target.DepthWrite = source.DepthWrite;
+        target.Distortion = source.Distortion; target.DistortionIntensity = source.DistortionIntensity;
+        target.Refraction = source.Refraction; target.AlphaBlend = source.AlphaBlend; target.CullingType = source.CullingType;
+        target.Flipbook = source.Flipbook;
+        target.UVDistortionIntensity = source.UVDistortionIntensity; target.TextureBlendType = source.TextureBlendType;
+        target.BlendUVDistortionIntensity = source.BlendUVDistortionIntensity; target.EmissiveScaling = source.EmissiveScaling;
+        target.EdgeThreshold = source.EdgeThreshold; std::memcpy(target.EdgeColor, source.EdgeColor, sizeof(source.EdgeColor));
+        target.EdgeColorScaling = source.EdgeColorScaling; target.IsAlphaCuttoffEnabled = source.IsAlphaCuttoffEnabled;
+        target.SoftParticleDistanceFar = source.SoftParticleDistanceFar; target.SoftParticleDistanceNear = source.SoftParticleDistanceNear;
+        target.SoftParticleDistanceNearOffset = source.SoftParticleDistanceNearOffset;
+        target.Maginification = source.Maginification; target.LocalTime = source.LocalTime;
+        target.MaterialType = source.MaterialType; target.MaterialUniformCount = source.MaterialUniformCount;
+        std::memcpy(target.MaterialUniforms.data(), source.MaterialUniforms.data(), source.MaterialUniformCount * sizeof(source.MaterialUniforms[0]));
+        target.MaterialGradientCount = 0; target.CustomData1Count = source.CustomData1Count; target.CustomData2Count = source.CustomData2Count;
+        // Compatible already proved the collector equal within this run; a new run refreshes all RefPtrs normally.
+        if (copyCollector) target.Collector = source.Collector;
+        // The pinned collector equality omits these two active scalars.
+        target.Collector.IsDepthRequired = source.Collector.IsDepthRequired; target.Collector.DepthIndex = source.Collector.DepthIndex;
+        target.RenderingUserData = source.RenderingUserData; target.HandleUserData = source.HandleUserData;
+    }
     static bool Compatible(const State& a, const State& b)
     {
         if (a.DepthTest != b.DepthTest || a.CullingType != b.CullingType
             || std::memcmp(&a.Maginification, &b.Maginification, 4) || std::memcmp(&a.LocalTime, &b.LocalTime, 4)
             || a.Collector.MaterialDataPtr != b.Collector.MaterialDataPtr || a.Collector != b.Collector) return false;
-        for (int i = 1; i < 12; ++i)
-            if (std::memcmp(a.MaterialUniforms[i].data(), b.MaterialUniforms[i].data(), 16)) return false;
-        return true;
+        return std::memcmp(a.MaterialUniforms.data() + 1, b.MaterialUniforms.data() + 1, 11 * sizeof(a.MaterialUniforms[0])) == 0;
     }
     void ClearRun() { vertices_.clear(); short_.clear(); run_.reset(); useBulk_ = false; }
     void FlushRun()
@@ -255,7 +284,8 @@ public:
         if (legacyPending_) { legacy_->Rendering(); legacyPending_ = false; }
         const size_t bytes = static_cast<size_t>(count) * BulkSpriteGpu::Stride;
         if (run_ && (!Compatible(*run_, state) || vertices_.size() + bytes > static_cast<size_t>(renderer_->GetSquareMaxCount()) * 4 * BulkSpriteGpu::Stride)) FlushRun();
-        if (!run_) run_ = std::make_unique<State>(state);
+        const bool newRun = !run_;
+        if (newRun) run_ = std::make_unique<State>(state);
         const auto offset = vertices_.size();
         if (!useBulk_)
         {
@@ -265,7 +295,17 @@ public:
             if (short_.size() >= 4) { useBulk_ = true; short_.clear(); }
         }
         if (!current_) current_ = std::make_unique<State>();
-        *current_ = state;
+        {
+            AECN_VFX_TIMING_SCOPE(stateTiming, AecnRenderTiming::BulkStateCopy);
+            CopyEligibleState(*current_, state, newRun);
+#ifdef _DEBUG
+            static const bool verify = std::getenv("AECN_VFX_VERIFY_FIXED_SPRITES") != nullptr;
+            if (verify && (*current_ != state || current_->CustomData2Count != state.CustomData2Count
+                || current_->Collector.IsDepthRequired != state.Collector.IsDepthRequired || current_->Collector.DepthIndex != state.Collector.DepthIndex
+                || std::memcmp(current_->MaterialUniforms.data(), state.MaterialUniforms.data(), state.MaterialUniformCount * sizeof(state.MaterialUniforms[0]))))
+                throw std::runtime_error("Eligible sprite state differs from the original snapshot");
+#endif
+        }
         vertices_.resize(offset + bytes);
         const uint32_t tag = state.AlphaBlend == Effekseer::AlphaBlendType::Blend ? 1 : 2;
         for (int i = 0; i < count; ++i)

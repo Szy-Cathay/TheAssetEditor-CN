@@ -249,9 +249,12 @@ public partial class EffectVfxPreviewTests
         public int SceneRequests { get; private set; }
         public IDisposable? BeginScene(CommonShaderParameters parameters) { SceneRequests++; return Scene; }
         public bool Disposed { get; private set; }
+        public bool ForwardReplayAllowed { get; private set; } = true;
         public float Time { get; private set; }
         public Func<float, Matrix>? History { get; private set; }
         public void Reload(VfxPreviewSnapshot snapshot) => ReloadCount++;
+        public void ConfigureInteractiveSeekFrame(bool isHistoryConstant, float? groundHeight, bool initializeDuration = false, bool allowForwardReplay = true)
+            => ForwardReplayAllowed = allowForwardReplay;
         public void Advance(float seconds, Matrix attachment) => Seek(Time + seconds, attachment);
         public void Seek(float seconds, Matrix attachment) => Time = seconds;
         public void Seek(float seconds, Matrix attachment, Func<float, Matrix> history) { Seek(seconds, attachment); History = history; }

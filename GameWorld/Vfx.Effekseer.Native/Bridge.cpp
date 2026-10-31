@@ -20,6 +20,7 @@
 #include <array>
 #include <memory>
 #include <atomic>
+#include <type_traits>
 #include "SpriteUploadCache.h"
 #ifdef _DEBUG
 #include <crtdbg.h>
@@ -114,6 +115,7 @@ struct Preview
     struct NativeAlphaLayer { const AecnHalfLayerConfig* config = nullptr; bool halfResolution = false; };
     std::vector<NativeAlphaLayer> nativeAlphaLayers;
     EffectRef effect;
+    AecnRenderTiming::Stats timing;
     MaterialLoaderRef materialLoader;
     MaterialRef material, decalMaterial, scrollingMaterial, oneShotMaterial, basicMeshMaterial, gemstoneMaterial, animatedUVMaterial, basicSpriteMaterial, premultiplyAnimatedMaterial, solidMaterial, prelitSpriteMaterial, soulPanningMaterial, growingVinesMaterial, rigidDissolveMaterial, distortionMaterial, tidecallMaterial, vertexAnimatedMaterial, rigidBasicDitherMaterial;
     AecnSpriteUpload::Renderer* uploadRenderer = nullptr;
@@ -593,7 +595,46 @@ API int AecnVfxEndScene(Preview* preview)
 }
 API int AecnVfxDepthAvailable(Preview* preview) { return preview->depthAvailable ? 1 : 0; }
 API int AecnVfxDrawCalls(Preview* preview) { return preview->halfDrawCalls >= 0 ? preview->halfDrawCalls : preview->renderer->GetDrawCallCount(); }
+API uint64_t AecnVfxVerifiedSpriteVertices(Preview* preview) { return preview && preview->uploadRenderer ? preview->uploadRenderer->VerifiedSpriteVertices() : 0; }
+API int AecnVfxTimingsAvailable() { return AecnRenderTiming::Available ? 1 : 0; }
+API int AecnVfxSetTimings(Preview* preview, int enabled)
+{
+    return Guard([&] {
+        if (!preview || (enabled != 0 && enabled != 1)) throw std::runtime_error("Invalid native timing control");
+        if (enabled && !AecnRenderTiming::Available) throw std::runtime_error("Native timings were not compiled; use the opt-in diagnostic artifact");
+        preview->timing.Enabled = enabled != 0; preview->timing.Values.fill(0);
+    });
+}
+API int AecnVfxReadTimings(Preview* preview, double* values, int count)
+{
+    return Guard([&] {
+        if (!preview || !values || (count != 24 && count != AecnRenderTiming::PhaseCount * 2)) throw std::runtime_error("Invalid native timing output");
+        if (!AecnRenderTiming::Available) throw std::runtime_error("Native timings were not compiled; use the opt-in diagnostic artifact");
+        std::copy_n(preview->timing.Values.begin(), count, values);
+        std::fill_n(preview->timing.Values.begin(), count, 0.0);
+    });
+}
 
+API int AecnVfxReadStateCopyTimings(Preview* preview, double* values, int count)
+{
+    return Guard([&] {
+        if (!preview || !values || count != 2) throw std::runtime_error("Invalid native state timing output");
+        if (!AecnRenderTiming::Available) throw std::runtime_error("Native timings were not compiled; use the opt-in diagnostic artifact");
+        const auto offset = AecnRenderTiming::BulkStateCopy * 2;
+        std::copy_n(preview->timing.Values.begin() + offset, 2, values);
+        std::fill_n(preview->timing.Values.begin() + offset, 2, 0.0);
+    });
+}
+API int AecnVfxReadSpriteTimings(Preview* preview, double* values, int count)
+{
+    return Guard([&] {
+        if (!preview || !values || count != 10) throw std::runtime_error("Invalid native sprite timing output");
+        if (!AecnRenderTiming::Available) throw std::runtime_error("Native timings were not compiled; use the opt-in diagnostic artifact");
+        const auto offset = AecnRenderTiming::SpriteCull * 2;
+        std::copy_n(preview->timing.Values.begin() + offset, count, values);
+        std::fill_n(preview->timing.Values.begin() + offset, count, 0.0);
+    });
+}
 API int AecnVfxTextureRgbaMipChain(Preview* preview, const void* pixels, int length, int width, int height, int srgb, int mipLevels)
 {
     return Guard([&]
@@ -682,6 +723,18 @@ API int AecnVfxModelAlias(Preview* preview, int sourceIndex)
         const auto cycles = preview->modelAnimationCycles[sourceIndex];
         preview->models.push_back(model);
         preview->modelAnimationCycles.push_back(cycles);
+    });
+}
+API int AecnVfxPrepareModel(Preview* preview, int modelIndex)
+{
+    return Guard([&]
+    {
+        if (!preview || preview->renderer == nullptr || modelIndex < 0 || modelIndex >= static_cast<int>(preview->models.size()))
+            throw std::runtime_error("Invalid model preparation index");
+        auto model = preview->models[modelIndex];
+        if (model == nullptr) throw std::runtime_error("Missing model geometry");
+        model->StoreBufferToGPU(preview->renderer->GetGraphicsDevice().Get());
+        if (!model->GetIsBufferStoredOnGPU()) throw std::runtime_error("Cannot prepare model geometry");
     });
 }
 API int AecnVfxModelFrames(Preview* preview, const AecnVertex* vertices, int vertexLength, int verticesPerFrame,
@@ -853,7 +906,7 @@ API int AecnVfxConfigure(Preview* preview, const AecnLayer* layers, int count)
                 throw std::runtime_error("Unsupported UV orientation");
             if (layer.CameraFacing < 0 || layer.CameraFacing > 1 || (layer.CameraFacing && layer.Kind != 0))
                 throw std::runtime_error("Invalid camera-facing geometry");
-            if (layer.OpaqueModel < 0 || layer.OpaqueModel > 1 || (layer.OpaqueModel && (layer.Kind != 1 || (layer.MeshMaterialIndex >= 0 && (layer.MeshMaterialIndex >= static_cast<int>(preview->meshMaterials.size()) || (!preview->meshMaterials[layer.MeshMaterialIndex].tidecall && !preview->meshMaterials[layer.MeshMaterialIndex].solid && !preview->meshMaterials[layer.MeshMaterialIndex].growingVines && !preview->meshMaterials[layer.MeshMaterialIndex].rigidDissolve && !preview->meshMaterials[layer.MeshMaterialIndex].rigidBasicDither))))))
+            if (layer.OpaqueModel < 0 || layer.OpaqueModel > 1 || (layer.OpaqueModel && (layer.Kind != 1 || (layer.MeshMaterialIndex >= 0 && (layer.MeshMaterialIndex >= static_cast<int>(preview->meshMaterials.size()) || (!preview->meshMaterials[layer.MeshMaterialIndex].gemstone && !preview->meshMaterials[layer.MeshMaterialIndex].tidecall && !preview->meshMaterials[layer.MeshMaterialIndex].solid && !preview->meshMaterials[layer.MeshMaterialIndex].growingVines && !preview->meshMaterials[layer.MeshMaterialIndex].rigidDissolve && !preview->meshMaterials[layer.MeshMaterialIndex].rigidBasicDither))))))
                 throw std::runtime_error("Invalid opaque model material");
             if (layer.LightingMode < 0 || layer.LightingMode > 2 || layer.NormalIndex < -1 || layer.NormalIndex >= static_cast<int>(preview->textures.size()))
                 throw std::runtime_error("Invalid particle lighting material");
@@ -1146,7 +1199,7 @@ static bool TryDrawHalfScene(Preview& owner, const std::vector<SceneDraw>& draws
     auto context = owner.renderer->GetContext();
     if (!HalfResolutionScene::CanRender(context, halfDraws, fullDepth)) return false;
     for (const auto& command : draws) { command.preview->renderer->ResetDrawCallCount(); command.preview->halfDrawCalls = 0; }
-    owner.halfScene.Render(owner.renderer->GetDevice(), context, halfDraws, fullDepth);
+    { AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::HalfScene); owner.halfScene.Render(owner.renderer->GetDevice(), context, halfDraws, fullDepth); }
     owner.halfDrawCalls = static_cast<int>(owner.halfScene.DrawCallCount());
     return true;
 }
@@ -1156,6 +1209,8 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
 {
     return Guard([&]
     {
+        AECN_VFX_TIMING_ACTIVATE(active, preview->timing);
+        AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::Particles);
         if (count < 0 || count > 1048576) throw std::runtime_error("Invalid particle count");
         preview->halfDrawCalls = -1;
         preview->renderer->ResetDrawCallCount();
@@ -1179,13 +1234,15 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                 if (preview->layers[particles[index].Layer].Distortion != 0) orderedParticles.push_back(particles[index]);
             particles = orderedParticles.data();
         }
+        AECN_VFX_TIMING_SCOPE(floatingPreparation, AecnRenderTiming::FloatingScene);
         FloatSceneTarget::Frame floatingScene(preview->floatingScene, preview->renderer->GetDevice(), preview->renderer->GetContext(),
             lighting ? lighting->Display : nullptr, lighting ? lighting->Bloom : nullptr);
+        AECN_VFX_TIMING_FINISH(floatingPreparation);
         Matrix44 camera, lens;
         std::memcpy(camera.Values, view, 16 * sizeof(float)); std::memcpy(lens.Values, projection, 16 * sizeof(float));
         preview->renderer->SetCameraMatrix(camera); preview->renderer->SetProjectionMatrix(lens);
         if (softDepth || std::any_of(preview->layers.begin(), preview->layers.end(), [](const AecnLayer& layer) { return layer.SoftDistance > 0 || layer.NativeSoftDepth || layer.DistortionSoftDepth || layer.Kind == 2 || layer.MeshMaterialIndex >= 0; }))
-            preview->CaptureDepth(projection);
+        { AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::Depth); preview->CaptureDepth(projection); }
         Backend::TextureRef sceneDepth;
         EffekseerRenderer::DepthReconstructionParameter reconstruction;
         preview->renderer->GetDepth(sceneDepth, reconstruction);
@@ -1220,7 +1277,7 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
             if (preparedActive) { preview->uploadRenderer->FlushCachedSprites(); preparedActive = false; }
         };
         auto beginRendering = [&] { preview->renderer->BeginRendering(); preparedActive = false; rendering = true; };
-        auto endRendering = [&] { if (rendering) { flushPrepared(); preview->renderer->EndRendering(); rendering = false; } };
+        auto endRendering = [&] { if (rendering) { AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::RendererEnd); flushPrepared(); preview->renderer->EndRendering(); rendering = false; } };
         std::unique_ptr<WeightedDistortionTarget::Frame> distortionFrame;
         int distortionBegin = 0, distortionEnd = 0, distortionPass = std::max(0, sharedDistortionPass);
         struct SpriteMaterialTemplate
@@ -1361,7 +1418,41 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                 auto& material = materialScratch;
                 const bool reuseSpriteMaterial = spriteMaterial && spriteMaterial->Material.MaterialIndex == 0;
                 // The renderer also compares this pointer when batching, so always submit the same scratch address.
-                if (reuseSpriteMaterial) material = spriteMaterial->Material;
+                if (reuseSpriteMaterial)
+                {
+                    const auto& source = spriteMaterial->Material;
+                    if (source.MaterialTextures.size() == 3 && source.MaterialUniforms.size() == 15 && source.MaterialGradients.empty()
+                        && material.MaterialIndex == 0 && material.MaterialTextures.size() == 3
+                        && material.MaterialUniforms.size() == 15 && material.MaterialGradients.empty())
+                    {
+                        static_assert(std::is_trivially_copyable<MaterialTextureParameter>::value
+                            && sizeof(MaterialTextureParameter) == 2 * sizeof(int32_t), "Texture parameters must be contiguous PODs");
+                        static_assert(std::is_trivially_copyable<std::array<float, 4>>::value
+                            && sizeof(std::array<float, 4>) == 4 * sizeof(float), "Uniforms must be contiguous float4s");
+#ifdef _DEBUG
+                        static const bool verifyMaterial = std::getenv("AECN_VFX_VERIFY_FIXED_SPRITES") != nullptr;
+#endif
+                        // Keep vector storage and the scratch address stable; no shape or reference ownership changes.
+                        material.MaterialIndex = source.MaterialIndex;
+                        std::memcpy(material.MaterialTextures.data(), source.MaterialTextures.data(), 3 * sizeof(MaterialTextureParameter));
+                        std::memcpy(material.MaterialUniforms.data(), source.MaterialUniforms.data(), 15 * sizeof(std::array<float, 4>));
+#ifdef _DEBUG
+                        if (verifyMaterial)
+                        {
+                            MaterialRenderData expected;
+                            expected = source;
+                            if (material.MaterialIndex != expected.MaterialIndex
+                                || material.MaterialTextures.size() != expected.MaterialTextures.size()
+                                || material.MaterialUniforms.size() != expected.MaterialUniforms.size()
+                                || !material.MaterialGradients.empty()
+                                || std::memcmp(material.MaterialTextures.data(), expected.MaterialTextures.data(), 3 * sizeof(MaterialTextureParameter))
+                                || std::memcmp(material.MaterialUniforms.data(), expected.MaterialUniforms.data(), 15 * sizeof(std::array<float, 4>)))
+                                throw std::runtime_error("Sprite material differs from the original assignment");
+                        }
+#endif
+                    }
+                    else material = source;
+                }
                 else
                 {
                     material.MaterialIndex = -1;
@@ -1417,7 +1508,7 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                     }
                     else material.MaterialUniforms.push_back({preview->depthAvailable ? 1.0f : 0.0f, front.X, front.Y, front.Z});
                     basic.MaterialType = RendererMaterialType::File; basic.MaterialRenderDataPtr = &material;
-                    basic.AlphaBlend = source.rigidBasicDither || source.tidecall || source.solid || source.growingVines || source.rigidDissolve ? AlphaBlendType::Opacity : AlphaBlendType::Blend; basic.SoftParticleDistanceFar = 1;
+                    basic.AlphaBlend = source.gemstone || source.rigidBasicDither || source.tidecall || source.solid || source.growingVines || source.rigidDissolve ? AlphaBlendType::Opacity : AlphaBlendType::Blend; basic.SoftParticleDistanceFar = 1;
                     basic.TextureWraps.fill(TextureWrapType::Repeat);
                 }
                 else if (layer.Distortion != 0)
@@ -1512,9 +1603,11 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                 NodeRendererDepthParameter depth;
                 if (layer.Kind == 0)
                 {
+                    AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::Sprites);
                     if (canCullSprites && layer.MeshMaterialIndex < 0 && layer.Distortion == 0 && !layer.OpaqueModel
                         && basic.MaterialType == RendererMaterialType::File && material.MaterialIndex == 0)
                     {
+                        AECN_VFX_TIMING_SCOPE(cullTiming, AecnRenderTiming::SpriteCull);
                         bool outside = true;
                         for (int i = begin; i < end; ++i)
                             if (!SpriteOutsideXY(layer, particles[i], view, projection, spriteViewProjection)) { outside = false; break; }
@@ -1534,10 +1627,11 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                     node.Billboard = BillboardType::Fixed; node.IsRightHand = true; node.ZSort = ZSortType::None;
                     node.DepthParameterPtr = &depth; node.BasicParameterPtr = &basic;
                     if (usePrepared) preview->uploadRenderer->SelectCachedSpriteLayer(static_cast<size_t>(layerIndex));
-                    sprites->BeginRendering(node, end - begin, nullptr);
+                    { AECN_VFX_TIMING_SCOPE(beginTiming, AecnRenderTiming::SpriteBegin); sprites->BeginRendering(node, end - begin, nullptr); }
                     for (int i = begin; i < end; ++i)
                     {
                         const auto& particle = particles[i];
+                        AECN_VFX_TIMING_SCOPE(instanceTiming, AecnRenderTiming::SpriteInstance);
                         SpriteRenderer::InstanceParameter instance;
                         std::memset(&instance, 0, sizeof(instance));
                         instance.SRTMatrix43 = Transform(particle); instance.AllColor = Colour(particle, brightness, alphaScale);
@@ -1601,12 +1695,14 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                             instance.CustomData1 = {particle.MaterialTime, particle.AppearancePhase, particle.ParticleSize, 0};
                             std::copy_n(particle.Colour, 4, instance.CustomData2.begin());
                         }
+                        AECN_VFX_TIMING_FINISH(instanceTiming);
                         sprites->Rendering(node, instance, nullptr);
                     }
-                    sprites->EndRendering(node, nullptr);
+                    { AECN_VFX_TIMING_SCOPE(endTiming, AecnRenderTiming::SpriteEnd); sprites->EndRendering(node, nullptr); }
                 }
                 else
                 {
+                    AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::Models);
                     ModelRenderer::NodeParameter node{};
                     node.EffectPointer = preview->effect.Get(); node.ZTest = layer.Kind == 2 ? false : layer.ZTest != 0;
                     node.ZWrite = layer.OpaqueModel || (layer.MeshMaterialIndex >= 0 && preview->meshMaterials[layer.MeshMaterialIndex].gemstone);
@@ -1615,7 +1711,7 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                     const bool mirroredProjection = projection[0] * projection[5] - projection[1] * projection[4] < 0;
                     // These shipped shaders cull back faces before transparent composition.
                     const bool singleSided = layer.MeshMaterialIndex >= 0
-                        && (preview->meshMaterials[layer.MeshMaterialIndex].vertexAnimated || preview->meshMaterials[layer.MeshMaterialIndex].tidecall || preview->meshMaterials[layer.MeshMaterialIndex].soulPanning || preview->meshMaterials[layer.MeshMaterialIndex].scrollingMesh || preview->meshMaterials[layer.MeshMaterialIndex].growingVines || preview->meshMaterials[layer.MeshMaterialIndex].rigidDissolve || preview->meshMaterials[layer.MeshMaterialIndex].rigidBasicDither);
+                        && (preview->meshMaterials[layer.MeshMaterialIndex].gemstone || preview->meshMaterials[layer.MeshMaterialIndex].vertexAnimated || preview->meshMaterials[layer.MeshMaterialIndex].tidecall || preview->meshMaterials[layer.MeshMaterialIndex].soulPanning || preview->meshMaterials[layer.MeshMaterialIndex].scrollingMesh || preview->meshMaterials[layer.MeshMaterialIndex].growingVines || preview->meshMaterials[layer.MeshMaterialIndex].rigidDissolve || preview->meshMaterials[layer.MeshMaterialIndex].rigidBasicDither);
                     node.Culling = layer.Kind == 2 ? (mirroredProjection ? CullingType::Back : CullingType::Front)
                         : singleSided ? (mirroredProjection ? CullingType::Front : CullingType::Back) : CullingType::Double;
                     node.ModelIndex = layer.ModelIndex; node.Magnification = 1;
@@ -1663,7 +1759,7 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
         catch (...) { endRendering(); distortionFrame.reset(); throw; }
         endRendering();
         preview->depthAvailable = !missingRequiredDepth && (sceneDepth != nullptr || independentDepth != nullptr);
-        floatingScene.Finish();
+        { AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::FloatingScene); floatingScene.Finish(); }
 #ifdef _DEBUG
         if (std::getenv("ASSETEDITOR_VFX_HEADLESS_TEST") != nullptr)
             std::fprintf(stderr, "Effekseer draw calls: %d; particles: %d\n", preview->renderer->GetDrawCallCount(), count);
@@ -1677,6 +1773,8 @@ API int AecnVfxDrawInScene(Preview* owner, Preview* preview, const float* view, 
 API int AecnVfxDraw(Preview* preview, const float* view, const float* projection, const AecnParticle* particles, int count,
     const AecnLighting* lighting, ID3D11ShaderResourceView* softDepth)
 {
+    AECN_VFX_TIMING_ACTIVATE(active, preview->timing);
+    AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::NativeDraw);
     if (preview && (!preview->halfLayers.empty() || !preview->fullLayers.empty()))
     {
         if (!AecnVfxBeginScene(preview, lighting)) return 0;

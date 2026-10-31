@@ -43,6 +43,7 @@ namespace GameWorld.Core.Components.Rendering
         private readonly SceneRenderParametersStore _sceneLightParameters;
         private readonly IEventHub _eventHub;
         private readonly GridComponent _gridComponent;
+        internal VfxInteractiveFrameBudget VfxPreparationBudget { get; } = new();
 
         bool _cullingEnabled = false;
         bool _bigSceneDepthBiasMode = false;
@@ -257,6 +258,7 @@ namespace GameWorld.Core.Components.Rendering
 
         public override void Update(GameTime gameTime)
         {
+            VfxPreparationBudget.ResetFrame();
             foreach (var value in _renderItems.Keys)
                 _renderItems[value].Clear();
 

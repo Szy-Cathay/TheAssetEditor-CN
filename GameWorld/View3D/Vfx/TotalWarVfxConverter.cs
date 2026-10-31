@@ -1,4 +1,5 @@
-using System.IO;
+﻿using System.IO;
+using System.Security.Cryptography;
 using System.Xml.Linq;
 using Microsoft.Xna.Framework;
 using Shared.Core.PackFiles.Models;
@@ -24,6 +25,7 @@ internal sealed class VfxConversion
     public List<VfxPreviewModel> Models { get; } = [];
     public List<VfxScrollingMeshBinding> MeshMaterials { get; } = [];
     public List<VfxPreviewDiagnostic> Diagnostics { get; } = [];
+    public VfxPreviewEditorInfo EditorInfo { get; set; } = VfxPreviewEditorInfo.Empty;
 }
 
 // Only builds a preview projection. The source VfxDocument is never edited or used as a save result.
@@ -34,8 +36,35 @@ internal static class TotalWarVfxConverter
 
     private sealed class ConversionContext
     {
+        private readonly Dictionary<(string Path, string Hash), VfxDocument> _documents = [];
+        private readonly Dictionary<(string? Text, string Field, int Fallback, bool Planar), VfxPreviewCurve> _curves = [];
         public VfxModelAnimationBudget AnimationBudget { get; } = new();
+        public VfxPreviewEditorInfoBuilder? Editor { get; set; }
+        public bool CollectEditorInfo { get; init; } = true;
+        public CancellationToken CancellationToken { get; init; }
+        public VfxPreviewXmlCache? PreviewDocuments { get; init; }
         public Dictionary<ModelCacheKey, (VfxPreviewModel Model, string Texture, VfxScrollingMeshMaterial? Material, int PartCount)> Models { get; } = [];
+
+        public VfxDocument ReadDocument(VfxPreviewSnapshot snapshot)
+        {
+            CancellationToken.ThrowIfCancellationRequested();
+            var key = (snapshot.SourcePath.Replace('\\', '/').ToLowerInvariant(), System.Convert.ToHexStringLower(SHA256.HashData(snapshot.GameBytes)));
+            if (_documents.TryGetValue(key, out var cached)) return cached;
+            var document = PreviewDocuments?.Read(snapshot.SourcePath, key.Item2, snapshot.GameBytes, CancellationToken)
+                ?? VfxDocument.Read(snapshot.GameBytes);
+            _documents.Add(key, document);
+            return document;
+        }
+
+        public VfxPreviewCurve ReadCurve(string? text, string field, float fallback, bool planarScale = false)
+        {
+            var key = (text, field, BitConverter.SingleToInt32Bits(fallback), planarScale);
+            if (_curves.TryGetValue(key, out var existing)) return existing;
+            // Numeric curves are immutable; particle randomness and diagnostics remain with each caller.
+            var curve = new VfxPreviewCurve(text, field, fallback, planarScale);
+            _curves.Add(key, curve);
+            return curve;
+        }
 
         public ConversionCheckpoint Capture() => new(AnimationBudget.Capture(), Models.Keys.ToHashSet());
 
@@ -46,9 +75,20 @@ internal static class TotalWarVfxConverter
         }
     }
 
-    public static VfxConversion Convert(VfxPreviewSnapshot snapshot)
+    public static VfxConversion Convert(VfxPreviewSnapshot snapshot) => Convert(snapshot, collectEditorInfo: true);
+
+    public static VfxConversion Convert(VfxPreviewSnapshot snapshot, bool collectEditorInfo)
+        => Convert(snapshot, collectEditorInfo, CancellationToken.None);
+
+    internal static VfxConversion Convert(VfxPreviewSnapshot snapshot, bool collectEditorInfo, CancellationToken cancellationToken)
+        => Convert(snapshot, collectEditorInfo, cancellationToken, null);
+
+    internal static VfxConversion Convert(VfxPreviewSnapshot snapshot, bool collectEditorInfo, CancellationToken cancellationToken,
+        VfxPreviewXmlCache? previewDocuments)
     {
-        var result = ConvertNested(snapshot, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0, null, new());
+        var context = new ConversionContext { CollectEditorInfo = collectEditorInfo, CancellationToken = cancellationToken,
+            PreviewDocuments = previewDocuments };
+        var result = ConvertNested(snapshot, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0, null, context);
         var rejected = new HashSet<VfxPreviewEmitter>();
         foreach (var emitter in result.Emitters)
         {
@@ -74,6 +114,7 @@ internal static class TotalWarVfxConverter
                 foreach (var particleEvent in emitter.Events)
                     particleEvent.Children = particleEvent.Children.Where(child => !rejected.Contains(child)).ToArray();
         }
+        result.EditorInfo = context.Editor?.Build(result) ?? VfxPreviewEditorInfo.Empty;
         return result;
     }
 
@@ -88,7 +129,8 @@ internal static class TotalWarVfxConverter
 
     private static VfxConversion ConvertContents(VfxPreviewSnapshot snapshot, HashSet<string> visited, int depth, XElement? overrides, ConversionContext context)
     {
-        var document = VfxDocument.Read(snapshot.GameBytes);
+        var document = context.ReadDocument(snapshot);
+        var editor = depth == 0 && context.CollectEditorInfo ? context.Editor = new(document) : null;
         var effect = document.Root.Element("vfx")!;
         var emitterLayers = (effect.Element("emitters")?.Elements("emitter") ?? []).Select(element => new
         {
@@ -107,9 +149,17 @@ internal static class TotalWarVfxConverter
         var modelCache = context.Models;
         foreach (var layer in emitterLayers)
         {
+            context.CancellationToken.ThrowIfCancellationRequested();
             if (rootSelection != null && !rootSelection.EmitterIds.Contains(layer.Name, StringComparer.Ordinal))
+            {
+                editor?.RecordRoot(layer.Element, VfxPreviewFieldState.Unselected);
                 continue;
+            }
             if (result.Emitters.Count >= 256) throw new InvalidDataException("VFX preview emitter limit");
+            var emitterOverride = overrides?.Elements("emitter").FirstOrDefault(x => (string?)x.Attribute("name") == layer.Name);
+            // Reference exclusions need no field parsing, resource lookup or animation checkpoint.
+            if (overrides != null && emitterOverride == null || (string?)emitterOverride?.Attribute("enable") == "false")
+            { result.DisabledEmitterCount++; continue; }
             var consumed = new HashSet<XElement>();
             var consumedModifiers = new HashSet<XElement>();
             var properties = ForQuality(layer.Element.Elements()).GroupBy(Name).ToDictionary(x => x.Key, x => x.Last());
@@ -123,13 +173,13 @@ internal static class TotalWarVfxConverter
             var textureCount = result.Textures.Count;
             var modelCount = result.Models.Count;
             var materialCount = result.MeshMaterials.Count;
+            var editorState = VfxPreviewFieldState.Unknown;
+            var editorNotes = editor == null ? null : new List<VfxPreviewDiagnostic>();
             try
             {
                 var enabled = Get("Enable");
-                var emitterOverride = overrides?.Elements("emitter").FirstOrDefault(x => (string?)x.Attribute("name") == layer.Name);
-                if (overrides != null && emitterOverride == null || (string?)emitterOverride?.Attribute("enable") == "false"
-                    || Scalar(enabled, 1) == 0)
-                { result.DisabledEmitterCount++; continue; }
+                if (Scalar(enabled, 1) == 0)
+                { result.DisabledEmitterCount++; editorState = VfxPreviewFieldState.Disabled; continue; }
                 if (layer.Type is not ("continuous_mesh" or "continuous_rigid")) Fail("type", "Vfx.Preview.GeometryUnsupported");
                 var native = EffekseerLayer.Create();
                 native.Kind = layer.Type == "continuous_rigid" ? 1 : 0;
@@ -176,7 +226,8 @@ internal static class TotalWarVfxConverter
                     Note("BurstInterval/BurstIntervalLength", "Vfx.Preview.Unmapped");
                 var maxParticles = Integer(Get("MaximumParticles"), 8192, 0, 1000000);
                 if (maxParticles > TotalWarVfxSimulation.ParticleLimit) Note("MaximumParticles", "Vfx.Preview.CapacityLimited");
-                if (maxParticles == 0 || emission.Maximum <= 0 && spawnSpacing == 0) { result.DisabledEmitterCount++; continue; }
+                if (maxParticles == 0 || emission.Maximum <= 0 && spawnSpacing == 0)
+                { result.DisabledEmitterCount++; editorState = VfxPreviewFieldState.Disabled; continue; }
 
                 var pass = render.LastOrDefault(x => (string?)x.Attribute("name") == "scene_view_type");
                 if (pass != null)
@@ -195,6 +246,12 @@ internal static class TotalWarVfxConverter
                         Fail("scene_view_type", "Vfx.Preview.PassUnsupported");
                 }
                 var scale = Curve("ParticleScale", 1, planarScale: native.Kind == 0);
+                VfxModelNativeScale? modelScaleTable = null;
+                if (native.Kind == 1 && Get("ParticleScale") is { } modelScale)
+                {
+                    try { modelScaleTable = VfxModelNativeScale.Create(modelScale.Value); }
+                    catch (VfxMappingException exception) { Note(exception.Field, exception.Reason); }
+                }
                 if (!properties.ContainsKey("ParticleScale")) Note("ParticleScale", "Vfx.Preview.DefaultScaleCalibrated");
                 var alignment = 0;
                 var translation = Modifier("vs_translation");
@@ -511,6 +568,7 @@ internal static class TotalWarVfxConverter
                         : legacySpreadSpawn || spawnAreaArc != null ? "Vfx.Preview.SpawnCandidate" : "Vfx.Preview.Unmapped");
                 var flatTerrain = false;
                 var spawnOnTerrain = false;
+                var modelTerrainBirth = false;
                 var terrainSpawnDirection = 2;
                 if (relativeMode == 2)
                 {
@@ -548,9 +606,21 @@ internal static class TotalWarVfxConverter
                 var verticalAcceleration = 0f;
                 float? constantForceDamping = null;
                 var particleForceCurve = false;
+                var modelConstantForce = false;
                 if (!force.IsZero)
                 {
-                    if (native.Kind == 0 && speed.IsZero && deceleration.IsZero && orientation.IsZero
+                    if (native.Kind == 1 && simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY"
+                        && force.TryConstantVector(out _) && Curve("ForceB", 0).IsZero && Curve("ForceC", 0).IsZero
+                        && deceleration.IsConstant && deceleration.Range("x", 0) is var modelDamping
+                        && modelDamping.Min >= 0 && modelDamping.Min == modelDamping.Max
+                        && Scalar(Get("ParticlesFollowTerrain"), 0) == 0 && Scalar(Get("EnableCollisions"), 0) == 0
+                        && Scalar(Get("EffectedByWindFactor"), 0) == 0 && Scalar(Get("WindVarianceFactor"), 0) == 0
+                        && Scalar(Get("AllowEmitFromMesh"), 0) == 0 && Scalar(Get("EventEnable"), 0) == 0)
+                    {
+                        modelConstantForce = true;
+                        Note("ForceA/ParticleDeceleration", "Vfx.Preview.ModelConstantForceCandidate");
+                    }
+                    else if (native.Kind == 0 && speed.IsZero && deceleration.IsZero && orientation.IsZero
                         && force.TryConstantVector(out var constantForce) && constantForce.X == 0 && constantForce.Z == 0)
                     {
                         // Native force-only controls support a 1/100 unit conversion; other motion remains diagnosed.
@@ -699,6 +769,14 @@ internal static class TotalWarVfxConverter
                         Note("RigidData/material", "Vfx.Preview.OpaqueCharacterCandidate");
                     foreach (var shader in modelVariants.SelectMany(parts => parts).Select(part => part.Model.ApproximateMaterialShader).OfType<string>().Distinct())
                         Note(shader, "Vfx.Preview.ModelMaterialFallback");
+                    if (relativeMode == 1 && Scalar(Get("ParticlesSpawnOnTerrain"), 0) != 0)
+                    {
+                        spawnOnTerrain = true;
+                        modelTerrainBirth = simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY"
+                            && modelVariants.SelectMany(parts => parts).All(part => part.Model.AnimationVertices == null);
+                        Note("ParticlesSpawnOnTerrain", modelTerrainBirth
+                            ? "Vfx.Preview.ModelTerrainBirthCandidate" : "Vfx.Preview.ModelTerrainBirthUnsupported");
+                    }
                     (model, texturePath, meshMaterial) = modelVariants[0][0];
                     if (modelVariants.SelectMany(parts => parts).Any(part => (part.Material == null) != (meshMaterial == null)))
                         Fail("RigidData", "Vfx.Preview.MaterialUnsupported");
@@ -892,6 +970,7 @@ internal static class TotalWarVfxConverter
                     Name = layer.Name, Render = native, Emission = emission, Life = life, Scale = scale,
                     IsEventHelper = eventHelper, Events = events,
                     InitialScale = Curve("ParticleInitialScale", 1, planarScale: native.Kind == 0), InitialAlpha = initialAlpha,
+                    ModelScaleTable = modelScaleTable,
                     SpriteScaleTable = spriteTables ? VfxSpriteNativeScaleCurve.TryCreateAnalytic(properties.GetValueOrDefault("ParticleScale")?.Value) : null,
                     SpriteInitialAlphaTable = spriteTables ? VfxSpriteNativeScaleCurve.TryCreateAnalytic(properties.GetValueOrDefault("ParticleInitialAlpha")?.Value, "x") : null,
                     SpriteAlphaTable = spriteTables && alphaStart == Vector2.Zero && alphaEnd == Vector2.Zero
@@ -901,6 +980,8 @@ internal static class TotalWarVfxConverter
                     AlphaStartOffset = alphaStart, AlphaEndOffset = alphaEnd,
                     CalibratedVerticalAcceleration = verticalAcceleration,
                     ParticleForceCurve = particleForceCurve,
+                    ModelConstantForce = modelConstantForce,
+                    DestroyOnExplicitStop = native.Kind == 1 && Scalar(Get("ParticleDestroyImmediately"), 0) != 0,
                     ConstantForceDamping = constantForceDamping,
                     Start = start, Duration = duration, HasExplicitDuration = durationNode != null, Infinite = infinite, MaximumParticles = Math.Min(TotalWarVfxSimulation.ParticleLimit, maxParticles),
                     BurstInterval = fixedBurst ? burstInterval.Min : 0, BurstLength = fixedBurst ? burstLength.Min : 0,
@@ -918,7 +999,8 @@ internal static class TotalWarVfxConverter
                     ModelEmitterMotion = nativeModelMotion,
                     ModelEmitterBirthLoop = nativeModelOrientation != null && Scalar(Get("EmitterOrientationLoopAnim"), 0) != 0,
                     ModelEmitterFollowLoop = Scalar(Get("InfiniteLife"), 0) != 0,
-                    RequiresFlatTerrain = flatTerrain, SpawnOnTerrain = spawnOnTerrain, TerrainSpawnDirection = terrainSpawnDirection,
+                    RequiresFlatTerrain = flatTerrain, SpawnOnTerrain = spawnOnTerrain, ModelTerrainBirth = modelTerrainBirth,
+                    TerrainSpawnDirection = terrainSpawnDirection,
                     ParticleCullDistances = particleCullDistances,
                     SpawnAngle = angle, SpawnSpread = spread, ZeroSpawnArc = zeroSpawnArc, DefaultVerticalSpawn = defaultVerticalSpawn,
                     LegacySpreadSpawn = legacySpreadSpawn, RadialSpawnDirection = radialSpawnDirection,
@@ -1011,11 +1093,22 @@ internal static class TotalWarVfxConverter
                 if (result.Emitters.Sum(emitter => emitter.RenderLayerCount) + projected.RenderLayerCount > 512)
                     Fail("RigidData", "Vfx.Preview.RangeUnsupported");
                 result.Emitters.Add(projected);
+                projected.PreviewRootKind = "Emitter";
+                projected.PreviewRootName = layer.Name;
+                projected.PreviewRootOccurrence = layer.Element.ElementsBeforeSelf("emitter")
+                    .Count(element => ((string?)element.Attribute("id") ?? "") == layer.Name);
+                editorState = VfxPreviewFieldState.Connected;
                 Note("", "Vfx.Preview.Candidate");
             }
-            catch (VfxMappingException exception) { DiscardLayerResources(); Note(exception.Field, exception.Reason); }
+            catch (VfxMappingException exception)
+            { editorState = VfxPreviewFieldState.Failed; DiscardLayerResources(); Note(exception.Field, exception.Reason); }
             catch (Exception exception) when (exception is InvalidDataException or FormatException or System.Xml.XmlException)
-            { DiscardLayerResources(); Note("", "Vfx.Preview.InvalidData"); }
+            { editorState = VfxPreviewFieldState.Failed; DiscardLayerResources(); Note("", "Vfx.Preview.InvalidData"); }
+            finally
+            {
+                editor?.RecordEmitter(layer.Element, editorState, properties.Values.Concat(behaviourFields).Concat(render)
+                    .SelectMany(element => element.DescendantsAndSelf()), consumed, consumedModifiers, editorNotes!);
+            }
             foreach (var field in properties.Values.Concat(behaviourFields).Concat(render).Where(x => !consumed.Contains(x)))
                 Note(Name(field), "Vfx.Preview.Unmapped");
             foreach (var modifier in behaviour?.Elements("modifier") ?? [])
@@ -1056,7 +1149,7 @@ internal static class TotalWarVfxConverter
             VfxPreviewCurve MakeCurve(XElement? node, string name, float fallback, bool planarScale = false)
             {
                 var curve = node?.Attribute("value") != null
-                    ? new VfxPreviewCurve(null, name, Scalar(node, fallback)) : new VfxPreviewCurve(node?.Value, name, fallback, planarScale);
+                    ? context.ReadCurve(null, name, Scalar(node, fallback)) : context.ReadCurve(node?.Value, name, fallback, planarScale);
                 if (curve.HasBezierSegments) Note(name, "Vfx.Preview.BezierCandidate");
                 if (curve.HasAnalyticSegments) Note(name, "Vfx.Preview.AnalyticCurveCalibrated");
                 return curve;
@@ -1124,12 +1217,22 @@ internal static class TotalWarVfxConverter
                     Scalar(Behaviour("row_restricted"), 0) != 0, Integer(Behaviour("row_restriction"), 0, 0, rows - 1),
                     Scalar(Behaviour("randomize_row"), 0) != 0, Scalar(Behaviour("cell_blend"), 0) != 0, outerX, outerY, outerCell, fixedSpeed);
             }
-            void Note(string field, string reason) => result.Diagnostics.Add(new(snapshot.SourcePath, layer.Name, field, reason));
+            void Note(string field, string reason)
+            {
+                var note = new VfxPreviewDiagnostic(snapshot.SourcePath, layer.Name, field, reason);
+                result.Diagnostics.Add(note);
+                editorNotes?.Add(note);
+            }
         }
         foreach (var reference in references)
         {
-            if (rootSelection != null && !rootSelection.ReferenceNames.Contains(reference.Name, StringComparer.Ordinal)) continue;
+            if (rootSelection != null && !rootSelection.ReferenceNames.Contains(reference.Name, StringComparer.Ordinal))
+            {
+                editor?.RecordReference(reference.Element, VfxPreviewFieldState.Unselected, [], []);
+                continue;
+            }
             var animationCheckpoint = context.Capture();
+            var referenceDiagnosticStart = result.Diagnostics.Count;
             try
             {
                 var node = reference.Element;
@@ -1147,6 +1250,10 @@ internal static class TotalWarVfxConverter
                 var referenceInstance = new object();
                 foreach (var emitter in child.Emitters)
                 {
+                    emitter.PreviewRootKind = "Reference";
+                    emitter.PreviewRootName = reference.Name;
+                    emitter.PreviewRootOccurrence = node.ElementsBeforeSelf("vfx")
+                        .Count(element => ((string?)element.Attribute("inst_name") ?? "") == reference.Name);
                     if (emitter.IsEventTemplate) { referencedEmitters.Add(emitter); continue; }
                     if ((string?)node.Attribute("infinite_life") == "false")
                     {
@@ -1191,11 +1298,21 @@ internal static class TotalWarVfxConverter
                         && !x.Name.LocalName.StartsWith("spawn_rate_scale_factor_", StringComparison.Ordinal)
                         && !(x.Name.LocalName == "sound_record" && x.Value.Length == 0)))
                         result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, Name(values) + "/" + attribute.Name.LocalName, "Vfx.Preview.Unmapped"));
+                editor?.RecordReference(node, referencedEmitters.Count > 0 ? VfxPreviewFieldState.Connected
+                    : child.TotalEmitterCount > child.DisabledEmitterCount ? VfxPreviewFieldState.Failed
+                    : child.DisabledEmitterCount > 0 ? VfxPreviewFieldState.Disabled : VfxPreviewFieldState.NotConnected,
+                    referencedEmitters, result.Diagnostics.Skip(referenceDiagnosticStart).ToArray());
             }
             catch (VfxMappingException exception)
-            { context.Restore(animationCheckpoint); result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, exception.Field, exception.Reason)); }
+            {
+                context.Restore(animationCheckpoint); result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, exception.Field, exception.Reason));
+                editor?.RecordReference(reference.Element, VfxPreviewFieldState.Failed, [], result.Diagnostics.Skip(referenceDiagnosticStart).ToArray());
+            }
             catch (Exception exception) when (exception is InvalidDataException or FormatException or System.Xml.XmlException)
-            { context.Restore(animationCheckpoint); result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, "vfx_ref", "Vfx.Preview.InvalidData")); }
+            {
+                context.Restore(animationCheckpoint); result.Diagnostics.Add(new(snapshot.SourcePath, reference.Name, "vfx_ref", "Vfx.Preview.InvalidData"));
+                editor?.RecordReference(reference.Element, VfxPreviewFieldState.Failed, [], result.Diagnostics.Skip(referenceDiagnosticStart).ToArray());
+            }
         }
         // Event children are templates. Only an actual parent particle instantiates them at runtime.
         foreach (var emitter in result.Emitters.Where(e => !e.IsEventTemplate).ToArray())
@@ -1216,23 +1333,32 @@ internal static class TotalWarVfxConverter
                         || result.MeshMaterials.Count + child.MeshMaterials.Count > 256)
                         Fail(field, "Vfx.Preview.RangeUnsupported");
                     particleEvent.Children = child.Emitters.Where(e => !e.IsEventTemplate).ToArray();
-                    foreach (var definition in child.Emitters) definition.IsEventTemplate = true;
+                    foreach (var definition in child.Emitters)
+                    {
+                        definition.IsEventTemplate = true;
+                        definition.PreviewRootKind = emitter.PreviewRootKind;
+                        definition.PreviewRootName = emitter.PreviewRootName;
+                        definition.PreviewRootOccurrence = emitter.PreviewRootOccurrence;
+                    }
                     RebaseResources(child, result);
                     result.Emitters.AddRange(child.Emitters);
                     result.Textures.AddRange(child.Textures); result.TexturePaths.AddRange(child.TexturePaths);
                     result.TextureUsages.AddRange(child.TextureUsages); result.Models.AddRange(child.Models);
                     result.MeshMaterials.AddRange(child.MeshMaterials); result.Diagnostics.AddRange(child.Diagnostics);
                     result.Diagnostics.Add(new(snapshot.SourcePath, emitter.Name, field, "Vfx.Preview.ParticleEventCandidate"));
+                    editor?.RecordEventResult(emitter, field, VfxPreviewFieldState.PendingConfirmation, "Vfx.Preview.ParticleEventCandidate");
                 }
                 catch (VfxMappingException exception)
                 {
                     context.Restore(checkpoint);
                     result.Diagnostics.Add(new(snapshot.SourcePath, emitter.Name, field + "/" + exception.Field, exception.Reason));
+                    editor?.RecordEventResult(emitter, field, VfxPreviewFieldState.Failed, exception.Reason);
                 }
                 catch (Exception exception) when (exception is InvalidDataException or FormatException or System.Xml.XmlException)
                 {
                     context.Restore(checkpoint);
                     result.Diagnostics.Add(new(snapshot.SourcePath, emitter.Name, field, "Vfx.Preview.InvalidData"));
+                    editor?.RecordEventResult(emitter, field, VfxPreviewFieldState.Failed, "Vfx.Preview.InvalidData");
                 }
             }
         foreach (var setting in effect.Attributes().Where(x => x.Name != "revision"))
@@ -1305,6 +1431,9 @@ internal static class TotalWarVfxConverter
                 Fail("RigidData/vertex_colour", "Vfx.Preview.GeometryUnsupported");
             var texture = material?.Textures.GetValueOrDefault(TextureType.Diffuse) ?? material?.Textures.GetValueOrDefault(TextureType.BaseColour)
                 ?? part.Material.GetTexture(TextureType.Diffuse)?.Path ?? part.Material.GetTexture(TextureType.BaseColour)?.Path ?? "";
+            if (material == null && part.Material.GetTexture(TextureType.Diffuse) is { } embeddedDiffuse)
+                texture = VfxLegacyModelColour.ResolveEmbeddedDiffuse(file.Header.Version, part.Material.BinaryVertexFormat,
+                    part.CommonHeader.ModelTypeFlag, embeddedDiffuse.Path);
             // Static entry pivots are local offsets from the neutral half, before particle scale/rotation.
             var offset = animated ? Vector3.Zero : part.Material.PivotPoint + new Vector3(.5f) - pivot;
             if (!float.IsFinite(offset.X) || !float.IsFinite(offset.Y) || !float.IsFinite(offset.Z))
@@ -1322,7 +1451,7 @@ internal static class TotalWarVfxConverter
                 : animated ? VfxModelAnimation.Bake(part.Mesh.VertexList, vertices, indices, file.Header.SkeletonName,
                 Read(@"animations\skeletons\" + file.Header.SkeletonName + ".anim"), Read(animation), animationSpeed, maximumLife, animationBudget)
                 : new VfxPreviewModel(vertices, indices);
-            if (scrolling?.Parameters.Length is VfxRigidBasicDitherMaterial.ParameterCount or 12 or 56 or 60 or VfxTidecallMaterial.ParameterCount) geometry = geometry with { OpaqueMaterial = true };
+            if (scrolling?.Parameters.Length is VfxRigidBasicDitherMaterial.ParameterCount or 12 or 40 or 56 or 60 or VfxTidecallMaterial.ParameterCount) geometry = geometry with { OpaqueMaterial = true };
             if (scrolling == null && material is { Alpha: false } && material.Name.Contains("alpha_off", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(material.ShaderPath.Replace('\\', '/'), "shaders/rigid_character.xml.shader", StringComparison.OrdinalIgnoreCase))
                 geometry = geometry with { OpaqueMaterial = true };
