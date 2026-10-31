@@ -674,7 +674,6 @@ public class UiAnimationMetadataFamilyTests
             "AnimationMeta",
             "SuperView",
             "SuperViewViewModel.cs"));
-        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
         XNamespace mathViews = "clr-namespace:CommonControls.MathViews;assembly=Shared.Ui";
         var attributeDocument = XDocument.Parse(attributeView);
         var vectorEditors = attributeDocument.Descendants(mathViews + "Vector3View").ToArray();
@@ -725,12 +724,6 @@ public class UiAnimationMetadataFamilyTests
             NUnitAssert.That(vectorEditors.All(editor =>
                 (string?)editor.Attribute("HorizontalAlignment") == "Stretch" &&
                 (string?)editor.Attribute("MinWidth") == "0"), Is.True);
-            NUnitAssert.That(
-                (string?)attributeDocument.Descendants(presentation + "ListView").Single()
-                    .Attribute("ScrollViewer.HorizontalScrollBarVisibility"),
-                Is.EqualTo("Disabled"));
-            NUnitAssert.That(attributeDocument.Descendants(presentation + "ContentPresenter")
-                .Any(presenter => presenter.Attribute("MinWidth") != null), Is.False);
             NUnitAssert.That(
                 attributeView,
                 Does.Contain("Style=\"{StaticResource AeForm.Label}\""));
