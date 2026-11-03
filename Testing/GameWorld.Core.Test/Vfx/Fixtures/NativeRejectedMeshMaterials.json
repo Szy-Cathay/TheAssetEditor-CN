@@ -1,0 +1,1840 @@
+{
+  "scope": "Complete manifest-backed original XML materials; expected float offsets from fresh official DXBC reflection, not the production parser field arrays. Legacy vertex-anim inserts explicit no-fog at native battle index18.",
+  "manifestSha256": "d60634dad045662ab12436e4457d0d361be046af15084dea374165c14e6a3785",
+  "materials": [
+    {
+      "path": "materials/vfx/vfx_lightning_02.xml.material",
+      "shader": "shaders/basic_additive.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\data.pack",
+      "sha256": "ae3cf0deb86a96c86edef2056597de1bffd5cd5ad6b0f1ce33f1a8ab86c35575",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPnZmeF9saWdodG5pbmdfMDIueG1sPC9uYW1lPg0KIDxzaGFkZXI+c2hhZGVycy9iYXNpY19hZGRpdGl2ZS54bWwuc2hhZGVyPC9zaGFkZXI+DQogPHNvcnRfb3ZlcnJpZGU+MjM1PC9zb3J0X292ZXJyaWRlPg0KIDx0ZXh0dXJlcz4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9iYXNlX2dsb3dfdGV4dHVyZTwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvZGVmYXVsdF93aGl0ZS5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX3Njcm9sbGluZ19kZXRhaWw8L3Nsb3Q+DQogICA8c291cmNlPmNvbW1vbnRleHR1cmVzL2RlZmF1bHRfd2hpdGUuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiA8L3RleHR1cmVzPg0KIDxwYXJhbXM+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb3dfY29sb3VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQzPC90eXBlPg0KICAgPHZhbHVlPjEsMSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvd19zdHJlbmd0aDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjI8L3ZhbHVlPg0KICA8L3BhcmFtPg0KIDwvcGFyYW1zPg0KPC9tYXRlcmlhbD4NCg==",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/compiled/shaders_basic_additive_xml_hlsl_b8ed4615268afa4b0523ef8d1dcd9cee.asm.txt",
+      "reflectionSha256": "8a49b0a37b3178eaac4370783d92dbe2d1737450861766b9948eda5dd5a656ed",
+      "layout": [
+        {
+          "name": "glow_colour",
+          "byteOffset": 0,
+          "components": 3
+        },
+        {
+          "name": "glow_strength",
+          "byteOffset": 12,
+          "components": 1
+        }
+      ],
+      "expectedParameters": [
+        1.0,
+        1.0,
+        1.0,
+        2.0
+      ],
+      "expectedTextures": [
+        "commontextures/default_white.dds",
+        "commontextures/default_white.dds"
+      ],
+      "mode": -1
+    },
+    {
+      "path": "materials/vfx/vfx_sphere_bubble.xml.material",
+      "shader": "shaders/wh2_vfx_mesh_bubble.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\data.pack",
+      "sha256": "25f9604bf478847d6a657922763ab4a5613ec94d03d9938bfd70cafcff6afdfb",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPnZmeF9zcGhlcmVfYnViYmxlLnhtbDwvbmFtZT4NCiA8c2hhZGVyPnNoYWRlcnMvd2gyX3ZmeF9tZXNoX2J1YmJsZS54bWwuc2hhZGVyPC9zaGFkZXI+DQogPHNvcnRfb3ZlcnJpZGU+MjM2PC9zb3J0X292ZXJyaWRlPg0KIDx0ZXh0dXJlcz4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0E8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy92ZnhfdXRpbDEuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0I8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy92ZnhfdXRpbDEuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9jb2xvdXJfb3ZlcmxheTwvc2xvdD4NCiAgIDxzb3VyY2U+dmZ4L1RleHR1cmVzL3doX3ZmeF9idWJibGVfY29sb3VyX2Jhc2VfY29sb3VyLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfZ2xvYmFsX21hc2s8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy92ZnhfZXF1YWxfcmFtcF9iYXNlX2NvbG91ci5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KIDwvdGV4dHVyZXM+DQogPHBhcmFtcz4NCiAgPHBhcmFtPg0KICAgPG5hbWU+VGV4dHVyZV9BX2NoYW5uZWxzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ0PC90eXBlPg0KICAgPHZhbHVlPjEsMSwwLDA8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5UZXh0dXJlX0JfQ2hhbm5lbHM8L25hbWU+DQogICA8dHlwZT5mbG9hdDQ8L3R5cGU+DQogICA8dmFsdWU+MCwxLDEsMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3BhbjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLDAuNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3N0cmVuZ3RoPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3RpbGU8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZGVwdGhfZmFkZV9zd2l0Y2g8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvYmFsX21hc2tfcGFuPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAsMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb2JhbF9tYXNrX3RpbGluZzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5nbG93X2NvbG91cjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MzwvdHlwZT4NCiAgIDx2YWx1ZT4wLjUsMC41LDAuNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb3dfc3RyZW5ndGg8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wLjc8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5ub3JtYWxfZmFkZV9pbl9vdXQ8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+bm9ybWFsX2ZhZGVfcG93ZXI8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+cGl4ZWxfZGVwdGhfZmFkZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjguMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19icmlnaHRuZXNzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC41PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2JyaWdodG5lc3MyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC41PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl9zY3JvbGw8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MC4wNSwwLjA1PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl9zY3JvbGwyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPi0wLjAxLC0wLjAxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl90aWxpbmc8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MiwyPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl90aWxpbmcyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjIsMjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnRvdGFsX2FscGhhX3N0cmVuZ3RoPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZmeF9tZXNoX2FscGhhPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogPC9wYXJhbXM+DQo8L21hdGVyaWFsPg0K",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/compiled/shaders_wh2_vfx_mesh_bubble_xml_hlsl_31e6cb0e94b285043d0881be6e011302.asm.txt",
+      "reflectionSha256": "7166cda5390fe2aecf1785b1f0c6b93ac389c238182c26bfa07b6f2b0819ca84",
+      "layout": [
+        {
+          "name": "Texture_A_channels",
+          "byteOffset": 0,
+          "components": 4
+        },
+        {
+          "name": "Texture_B_Channels",
+          "byteOffset": 16,
+          "components": 4
+        },
+        {
+          "name": "colour_overlay_pan",
+          "byteOffset": 32,
+          "components": 2
+        },
+        {
+          "name": "colour_overlay_strength",
+          "byteOffset": 40,
+          "components": 1
+        },
+        {
+          "name": "colour_overlay_tile",
+          "byteOffset": 44,
+          "components": 2
+        },
+        {
+          "name": "depth_fade_switch",
+          "byteOffset": 52,
+          "components": 1
+        },
+        {
+          "name": "global_mask_pan",
+          "byteOffset": 56,
+          "components": 2
+        },
+        {
+          "name": "global_mask_tiling",
+          "byteOffset": 64,
+          "components": 2
+        },
+        {
+          "name": "glow_colour",
+          "byteOffset": 72,
+          "components": 3
+        },
+        {
+          "name": "glow_strength",
+          "byteOffset": 84,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_in_out",
+          "byteOffset": 88,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_power",
+          "byteOffset": 92,
+          "components": 1
+        },
+        {
+          "name": "pixel_depth_fade",
+          "byteOffset": 96,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness",
+          "byteOffset": 100,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness2",
+          "byteOffset": 104,
+          "components": 1
+        },
+        {
+          "name": "scrolling_colour_scroll",
+          "byteOffset": 108,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll2",
+          "byteOffset": 116,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling",
+          "byteOffset": 124,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling2",
+          "byteOffset": 132,
+          "components": 2
+        },
+        {
+          "name": "total_alpha_strength",
+          "byteOffset": 140,
+          "components": 1
+        },
+        {
+          "name": "vfx_mesh_alpha",
+          "byteOffset": 144,
+          "components": 1
+        }
+      ],
+      "expectedParameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.5,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        0.5,
+        0.5,
+        0.5,
+        0.7,
+        0.0,
+        1.0,
+        8.1,
+        0.5,
+        0.5,
+        0.05,
+        0.05,
+        -0.01,
+        -0.01,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        1.0,
+        1.0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedTextures": [
+        "vfx/Textures/vfx_util1.dds",
+        "vfx/Textures/vfx_util1.dds",
+        "vfx/Textures/wh_vfx_bubble_colour_base_colour.dds",
+        "vfx/Textures/vfx_equal_ramp_base_colour.dds"
+      ],
+      "mode": 0
+    },
+    {
+      "path": "materials/vfx/vfx_sphere__lava_bubble.xml.material",
+      "shader": "shaders/wh2_vfx_mesh_bubble.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\data.pack",
+      "sha256": "7f823cbd5cc991e8c6448a6e5dcd983768e7f042b34e9e91499dba98eed36814",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPnZmeF9zcGhlcmVfX2xhdmFfYnViYmxlLnhtbDwvbmFtZT4NCiA8c2hhZGVyPnNoYWRlcnMvd2gyX3ZmeF9tZXNoX2J1YmJsZS54bWwuc2hhZGVyPC9zaGFkZXI+DQogPHNvcnRfb3ZlcnJpZGU+MjM2PC9zb3J0X292ZXJyaWRlPg0KIDx0ZXh0dXJlcz4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0E8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy92ZnhfdXRpbDEuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0I8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy92ZnhfdXRpbDEuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9jb2xvdXJfb3ZlcmxheTwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvZGVmYXVsdF9ub2lzZTEuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9nbG9iYWxfbWFzazwvc2xvdD4NCiAgIDxzb3VyY2U+dmZ4L1RleHR1cmVzL3ZmeF9lcXVhbF9yYW1wX2Jhc2VfY29sb3VyLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogPC90ZXh0dXJlcz4NCiA8cGFyYW1zPg0KICA8cGFyYW0+DQogICA8bmFtZT5UZXh0dXJlX0FfY2hhbm5lbHM8L25hbWU+DQogICA8dHlwZT5mbG9hdDQ8L3R5cGU+DQogICA8dmFsdWU+MSwxLDAsMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPlRleHR1cmVfQl9DaGFubmVsczwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0NDwvdHlwZT4NCiAgIDx2YWx1ZT4wLDEsMSwwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Y29sb3VyX292ZXJsYXlfcGFuPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAuMDUsMC4wNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3N0cmVuZ3RoPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+NTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3RpbGU8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MiwyPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZGVwdGhfZmFkZV9zd2l0Y2g8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvYmFsX21hc2tfcGFuPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAsMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb2JhbF9tYXNrX3RpbGluZzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5nbG93X2NvbG91cjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MzwvdHlwZT4NCiAgIDx2YWx1ZT4yLDIsMjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb3dfc3RyZW5ndGg8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPm5vcm1hbF9mYWRlX2luX291dDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjA8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5ub3JtYWxfZmFkZV9wb3dlcjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjAuMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnBpeGVsX2RlcHRoX2ZhZGU8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4zPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2JyaWdodG5lc3M8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wLjU8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfYnJpZ2h0bmVzczI8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wLjU8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3Njcm9sbDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLjA1LDAuMDU8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3Njcm9sbDI8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+LTAuMDEsLTAuMDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3RpbGluZzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4yLDI8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3RpbGluZzI8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MiwyPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dG90YWxfYWxwaGFfc3RyZW5ndGg8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmZ4X21lc2hfYWxwaGE8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiA8L3BhcmFtcz4NCjwvbWF0ZXJpYWw+DQo=",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/compiled/shaders_wh2_vfx_mesh_bubble_xml_hlsl_31e6cb0e94b285043d0881be6e011302.asm.txt",
+      "reflectionSha256": "7166cda5390fe2aecf1785b1f0c6b93ac389c238182c26bfa07b6f2b0819ca84",
+      "layout": [
+        {
+          "name": "Texture_A_channels",
+          "byteOffset": 0,
+          "components": 4
+        },
+        {
+          "name": "Texture_B_Channels",
+          "byteOffset": 16,
+          "components": 4
+        },
+        {
+          "name": "colour_overlay_pan",
+          "byteOffset": 32,
+          "components": 2
+        },
+        {
+          "name": "colour_overlay_strength",
+          "byteOffset": 40,
+          "components": 1
+        },
+        {
+          "name": "colour_overlay_tile",
+          "byteOffset": 44,
+          "components": 2
+        },
+        {
+          "name": "depth_fade_switch",
+          "byteOffset": 52,
+          "components": 1
+        },
+        {
+          "name": "global_mask_pan",
+          "byteOffset": 56,
+          "components": 2
+        },
+        {
+          "name": "global_mask_tiling",
+          "byteOffset": 64,
+          "components": 2
+        },
+        {
+          "name": "glow_colour",
+          "byteOffset": 72,
+          "components": 3
+        },
+        {
+          "name": "glow_strength",
+          "byteOffset": 84,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_in_out",
+          "byteOffset": 88,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_power",
+          "byteOffset": 92,
+          "components": 1
+        },
+        {
+          "name": "pixel_depth_fade",
+          "byteOffset": 96,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness",
+          "byteOffset": 100,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness2",
+          "byteOffset": 104,
+          "components": 1
+        },
+        {
+          "name": "scrolling_colour_scroll",
+          "byteOffset": 108,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll2",
+          "byteOffset": 116,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling",
+          "byteOffset": 124,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling2",
+          "byteOffset": 132,
+          "components": 2
+        },
+        {
+          "name": "total_alpha_strength",
+          "byteOffset": 140,
+          "components": 1
+        },
+        {
+          "name": "vfx_mesh_alpha",
+          "byteOffset": 144,
+          "components": 1
+        }
+      ],
+      "expectedParameters": [
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        0.0,
+        0.05,
+        0.05,
+        5.0,
+        2.0,
+        2.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        2.0,
+        2.0,
+        2.0,
+        10.0,
+        0.0,
+        0.1,
+        3.0,
+        0.5,
+        0.5,
+        0.05,
+        0.05,
+        -0.01,
+        -0.01,
+        2.0,
+        2.0,
+        2.0,
+        2.0,
+        1.0,
+        1.0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedTextures": [
+        "vfx/Textures/vfx_util1.dds",
+        "vfx/Textures/vfx_util1.dds",
+        "commontextures/default_noise1.dds",
+        "vfx/Textures/vfx_equal_ramp_base_colour.dds"
+      ],
+      "mode": 0
+    },
+    {
+      "path": "materials/vfx/wh2_final_battle_lightning.xml.material",
+      "shader": "shaders/wh2_vfx_mesh_lightning.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\data.pack",
+      "sha256": "79266e78607407e931c37a17c897089ab9b2554d240ae86acecb53f142e2b972",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPndoMl9maW5hbF9iYXR0bGVfbGlnaHRuaW5nLnhtbDwvbmFtZT4NCiA8c2hhZGVyPnNoYWRlcnMvd2gyX3ZmeF9tZXNoX2xpZ2h0bmluZy54bWwuc2hhZGVyPC9zaGFkZXI+DQogPHNvcnRfb3ZlcnJpZGU+MjU1PC9zb3J0X292ZXJyaWRlPg0KIDx0ZXh0dXJlcz4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0E8L3Nsb3Q+DQogICA8c291cmNlPmNvbW1vbnRleHR1cmVzL3dpbmRzX29mX21hZ2ljX21hdGVyaWFsX21hcC5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX1RleHR1cmVfQjwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvd2luZHNfb2ZfbWFnaWNfbWF0ZXJpYWxfbWFwLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfVGV4dHVyZV9DPC9zbG90Pg0KICAgPHNvdXJjZT5jb21tb250ZXh0dXJlcy93aW5kc19vZl9tYWdpY19tYXRlcmlhbF9tYXAuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9jb2xvdXJfb3ZlcmxheTwvc2xvdD4NCiAgIDxzb3VyY2U+dmZ4L1RleHR1cmVzL3doMl9saWdodGVuaW5nX2JvbHRfYmFzZV9jb2xvdXIuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9nbG9iYWxfbWFzazwvc2xvdD4NCiAgIDxzb3VyY2U+dmZ4L1RleHR1cmVzL2VkZ2VfZ3JhZGllbnRfYmFzZV9jb2xvdXIuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiA8L3RleHR1cmVzPg0KIDxwYXJhbXM+DQogIDxwYXJhbT4NCiAgIDxuYW1lPlRleHR1cmVfQV9jaGFubmVsczwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0NDwvdHlwZT4NCiAgIDx2YWx1ZT4wLDAsMCwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+VGV4dHVyZV9CX0NoYW5uZWxzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ0PC90eXBlPg0KICAgPHZhbHVlPjAsMCwwLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5UZXh0dXJlX0NfQ2hhbm5lbHM8L25hbWU+DQogICA8dHlwZT5mbG9hdDQ8L3R5cGU+DQogICA8dmFsdWU+MCwwLDAsMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3BhbjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4yLDA8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5jb2xvdXJfb3ZlcmxheV9zdHJlbmd0aDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjAuNzwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3RpbGU8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZGVwdGhfZmFkZV9zd2l0Y2g8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvYmFsX21hc2tfcGFuPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAsMi40PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvYmFsX21hc2tfdGlsaW5nPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjEsMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb3dfY29sb3VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQzPC90eXBlPg0KICAgPHZhbHVlPjAuNSwwLjUsMC41PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvd19zdHJlbmd0aDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjIwMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPm5vcm1hbF9mYWRlX2luX291dDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5ub3JtYWxfZmFkZV9wb3dlcjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjI8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5waXhlbF9kZXB0aF9mYWRlPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19icmlnaHRuZXNzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19icmlnaHRuZXNzMjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfYnJpZ2h0bmVzczM8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl9zY3JvbGw8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MCwtMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19jb2xvdXJfc2Nyb2xsMjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLC0xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl9zY3JvbGwzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAuMSwwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl90aWxpbmc8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl90aWxpbmcyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjEsMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19jb2xvdXJfdGlsaW5nMzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT50b3RhbF9hbHBoYV9zdHJlbmd0aDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjI8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT52ZXJ0ZXhfY29sb3VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZmeF9tZXNoX2FscGhhPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+NDwvdmFsdWU+DQogIDwvcGFyYW0+DQogPC9wYXJhbXM+DQo8L21hdGVyaWFsPg0K",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/compiled/shaders_wh2_vfx_mesh_lightning_xml_hlsl_022efc1ce9cc3356136c7710ea0b8c4e.asm.txt",
+      "reflectionSha256": "1d0200ee1b15f732189a6ef4391bdd5cd0571a3fd3bd2c3341f0f3e14b984e1d",
+      "layout": [
+        {
+          "name": "Texture_A_channels",
+          "byteOffset": 0,
+          "components": 4
+        },
+        {
+          "name": "Texture_B_Channels",
+          "byteOffset": 16,
+          "components": 4
+        },
+        {
+          "name": "Texture_C_Channels",
+          "byteOffset": 32,
+          "components": 4
+        },
+        {
+          "name": "colour_overlay_pan",
+          "byteOffset": 48,
+          "components": 2
+        },
+        {
+          "name": "colour_overlay_strength",
+          "byteOffset": 56,
+          "components": 1
+        },
+        {
+          "name": "colour_overlay_tile",
+          "byteOffset": 60,
+          "components": 2
+        },
+        {
+          "name": "depth_fade_switch",
+          "byteOffset": 68,
+          "components": 1
+        },
+        {
+          "name": "global_mask_pan",
+          "byteOffset": 72,
+          "components": 2
+        },
+        {
+          "name": "global_mask_tiling",
+          "byteOffset": 80,
+          "components": 2
+        },
+        {
+          "name": "glow_colour",
+          "byteOffset": 88,
+          "components": 3
+        },
+        {
+          "name": "glow_strength",
+          "byteOffset": 100,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_in_out",
+          "byteOffset": 104,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_power",
+          "byteOffset": 108,
+          "components": 1
+        },
+        {
+          "name": "pixel_depth_fade",
+          "byteOffset": 112,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness",
+          "byteOffset": 116,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness2",
+          "byteOffset": 120,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness3",
+          "byteOffset": 124,
+          "components": 1
+        },
+        {
+          "name": "scrolling_colour_scroll",
+          "byteOffset": 128,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll2",
+          "byteOffset": 136,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll3",
+          "byteOffset": 144,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling",
+          "byteOffset": 152,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling2",
+          "byteOffset": 160,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling3",
+          "byteOffset": 168,
+          "components": 2
+        },
+        {
+          "name": "total_alpha_strength",
+          "byteOffset": 176,
+          "components": 1
+        },
+        {
+          "name": "vertex_colour",
+          "byteOffset": 180,
+          "components": 1
+        },
+        {
+          "name": "vfx_mesh_alpha",
+          "byteOffset": 184,
+          "components": 1
+        }
+      ],
+      "expectedParameters": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        2.0,
+        0.0,
+        0.7,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        2.4,
+        1.0,
+        1.0,
+        0.5,
+        0.5,
+        0.5,
+        200.0,
+        1.0,
+        2.0,
+        2.0,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        -1.0,
+        0.0,
+        -1.0,
+        0.1,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        2.0,
+        1.0,
+        4.0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ],
+      "expectedTextures": [
+        "commontextures/winds_of_magic_material_map.dds",
+        "commontextures/winds_of_magic_material_map.dds",
+        "commontextures/winds_of_magic_material_map.dds",
+        "vfx/Textures/wh2_lightening_bolt_base_colour.dds",
+        "vfx/Textures/edge_gradient_base_colour.dds"
+      ],
+      "mode": 1
+    },
+    {
+      "path": "materials/vfx/wh2_main_abilities_slann_forcefield.xml.material",
+      "shader": "shaders/wh2_vfx_mesh_distortion.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\data.pack",
+      "sha256": "518e348c6c07b1cda9d805c544f5eba5f03036767bb6a0e8a8bbd8df38205fe0",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPndoMl9tYWluX2FiaWxpdGllc19zbGFubl9mb3JjZWZpZWxkLnhtbDwvbmFtZT4NCiA8c2hhZGVyPnNoYWRlcnMvd2gyX3ZmeF9tZXNoX2Rpc3RvcnRpb24ueG1sLnNoYWRlcjwvc2hhZGVyPg0KIDxzb3J0X292ZXJyaWRlPjI1NTwvc29ydF9vdmVycmlkZT4NCiA8dGV4dHVyZXM+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfVGV4dHVyZV9BPC9zbG90Pg0KICAgPHNvdXJjZT52ZngvVGV4dHVyZXMvdmZ4X3V0aWwxLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfVGV4dHVyZV9CPC9zbG90Pg0KICAgPHNvdXJjZT52ZngvVGV4dHVyZXMvbW90ZXNfYmFzZV9jb2xvdXIuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0M8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy92ZnhfdXRpbDEuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9jb2xvdXJfb3ZlcmxheTwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvZGVmYXVsdF93aGl0ZS5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX2Rpc3RvcnRpb248L3Nsb3Q+DQogICA8c291cmNlPmNvbW1vbnRleHR1cmVzL3ZvbHVtZXRyaWNfbm9pc2UuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9nbG9iYWxfbWFzazwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvZGVmYXVsdF93aGl0ZS5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KIDwvdGV4dHVyZXM+DQogPHBhcmFtcz4NCiAgPHBhcmFtPg0KICAgPG5hbWU+VGV4dHVyZV9BX2NoYW5uZWxzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ0PC90eXBlPg0KICAgPHZhbHVlPjAsMCwwLDAuMjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPlRleHR1cmVfQl9DaGFubmVsczwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0NDwvdHlwZT4NCiAgIDx2YWx1ZT4xLDAsMCwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+VGV4dHVyZV9DX0NoYW5uZWxzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ0PC90eXBlPg0KICAgPHZhbHVlPjAuNiwwLDAsMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3BhbjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLC0xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Y29sb3VyX292ZXJsYXlfc3RyZW5ndGg8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Y29sb3VyX292ZXJsYXlfdGlsZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5kZXB0aF9mYWRlX3N3aXRjaDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5kaWZmdXNlX2Rpc3RvcnRpb25fc2NhbGU8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MC41LDAuNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmRpZmZ1c2VfZGlzdG9ydGlvbl9zcGVlZDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5kaXN0b3J0aW9uX2JyaWdodG5lc3M8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvYmFsX21hc2tfcGFuPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAsMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb2JhbF9tYXNrX3RpbGluZzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDAuNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb2JhbF9tYXNrX3RpbWU8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvd19jb2xvdXI8L25hbWU+DQogICA8dHlwZT5mbG9hdDM8L3R5cGU+DQogICA8dmFsdWU+MC41LDAuNSwwLjc8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5nbG93X3N0cmVuZ3RoPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTA8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5taXhfY29sb3VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQzPC90eXBlPg0KICAgPHZhbHVlPjEsMSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+bm9ybWFsX2ZhZGVfaW5fb3V0PC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPm5vcm1hbF9mYWRlX3Bvd2VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnBpeGVsX2RlcHRoX2ZhZGU8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19icmlnaHRuZXNzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19icmlnaHRuZXNzMjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjAuNzU8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfYnJpZ2h0bmVzczM8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl9zY3JvbGw8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MCwtMC4yPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl9zY3JvbGwyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAsLTAuNDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19jb2xvdXJfc2Nyb2xsMzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLC0wLjI8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3RpbGluZzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT42LDY8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3RpbGluZzI8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+NCw0PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl90aWxpbmczPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjQsNDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnRvdGFsX2FscGhhX3N0cmVuZ3RoPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZlcnRleF9hbHBoYV9jb250cmFzdDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjI8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT52ZXJ0ZXhfY29sb3VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZmeF9tZXNoX2FscGhhPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogPC9wYXJhbXM+DQo8L21hdGVyaWFsPg0K",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/compiled/shaders_wh2_vfx_mesh_distortion_xml_hlsl_440f71aefd6dbac3c7733625e13edf6e.asm.txt",
+      "reflectionSha256": "204ef60ec3b80395eccac34dd4a9087053560afdbc1be608e1d57387ad9db1bc",
+      "layout": [
+        {
+          "name": "Texture_A_channels",
+          "byteOffset": 0,
+          "components": 4
+        },
+        {
+          "name": "Texture_B_Channels",
+          "byteOffset": 16,
+          "components": 4
+        },
+        {
+          "name": "Texture_C_Channels",
+          "byteOffset": 32,
+          "components": 4
+        },
+        {
+          "name": "colour_overlay_pan",
+          "byteOffset": 48,
+          "components": 2
+        },
+        {
+          "name": "colour_overlay_strength",
+          "byteOffset": 56,
+          "components": 1
+        },
+        {
+          "name": "colour_overlay_tile",
+          "byteOffset": 60,
+          "components": 2
+        },
+        {
+          "name": "depth_fade_switch",
+          "byteOffset": 68,
+          "components": 1
+        },
+        {
+          "name": "diffuse_distortion_scale",
+          "byteOffset": 72,
+          "components": 2
+        },
+        {
+          "name": "diffuse_distortion_speed",
+          "byteOffset": 80,
+          "components": 2
+        },
+        {
+          "name": "distortion_brightness",
+          "byteOffset": 88,
+          "components": 1
+        },
+        {
+          "name": "global_mask_pan",
+          "byteOffset": 92,
+          "components": 2
+        },
+        {
+          "name": "global_mask_tiling",
+          "byteOffset": 100,
+          "components": 2
+        },
+        {
+          "name": "global_mask_time",
+          "byteOffset": 108,
+          "components": 1
+        },
+        {
+          "name": "glow_colour",
+          "byteOffset": 112,
+          "components": 3
+        },
+        {
+          "name": "glow_strength",
+          "byteOffset": 124,
+          "components": 1
+        },
+        {
+          "name": "mix_colour",
+          "byteOffset": 128,
+          "components": 3
+        },
+        {
+          "name": "normal_fade_in_out",
+          "byteOffset": 140,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_power",
+          "byteOffset": 144,
+          "components": 1
+        },
+        {
+          "name": "pixel_depth_fade",
+          "byteOffset": 148,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness",
+          "byteOffset": 152,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness2",
+          "byteOffset": 156,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness3",
+          "byteOffset": 160,
+          "components": 1
+        },
+        {
+          "name": "scrolling_colour_scroll",
+          "byteOffset": 164,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll2",
+          "byteOffset": 172,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll3",
+          "byteOffset": 180,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling",
+          "byteOffset": 188,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling2",
+          "byteOffset": 196,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling3",
+          "byteOffset": 204,
+          "components": 2
+        },
+        {
+          "name": "total_alpha_strength",
+          "byteOffset": 212,
+          "components": 1
+        },
+        {
+          "name": "vertex_alpha_contrast",
+          "byteOffset": 216,
+          "components": 1
+        },
+        {
+          "name": "vertex_colour",
+          "byteOffset": 220,
+          "components": 1
+        },
+        {
+          "name": "vfx_mesh_alpha",
+          "byteOffset": 224,
+          "components": 1
+        }
+      ],
+      "expectedParameters": [
+        0.0,
+        0.0,
+        0.0,
+        0.2,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.6,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        -1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.5,
+        0.5,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.5,
+        1.0,
+        0.5,
+        0.5,
+        0.7,
+        10.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        2.0,
+        10.0,
+        1.0,
+        0.75,
+        1.0,
+        0.0,
+        -0.2,
+        0.0,
+        -0.4,
+        0.0,
+        -0.2,
+        6.0,
+        6.0,
+        4.0,
+        4.0,
+        4.0,
+        4.0,
+        1.0,
+        2.0,
+        1.0,
+        1.0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        0,
+        0,
+        0
+      ],
+      "expectedTextures": [
+        "vfx/Textures/vfx_util1.dds",
+        "vfx/Textures/motes_base_colour.dds",
+        "vfx/Textures/vfx_util1.dds",
+        "commontextures/default_white.dds",
+        "commontextures/volumetric_noise.dds",
+        "commontextures/default_white.dds"
+      ],
+      "mode": 3
+    },
+    {
+      "path": "vfx/materials/wh2_dlc12_abilities_burning_beam_glow.xml.material",
+      "shader": "shaders/rigid_flat_color_tinted.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\vfx.pack",
+      "sha256": "439f4d9d8dd135d50afcb0ae573c9574147c3f36e68c0404aefa7de0421c26b7",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPndoMl9kbGMxMl9hYmlsaXRpZXNfYnVybmluZ19iZWFtX2dsb3cueG1sPC9uYW1lPg0KIDxzaGFkZXI+c2hhZGVycy9yaWdpZF9mbGF0X2NvbG9yX3RpbnRlZC54bWwuc2hhZGVyPC9zaGFkZXI+DQogPHNvcnRfb3ZlcnJpZGU+MjU1PC9zb3J0X292ZXJyaWRlPg0KIDx0ZXh0dXJlcy8+DQogPHBhcmFtcy8+DQo8L21hdGVyaWFsPg0K",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/compiled/shaders_rigid_flat_color_tinted_xml_hlsl_0da30c030f4106a58b9faab7ea6dda7d.asm.txt",
+      "reflectionSha256": "1aef6c2e8712fe6fc39bc7d8398886c96fc2e122e14197b90c42d0f1d05132de",
+      "layout": [],
+      "expectedParameters": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedTextures": [],
+      "mode": -1
+    },
+    {
+      "path": "vfx/materials/wh2_dlc13_lzd_charging_beams.xml.material",
+      "shader": "shaders/wh_vfx_mesh_vertex_anim.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\vfx.pack",
+      "sha256": "ec1480f076c2a40d95faffb116a5c9541060bac92e495c2f2762c7739d5d270a",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPndoMl9kbGMxM19semRfY2hhcmdpbmdfYmVhbXMueG1sPC9uYW1lPg0KIDxzaGFkZXI+c2hhZGVycy93aF92ZnhfbWVzaF92ZXJ0ZXhfYW5pbS54bWwuc2hhZGVyPC9zaGFkZXI+DQogPHNvcnRfb3ZlcnJpZGU+MjU1PC9zb3J0X292ZXJyaWRlPg0KIDx0ZXh0dXJlcz4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0E8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy92ZnhfdXRpbDEuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0I8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy92ZnhfdXRpbDEuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0M8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy9yYWRpYWxfcmFtcF9iYXNlX2NvbG91ci5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX2NvbG91cl9vdmVybGF5PC9zbG90Pg0KICAgPHNvdXJjZT52ZngvVGV4dHVyZXMvd2gyX2RsYzEzX2x6ZF9zaGlwX2JlYW1zX2NvbG91cl9iYXNlX2NvbG91ci5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX2dsb2JhbF9tYXNrPC9zbG90Pg0KICAgPHNvdXJjZT52ZngvVGV4dHVyZXMvcmFkaWFsX3JhbXBfYmFzZV9jb2xvdXIuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF92ZXJ0ZXhfZGlzcF90ZXh0dXJlPC9zbG90Pg0KICAgPHNvdXJjZT5jb21tb250ZXh0dXJlcy9kZWZhdWx0X3doaXRlLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogPC90ZXh0dXJlcz4NCiA8cGFyYW1zPg0KICA8cGFyYW0+DQogICA8bmFtZT5UZXh0dXJlX0FfY2hhbm5lbHM8L25hbWU+DQogICA8dHlwZT5mbG9hdDQ8L3R5cGU+DQogICA8dmFsdWU+MCwwLDAsMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPlRleHR1cmVfQl9DaGFubmVsczwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0NDwvdHlwZT4NCiAgIDx2YWx1ZT4wLDAsMCwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+VGV4dHVyZV9DX0NoYW5uZWxzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ0PC90eXBlPg0KICAgPHZhbHVlPjAsMCwwLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5jb2xvdXJfb3ZlcmxheV9wYW48L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MCwwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Y29sb3VyX292ZXJsYXlfc3RyZW5ndGg8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4yPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Y29sb3VyX292ZXJsYXlfdGlsZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5kZXB0aF9mYWRlX3N3aXRjaDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5nbG9iYWxfbWFza19wYW48L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MCwwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvYmFsX21hc2tfdGlsaW5nPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjEsMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb3dfY29sb3VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQzPC90eXBlPg0KICAgPHZhbHVlPjEsMSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvd19zdHJlbmd0aDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjQwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+bm9ybWFsX2ZhZGVfaW5fb3V0PC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPm5vcm1hbF9mYWRlX3Bvd2VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnBpeGVsX2RlcHRoX2ZhZGU8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4yMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19icmlnaHRuZXNzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19icmlnaHRuZXNzMjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfYnJpZ2h0bmVzczM8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wLjU8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3Njcm9sbDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLjEsMC4zPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl9zY3JvbGwyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPi0wLjIsMC4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl9zY3JvbGwzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAsMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19jb2xvdXJfdGlsaW5nPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjEsNzwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19jb2xvdXJfdGlsaW5nMjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDU8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3RpbGluZzM8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MSwzPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dGltZV9zb3VyY2U8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dG90YWxfYWxwaGFfc3RyZW5ndGg8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT40PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2FuaW08L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2FuaW1fc3BlZWQ8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT40PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2NvbG91cjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjA8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT52ZXJ0ZXhfZGlzcF9zY2FsZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT52ZXJ0ZXhfZGlzcF9zY3JvbGw8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MCwtMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZlcnRleF9kaXNwX3RpbGluZzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT52ZXJ0ZXhfZGlzcGxhY2VtZW50PC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZlcnRleF9vc2NpbGF0aW9uX3NjYWxlPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X3hfYW1wPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZlcnRleF94X2ZyZXE8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X3lfYW1wPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MzwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZlcnRleF95X2ZyZXE8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wLjI8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT52ZXJ0ZXhfel9hbXA8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4yPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X3pfZnJlcTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjAuNjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZmeF9tZXNoX2FscGhhPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogPC9wYXJhbXM+DQo8L21hdGVyaWFsPg0K",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/compiled/shaders_wh_vfx_mesh_vertex_anim_xml_hlsl_45f542e7e0c8d7cf0cca5a0cc6e1dc1c.asm.txt",
+      "reflectionSha256": "e5a50cf7b1cdb5414458dd7b7fd2331ee06379f2eb6bc1330b283b46e3ad4f7f",
+      "layout": [
+        {
+          "name": "Texture_A_channels",
+          "byteOffset": 0,
+          "components": 4
+        },
+        {
+          "name": "Texture_B_Channels",
+          "byteOffset": 16,
+          "components": 4
+        },
+        {
+          "name": "Texture_C_Channels",
+          "byteOffset": 32,
+          "components": 4
+        },
+        {
+          "name": "colour_overlay_pan",
+          "byteOffset": 48,
+          "components": 2
+        },
+        {
+          "name": "colour_overlay_strength",
+          "byteOffset": 56,
+          "components": 1
+        },
+        {
+          "name": "colour_overlay_tile",
+          "byteOffset": 60,
+          "components": 2
+        },
+        {
+          "name": "depth_fade_switch",
+          "byteOffset": 68,
+          "components": 1
+        },
+        {
+          "name": "global_mask_pan",
+          "byteOffset": 72,
+          "components": 2
+        },
+        {
+          "name": "global_mask_tiling",
+          "byteOffset": 80,
+          "components": 2
+        },
+        {
+          "name": "glow_colour",
+          "byteOffset": 88,
+          "components": 3
+        },
+        {
+          "name": "glow_strength",
+          "byteOffset": 100,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_in_out",
+          "byteOffset": 104,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_power",
+          "byteOffset": 108,
+          "components": 1
+        },
+        {
+          "name": "pixel_depth_fade",
+          "byteOffset": 112,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness",
+          "byteOffset": 116,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness2",
+          "byteOffset": 120,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness3",
+          "byteOffset": 124,
+          "components": 1
+        },
+        {
+          "name": "scrolling_colour_scroll",
+          "byteOffset": 128,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll2",
+          "byteOffset": 136,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll3",
+          "byteOffset": 144,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling",
+          "byteOffset": 152,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling2",
+          "byteOffset": 160,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling3",
+          "byteOffset": 168,
+          "components": 2
+        },
+        {
+          "name": "time_source",
+          "byteOffset": 176,
+          "components": 1
+        },
+        {
+          "name": "total_alpha_strength",
+          "byteOffset": 180,
+          "components": 1
+        },
+        {
+          "name": "vertex_anim",
+          "byteOffset": 184,
+          "components": 1
+        },
+        {
+          "name": "vertex_anim_speed",
+          "byteOffset": 188,
+          "components": 1
+        },
+        {
+          "name": "vertex_colour",
+          "byteOffset": 192,
+          "components": 1
+        },
+        {
+          "name": "vertex_disp_scale",
+          "byteOffset": 196,
+          "components": 1
+        },
+        {
+          "name": "vertex_disp_scroll",
+          "byteOffset": 200,
+          "components": 2
+        },
+        {
+          "name": "vertex_disp_tiling",
+          "byteOffset": 208,
+          "components": 2
+        },
+        {
+          "name": "vertex_displacement",
+          "byteOffset": 216,
+          "components": 1
+        },
+        {
+          "name": "vertex_oscilation_scale",
+          "byteOffset": 220,
+          "components": 1
+        },
+        {
+          "name": "vertex_x_amp",
+          "byteOffset": 224,
+          "components": 1
+        },
+        {
+          "name": "vertex_x_freq",
+          "byteOffset": 228,
+          "components": 1
+        },
+        {
+          "name": "vertex_y_amp",
+          "byteOffset": 232,
+          "components": 1
+        },
+        {
+          "name": "vertex_y_freq",
+          "byteOffset": 236,
+          "components": 1
+        },
+        {
+          "name": "vertex_z_amp",
+          "byteOffset": 240,
+          "components": 1
+        },
+        {
+          "name": "vertex_z_freq",
+          "byteOffset": 244,
+          "components": 1
+        },
+        {
+          "name": "vfx_mesh_alpha",
+          "byteOffset": 248,
+          "components": 1
+        }
+      ],
+      "expectedParameters": [
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        2.0,
+        1.0,
+        1.0,
+        1.0,
+        1,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        40.0,
+        1.0,
+        1.0,
+        20.0,
+        1.0,
+        1.0,
+        0.5,
+        0.1,
+        0.3,
+        -0.2,
+        0.1,
+        0.0,
+        1.0,
+        1.0,
+        7.0,
+        1.0,
+        5.0,
+        1.0,
+        3.0,
+        0.0,
+        4.0,
+        1.0,
+        4.0,
+        0.0,
+        1.0,
+        0.0,
+        -1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.1,
+        2.0,
+        1.0,
+        3.0,
+        0.2,
+        2.0,
+        0.6,
+        1.0
+      ],
+      "expectedTextures": [
+        "vfx/Textures/vfx_util1.dds",
+        "vfx/Textures/vfx_util1.dds",
+        "vfx/Textures/radial_ramp_base_colour.dds",
+        "vfx/Textures/wh2_dlc13_lzd_ship_beams_colour_base_colour.dds",
+        "vfx/Textures/radial_ramp_base_colour.dds",
+        "commontextures/default_white.dds"
+      ],
+      "mode": -1
+    },
+    {
+      "path": "vfx/materials/wh2_dlc16_enviro_magic_beam.xml.material",
+      "shader": "shaders/wh_vfx_mesh_vertex_anim.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\vfx.pack",
+      "sha256": "30b591ad4e44bfa24dcfd029217cfc85a60389d652d0fbd4036eed11f54d3fd6",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPndoMl9kbGMxNl9lbnZpcm9fbWFnaWNfYmVhbS54bWw8L25hbWU+DQogPHNoYWRlcj5zaGFkZXJzL3doX3ZmeF9tZXNoX3ZlcnRleF9hbmltLnhtbC5zaGFkZXI8L3NoYWRlcj4NCiA8c29ydF9vdmVycmlkZT4yNTU8L3NvcnRfb3ZlcnJpZGU+DQogPHRleHR1cmVzPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX1RleHR1cmVfQTwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvY2xvdWRzLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfVGV4dHVyZV9CPC9zbG90Pg0KICAgPHNvdXJjZT52ZngvVGV4dHVyZXMvdmZ4X2VxdWFsX3JhbXBfZGlmZnVzZS5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX1RleHR1cmVfQzwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvd2luZHNfb2ZfbWFnaWNfc3BlY3VsYXIuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9jb2xvdXJfb3ZlcmxheTwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvZGVmYXVsdF93aGl0ZS5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX2dsb2JhbF9tYXNrPC9zbG90Pg0KICAgPHNvdXJjZT52ZngvVGV4dHVyZXMvMzBwY19tYXNrX2RpZmZ1c2UuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF92ZXJ0ZXhfZGlzcF90ZXh0dXJlPC9zbG90Pg0KICAgPHNvdXJjZT52ZngvVGV4dHVyZXMvd2hfd2F5c3RvbmVfZGlmZnVzZS5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KIDwvdGV4dHVyZXM+DQogPHBhcmFtcz4NCiAgPHBhcmFtPg0KICAgPG5hbWU+VGV4dHVyZV9BX2NoYW5uZWxzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ0PC90eXBlPg0KICAgPHZhbHVlPjAuMywwLDAsMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPlRleHR1cmVfQl9DaGFubmVsczwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0NDwvdHlwZT4NCiAgIDx2YWx1ZT4wLDEsMCwwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+VGV4dHVyZV9DX0NoYW5uZWxzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ0PC90eXBlPg0KICAgPHZhbHVlPjAsMCwxLDA8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5jb2xvdXJfb3ZlcmxheV9wYW48L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MCwtMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3N0cmVuZ3RoPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC4zPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Y29sb3VyX292ZXJsYXlfdGlsZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5kZXB0aF9mYWRlX3N3aXRjaDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5nbG9iYWxfbWFza19wYW48L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MCwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvYmFsX21hc2tfdGlsaW5nPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjEsMC4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvd19jb2xvdXI8L25hbWU+DQogICA8dHlwZT5mbG9hdDM8L3R5cGU+DQogICA8dmFsdWU+MSwxLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5nbG93X3N0cmVuZ3RoPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MzA8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5ub3JtYWxfZmFkZV9pbl9vdXQ8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+bm9ybWFsX2ZhZGVfcG93ZXI8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT41PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+cGl4ZWxfZGVwdGhfZmFkZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjMwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2JyaWdodG5lc3M8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2JyaWdodG5lc3MyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19icmlnaHRuZXNzMzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3Njcm9sbDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3Njcm9sbDI8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MCwwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl9zY3JvbGwzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAsMC41PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl90aWxpbmc8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MC41LDAuMjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19jb2xvdXJfdGlsaW5nMjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3RpbGluZzM8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dGltZV9zb3VyY2U8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dG90YWxfYWxwaGFfc3RyZW5ndGg8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT40PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2FuaW08L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2FuaW1fc3BlZWQ8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2NvbG91cjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjA8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT52ZXJ0ZXhfZGlzcF9zY2FsZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjEwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2Rpc3Bfc2Nyb2xsPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAsMC40PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2Rpc3BfdGlsaW5nPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjEsMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZlcnRleF9kaXNwbGFjZW1lbnQ8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X29zY2lsYXRpb25fc2NhbGU8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X3hfYW1wPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC4zPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X3hfZnJlcTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT52ZXJ0ZXhfeV9hbXA8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wLjM8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT52ZXJ0ZXhfeV9mcmVxPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZlcnRleF96X2FtcDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjAuMzwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZlcnRleF96X2ZyZXE8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmZ4X21lc2hfYWxwaGE8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiA8L3BhcmFtcz4NCjwvbWF0ZXJpYWw+DQo=",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/compiled/shaders_wh_vfx_mesh_vertex_anim_xml_hlsl_45f542e7e0c8d7cf0cca5a0cc6e1dc1c.asm.txt",
+      "reflectionSha256": "e5a50cf7b1cdb5414458dd7b7fd2331ee06379f2eb6bc1330b283b46e3ad4f7f",
+      "layout": [
+        {
+          "name": "Texture_A_channels",
+          "byteOffset": 0,
+          "components": 4
+        },
+        {
+          "name": "Texture_B_Channels",
+          "byteOffset": 16,
+          "components": 4
+        },
+        {
+          "name": "Texture_C_Channels",
+          "byteOffset": 32,
+          "components": 4
+        },
+        {
+          "name": "colour_overlay_pan",
+          "byteOffset": 48,
+          "components": 2
+        },
+        {
+          "name": "colour_overlay_strength",
+          "byteOffset": 56,
+          "components": 1
+        },
+        {
+          "name": "colour_overlay_tile",
+          "byteOffset": 60,
+          "components": 2
+        },
+        {
+          "name": "depth_fade_switch",
+          "byteOffset": 68,
+          "components": 1
+        },
+        {
+          "name": "global_mask_pan",
+          "byteOffset": 72,
+          "components": 2
+        },
+        {
+          "name": "global_mask_tiling",
+          "byteOffset": 80,
+          "components": 2
+        },
+        {
+          "name": "glow_colour",
+          "byteOffset": 88,
+          "components": 3
+        },
+        {
+          "name": "glow_strength",
+          "byteOffset": 100,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_in_out",
+          "byteOffset": 104,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_power",
+          "byteOffset": 108,
+          "components": 1
+        },
+        {
+          "name": "pixel_depth_fade",
+          "byteOffset": 112,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness",
+          "byteOffset": 116,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness2",
+          "byteOffset": 120,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness3",
+          "byteOffset": 124,
+          "components": 1
+        },
+        {
+          "name": "scrolling_colour_scroll",
+          "byteOffset": 128,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll2",
+          "byteOffset": 136,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll3",
+          "byteOffset": 144,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling",
+          "byteOffset": 152,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling2",
+          "byteOffset": 160,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling3",
+          "byteOffset": 168,
+          "components": 2
+        },
+        {
+          "name": "time_source",
+          "byteOffset": 176,
+          "components": 1
+        },
+        {
+          "name": "total_alpha_strength",
+          "byteOffset": 180,
+          "components": 1
+        },
+        {
+          "name": "vertex_anim",
+          "byteOffset": 184,
+          "components": 1
+        },
+        {
+          "name": "vertex_anim_speed",
+          "byteOffset": 188,
+          "components": 1
+        },
+        {
+          "name": "vertex_colour",
+          "byteOffset": 192,
+          "components": 1
+        },
+        {
+          "name": "vertex_disp_scale",
+          "byteOffset": 196,
+          "components": 1
+        },
+        {
+          "name": "vertex_disp_scroll",
+          "byteOffset": 200,
+          "components": 2
+        },
+        {
+          "name": "vertex_disp_tiling",
+          "byteOffset": 208,
+          "components": 2
+        },
+        {
+          "name": "vertex_displacement",
+          "byteOffset": 216,
+          "components": 1
+        },
+        {
+          "name": "vertex_oscilation_scale",
+          "byteOffset": 220,
+          "components": 1
+        },
+        {
+          "name": "vertex_x_amp",
+          "byteOffset": 224,
+          "components": 1
+        },
+        {
+          "name": "vertex_x_freq",
+          "byteOffset": 228,
+          "components": 1
+        },
+        {
+          "name": "vertex_y_amp",
+          "byteOffset": 232,
+          "components": 1
+        },
+        {
+          "name": "vertex_y_freq",
+          "byteOffset": 236,
+          "components": 1
+        },
+        {
+          "name": "vertex_z_amp",
+          "byteOffset": 240,
+          "components": 1
+        },
+        {
+          "name": "vertex_z_freq",
+          "byteOffset": 244,
+          "components": 1
+        },
+        {
+          "name": "vfx_mesh_alpha",
+          "byteOffset": 248,
+          "components": 1
+        }
+      ],
+      "expectedParameters": [
+        0.3,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.3,
+        1.0,
+        1.0,
+        1.0,
+        1,
+        0.0,
+        1.0,
+        1.0,
+        0.1,
+        1.0,
+        1.0,
+        1.0,
+        30.0,
+        1.0,
+        5.0,
+        30.0,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.5,
+        0.5,
+        0.2,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        4.0,
+        1.0,
+        1.0,
+        0.0,
+        10.0,
+        0.0,
+        0.4,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.3,
+        1.0,
+        0.3,
+        1.0,
+        0.3,
+        1.0,
+        1.0
+      ],
+      "expectedTextures": [
+        "commontextures/clouds.dds",
+        "vfx/Textures/vfx_equal_ramp_diffuse.dds",
+        "commontextures/winds_of_magic_specular.dds",
+        "commontextures/default_white.dds",
+        "vfx/Textures/30pc_mask_diffuse.dds",
+        "vfx/Textures/wh_waystone_diffuse.dds"
+      ],
+      "mode": -1
+    },
+    {
+      "path": "vfx/materials/wh3_campaign_storm_of_magic_tornado.xml.material",
+      "shader": "shaders/wh_vfx_mesh_tornado.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\vfx.pack",
+      "sha256": "8ca479eef840f5818a48e42ad59c815f4481e4aa13fe18f4166af03392cda91d",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPndoM19jYW1wYWlnbl9zdG9ybV9vZl9tYWdpY190b3JuYWRvLnhtbDwvbmFtZT4NCiA8c2hhZGVyPnNoYWRlcnMvd2hfdmZ4X21lc2hfdG9ybmFkby54bWwuc2hhZGVyPC9zaGFkZXI+DQogPHNvcnRfb3ZlcnJpZGU+MjU1PC9zb3J0X292ZXJyaWRlPg0KIDx0ZXh0dXJlcz4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9UZXh0dXJlX0E8L3Nsb3Q+DQogICA8c291cmNlPmNvbW1vbnRleHR1cmVzL2Nsb3VkX3NoYWRvd18wMi5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX1RleHR1cmVfQjwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvY2xvdWRfc2hhZG93XzAyLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfVGV4dHVyZV9DPC9zbG90Pg0KICAgPHNvdXJjZT5jb21tb250ZXh0dXJlcy9jbG91ZF9zaGFkb3dfMDIuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9jb2xvdXJfb3ZlcmxheTwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvY2xvdWRzX3NvZnQuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9nbG9iYWxfbWFzazwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvY2xvdWRzLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogPC90ZXh0dXJlcz4NCiA8cGFyYW1zPg0KICA8cGFyYW0+DQogICA8bmFtZT5UZXh0dXJlX0FfY2hhbm5lbHM8L25hbWU+DQogICA8dHlwZT5mbG9hdDQ8L3R5cGU+DQogICA8dmFsdWU+MSwxLDEsMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPlRleHR1cmVfQl9DaGFubmVsczwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0NDwvdHlwZT4NCiAgIDx2YWx1ZT4wLDEsMCwwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+VGV4dHVyZV9DX0NoYW5uZWxzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ0PC90eXBlPg0KICAgPHZhbHVlPjEsMCwxLDA8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5jb2xvdXJfb3ZlcmxheV9wYW48L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MC41LDAuMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmNvbG91cl9vdmVybGF5X3N0cmVuZ3RoPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC41PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Y29sb3VyX292ZXJsYXlfdGlsZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDQwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZGVwdGhfZmFkZV9zd2l0Y2g8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvYmFsX21hc2tfcGFuPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPi0wLjQsMC4yMjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb2JhbF9tYXNrX3RpbGluZzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLjIsNDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb3dfY29sb3VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQzPC90eXBlPg0KICAgPHZhbHVlPjEsNSwxNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb3dfc3RyZW5ndGg8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4zMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPm5vcm1hbF9mYWRlX2luX291dDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjAuNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPm5vcm1hbF9mYWRlX3Bvd2VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC4yPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+cGl4ZWxfZGVwdGhfZmFkZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjEwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2JyaWdodG5lc3M8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wLjQ8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfYnJpZ2h0bmVzczI8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wLjM8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfYnJpZ2h0bmVzczM8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wLjM8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3Njcm9sbDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4tMC41LDAuMjU8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3Njcm9sbDI8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MC4yNSwwLjQ8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5zY3JvbGxpbmdfY29sb3VyX3Njcm9sbDM8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+LTAuMiwtMC4yPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl90aWxpbmc8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MC41LDEwPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+c2Nyb2xsaW5nX2NvbG91cl90aWxpbmcyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjAuNSwxMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnNjcm9sbGluZ19jb2xvdXJfdGlsaW5nMzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLjY2LDEyPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dG90YWxfYWxwaGFfc3RyZW5ndGg8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT40PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2FscGhhX2NvbnRyYXN0PC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MS41PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dmVydGV4X2NvbG91cjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjEuMjwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnZmeF9tZXNoX2FscGhhPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTwvdmFsdWU+DQogIDwvcGFyYW0+DQogPC9wYXJhbXM+DQo8L21hdGVyaWFsPg0K",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/compiled/shaders_wh_vfx_mesh_tornado_xml_hlsl_0d6e3a18b2e1de9e7089f37b09baf059.asm.txt",
+      "reflectionSha256": "0a4261c9d68c5ebfaf9580231d11c5eb16a80fc0c3c9860a3dad40fa02f6e3f7",
+      "layout": [
+        {
+          "name": "Texture_A_channels",
+          "byteOffset": 0,
+          "components": 4
+        },
+        {
+          "name": "Texture_B_Channels",
+          "byteOffset": 16,
+          "components": 4
+        },
+        {
+          "name": "Texture_C_Channels",
+          "byteOffset": 32,
+          "components": 4
+        },
+        {
+          "name": "colour_overlay_pan",
+          "byteOffset": 48,
+          "components": 2
+        },
+        {
+          "name": "colour_overlay_strength",
+          "byteOffset": 56,
+          "components": 1
+        },
+        {
+          "name": "colour_overlay_tile",
+          "byteOffset": 60,
+          "components": 2
+        },
+        {
+          "name": "depth_fade_switch",
+          "byteOffset": 68,
+          "components": 1
+        },
+        {
+          "name": "global_mask_pan",
+          "byteOffset": 72,
+          "components": 2
+        },
+        {
+          "name": "global_mask_tiling",
+          "byteOffset": 80,
+          "components": 2
+        },
+        {
+          "name": "glow_colour",
+          "byteOffset": 88,
+          "components": 3
+        },
+        {
+          "name": "glow_strength",
+          "byteOffset": 100,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_in_out",
+          "byteOffset": 104,
+          "components": 1
+        },
+        {
+          "name": "normal_fade_power",
+          "byteOffset": 108,
+          "components": 1
+        },
+        {
+          "name": "pixel_depth_fade",
+          "byteOffset": 112,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness",
+          "byteOffset": 116,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness2",
+          "byteOffset": 120,
+          "components": 1
+        },
+        {
+          "name": "scrolling_brightness3",
+          "byteOffset": 124,
+          "components": 1
+        },
+        {
+          "name": "scrolling_colour_scroll",
+          "byteOffset": 128,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll2",
+          "byteOffset": 136,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_scroll3",
+          "byteOffset": 144,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling",
+          "byteOffset": 152,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling2",
+          "byteOffset": 160,
+          "components": 2
+        },
+        {
+          "name": "scrolling_colour_tiling3",
+          "byteOffset": 168,
+          "components": 2
+        },
+        {
+          "name": "total_alpha_strength",
+          "byteOffset": 176,
+          "components": 1
+        },
+        {
+          "name": "vertex_alpha_contrast",
+          "byteOffset": 180,
+          "components": 1
+        },
+        {
+          "name": "vertex_colour",
+          "byteOffset": 184,
+          "components": 1
+        },
+        {
+          "name": "vfx_mesh_alpha",
+          "byteOffset": 188,
+          "components": 1
+        }
+      ],
+      "expectedParameters": [
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        1.0,
+        0.0,
+        0.5,
+        0.1,
+        0.5,
+        1.0,
+        40.0,
+        0.0,
+        -0.4,
+        0.22,
+        0.2,
+        4.0,
+        1.0,
+        5.0,
+        15.0,
+        30.0,
+        0.5,
+        0.2,
+        10.0,
+        0.4,
+        0.3,
+        0.3,
+        -0.5,
+        0.25,
+        0.25,
+        0.4,
+        -0.2,
+        -0.2,
+        0.5,
+        10.0,
+        0.5,
+        10.0,
+        0.66,
+        12.0,
+        4.0,
+        1.5,
+        1.2,
+        1.0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        2,
+        0,
+        0,
+        0
+      ],
+      "expectedTextures": [
+        "commontextures/cloud_shadow_02.dds",
+        "commontextures/cloud_shadow_02.dds",
+        "commontextures/cloud_shadow_02.dds",
+        "commontextures/clouds_soft.dds",
+        "commontextures/clouds.dds"
+      ],
+      "mode": 2
+    },
+    {
+      "path": "vfx/materials/blue_lightening.xml.material",
+      "shader": "shaders/rigid_glow_vertexalpha.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\vfx.pack",
+      "sha256": "735d979005702bcd0855b6efc20616ee9b2a22da20132c6fff986f3e02a00aab",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPmJsdWVfbGlnaHRlbmluZy54bWw8L25hbWU+DQogPHNoYWRlcj5zaGFkZXJzL3JpZ2lkX2dsb3dfdmVydGV4YWxwaGEueG1sLnNoYWRlcjwvc2hhZGVyPg0KIDxzb3J0X292ZXJyaWRlPjIzMDwvc29ydF9vdmVycmlkZT4NCiA8dGV4dHVyZXM+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfZGl0aGVyPC9zbG90Pg0KICAgPHNvdXJjZT5jb21tb250ZXh0dXJlcy9kaXRoZXIuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9iYTYwMmEyMV9jNWVhXzQ0NWNfYmVkNF85MmY3OTkzN2QxZjY8L3Nsb3Q+DQogICA8c291cmNlPmNvbW1vbnRleHR1cmVzL3dpbmRzX29mX21hZ2ljX25vaXNlLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfMjI5NzhlOWVfOWRlMl80MTZkX2E3ODZfN2QzNGQ3ZDY0ZTQ3PC9zbG90Pg0KICAgPHNvdXJjZT5jb21tb250ZXh0dXJlcy93aW5kc19vZl9tYWdpY19zcGVjdWxhci5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KIDwvdGV4dHVyZXM+DQogPHBhcmFtcz4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Y29sb3VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQzPC90eXBlPg0KICAgPHZhbHVlPjEsMywyMDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmVtaXNzaXZlX3N0cmVuZ3RoPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MTIuNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogPC9wYXJhbXM+DQo8L21hdGVyaWFsPg0K",
+      "nativeReflectionAsm": "artifacts\\vfx-event-rejections-r131\\material\\compiled\\shaders_rigid_glow_vertexalpha_xml_hlsl_549a1fd64d794aa2c16d498782c0854f.asm.txt",
+      "reflectionSha256": "4813054fa589c0ec3468ba9bc712fb04fdd727866f6a0a1a5dff6e358509a641",
+      "layout": [
+        {
+          "name": "colour",
+          "byteOffset": 0,
+          "components": 3
+        },
+        {
+          "name": "emissive_strength",
+          "byteOffset": 12,
+          "components": 1
+        }
+      ],
+      "expectedParameters": [
+        1.0,
+        3.0,
+        20.0,
+        12.5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedTextures": [
+        "commontextures/dither.dds",
+        "commontextures/winds_of_magic_noise.dds",
+        "commontextures/winds_of_magic_specular.dds"
+      ],
+      "mode": 4
+    },
+    {
+      "path": "materials/vfx/wh3_vfx_tze_distortion_mesh_01.xml.material",
+      "shader": "shaders/wh3_vfx_distortion_mesh_02.xml.shader",
+      "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\data.pack",
+      "sha256": "41936ae97adf566df4482ecfae57a7f7849d879bc2ef68dd587fa44e5645efc8",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPndoM192ZnhfdHplX2Rpc3RvcnRpb25fbWVzaF8wMS54bWw8L25hbWU+DQogPHNoYWRlcj5zaGFkZXJzL3doM192ZnhfZGlzdG9ydGlvbl9tZXNoXzAyLnhtbC5zaGFkZXI8L3NoYWRlcj4NCiA8c29ydF9vdmVycmlkZT4yNTU8L3NvcnRfb3ZlcnJpZGU+DQogPHRleHR1cmVzPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX2Rpc3RvcnRpb25fZm9yX3Bhbm5pbmdfdGV4PC9zbG90Pg0KICAgPHNvdXJjZT5jb21tb250ZXh0dXJlcy9jbG91ZHNfc29mdC5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX3Bhbm5pbmdfdGV4dHVyZTwvc2xvdD4NCiAgIDxzb3VyY2U+dmZ4L1RleHR1cmVzL3doM19tdWx0aV9ub2lzZV9yZ2JhX2RpZmZ1c2UuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiA8L3RleHR1cmVzPg0KIDxwYXJhbXM+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmFscGhhX3ZhbHVlPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmRlcHRoX2ZhZGU8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4yPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZGlzdG9ydGlvbl9vZl9kaXN0b3J0aW9uX2RpcmVjdGlvbjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4tMC4wMiwwLjAwNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmRpc3RvcnRpb25fb2ZfZGlzdG9ydGlvbl9zY2FsZTwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4xLDE8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5kaXN0b3J0aW9uX3RleF9zdHJlbmd0aDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0PC90eXBlPg0KICAgPHZhbHVlPjAuNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnBhbm5pbmdfdGV4X2RpcmVjdGlvbjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLjAzLC0wLjAxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+cGFubmluZ190ZXh0dXJlX3NjYWxlPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjEsMjwvdmFsdWU+DQogIDwvcGFyYW0+DQogPC9wYXJhbXM+DQo8L21hdGVyaWFsPg0K",
+      "nativeReflectionAsm": "artifacts/vfx-event-rejections-r131/material/complete56-extra/compiled/shaders_wh3_vfx_distortion_mesh_02_xml_hlsl_1af1fb3efe1fbd87a60920e0d6ce6913.asm.txt",
+      "reflectionSha256": "cf0ce41f59b90f129d5ff2a4ef50c77f3f2595cb44f67f87e7d44fd1ecdb0c02",
+      "layout": [
+        {
+          "name": "alpha_value",
+          "components": 1,
+          "offset": 0
+        },
+        {
+          "name": "depth_fade",
+          "components": 1,
+          "offset": 4
+        },
+        {
+          "name": "distortion_of_distortion_direction",
+          "components": 2,
+          "offset": 8
+        },
+        {
+          "name": "distortion_of_distortion_scale",
+          "components": 2,
+          "offset": 16
+        },
+        {
+          "name": "distortion_tex_strength",
+          "components": 1,
+          "offset": 24
+        },
+        {
+          "name": "panning_tex_direction",
+          "components": 2,
+          "offset": 28
+        },
+        {
+          "name": "panning_texture_scale",
+          "components": 2,
+          "offset": 36
+        }
+      ],
+      "expectedParameters": [
+        0,
+        2,
+        -0.02,
+        0.005,
+        1,
+        1,
+        0.5,
+        0.03,
+        -0.01,
+        1,
+        2,
+        0,
+        0,
+        0,
+        0
+      ],
+      "expectedTextures": [
+        "commontextures/clouds_soft.dds",
+        "vfx/Textures/wh3_multi_noise_rgba_diffuse.dds"
+      ],
+      "mode": 5
+    }
+  ]
+}

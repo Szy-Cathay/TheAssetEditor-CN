@@ -23,12 +23,13 @@ public class VfxBasicMeshMaterialTests
     }
 
     [Test]
-    public void ActiveColourDistortion_IsRejectedRatherThanDroppingTheSeventhInput()
+    public void ActiveColourDistortion_PreservesTheSeventhOriginalInput()
     {
         var root = Material(); Set(root, "distortion_colour_switch", "1");
-        var exception = Assert.Throws<VfxMappingException>(() => VfxBasicMeshMaterial.Read(root));
-        Assert.That(exception!.Field, Is.EqualTo("distortion_colour_switch"));
-        Assert.That(exception.Reason, Is.EqualTo("Vfx.Preview.MaterialUnsupported"));
+        var material = VfxBasicMeshMaterial.Read(root);
+        Assert.That(material.Parameters[34], Is.EqualTo(1));
+        Assert.That(material.TexturePaths, Has.Length.EqualTo(7));
+        Assert.That(material.TexturePaths[6], Is.EqualTo("distortion_texture.dds"));
     }
 
     [Test]

@@ -42,11 +42,13 @@ public class VfxCoincidentCurveTests
 
     [TestCase("0.5,0.4,linear,linear,-0.05,0,0.05,0,0")]
     [TestCase("0.5,0.300000000000001,linear,linear,-0.05,0,0.1,0,0")]
-    public void ConflictingCoincidentKeys_StillStopTheAffectedLayer(string conflicting)
+    public void ConflictingCoincidentKeys_KeepTheFirstAuthoredValue(string conflicting)
     {
         var text = $"x,0,1;0.5,0.3,linear,linear,-0.05,0,0.05,0,0;{conflicting}:x,0;0,0";
-        var exception = Assert.Throws<VfxMappingException>(() => new VfxPreviewCurve(text, "ParticleScale", 1));
-        Assert.That(exception!.Reason, Is.EqualTo("Vfx.Preview.AmbiguousField"));
+        var curve = new VfxPreviewCurve(text, "ParticleScale", 1);
+        Assert.That(curve.Sample("x", .5, .5f), Is.EqualTo(.3f));
+        Assert.That(VfxCurve.TryParse(text, out var source), Is.True);
+        Assert.That(source!.ToString(), Is.EqualTo(text));
     }
 }
 

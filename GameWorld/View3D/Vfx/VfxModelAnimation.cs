@@ -13,16 +13,23 @@ internal sealed class VfxModelAnimationBudget
 
     public void Reserve(long vertices, long indices)
     {
+        if (!TryReserve(vertices, indices))
+            throw new VfxMappingException("RigidData/Animation", "Vfx.Preview.RangeUnsupported");
+    }
+
+    public bool TryReserve(long vertices, long indices)
+    {
         // Preserve the original combined byte budget while allowing different geometry ratios.
         if (vertices < 0 || indices < 0 || vertices > MaximumBytes / VertexBytes - _vertices
             || indices > MaximumIndices - _indices)
-            throw new VfxMappingException("RigidData/Animation", "Vfx.Preview.RangeUnsupported");
+            return false;
         var totalVertices = _vertices + vertices;
         var totalIndices = _indices + indices;
         if (totalVertices * VertexBytes + totalIndices * sizeof(int) > MaximumBytes)
-            throw new VfxMappingException("RigidData/Animation", "Vfx.Preview.RangeUnsupported");
+            return false;
         _vertices = totalVertices;
         _indices = totalIndices;
+        return true;
     }
 
     public void Release(long vertices, long indices) { _vertices -= vertices; _indices -= indices; }
@@ -169,12 +176,13 @@ internal static class VfxModelAnimation
                     throw new VfxMappingException("RigidData/Weights", "Vfx.Preview.GeometryUnsupported");
         }
         var requestedFrames = cycles == 0 ? 1 : Math.Max(2, Math.Ceiling((double)maximumLife * 60 / cycles));
-        if (!double.IsFinite(requestedFrames) || requestedFrames > 1800)
+        if (!double.IsFinite(requestedFrames) || requestedFrames > VfxModelAnimationData.MaximumFrames)
             throw new VfxMappingException("RigidData/Animation", "Vfx.Preview.RangeUnsupported");
         var frames = (int)requestedFrames;
         var vertexCount = (long)vertices.Length * frames;
         var indexCount = (long)indices.Length * frames;
-        budget.Reserve(vertexCount, indexCount);
+        if (frames > 1800 || !budget.TryReserve(vertexCount, indexCount))
+            return Compact(source, vertices, indices, skeleton, clip, animationFile, skinWeights, frames, cycles, budget);
         try
         {
             var baked = new EffekseerVertex[checked((int)vertexCount)];
@@ -206,6 +214,40 @@ internal static class VfxModelAnimation
         catch { budget.Release(vertexCount, indexCount); throw; }
     }
 
+    private static VfxPreviewModel Compact(CommonVertex[] source, EffekseerVertex[] vertices, int[] indices,
+        GameSkeleton skeleton, AnimationClip clip, AnimationFile animationFile, float[][] weights, int frames,
+        float cycles, VfxModelAnimationBudget budget)
+    {
+        var reservedVertices = VfxModelAnimationData.ReservedVertices(vertices.Length, frames, skeleton.BoneCount);
+        var reservedIndices = (long)indices.Length * (VfxModelAnimationData.CachedFrames + 1);
+        budget.Reserve(reservedVertices, reservedIndices);
+        try
+        {
+            var poses = new Matrix[checked(frames * skeleton.BoneCount)];
+            for (var frame = 0; frame < frames; ++frame)
+            {
+                var sample = Math.Min(clip.DynamicFrames.Count - 1,
+                    frame / (double)frames * animationFile.Header.FrameRate * animationFile.Header.AnimationTotalPlayTimeInSec);
+                var first = (int)Math.Floor(sample);
+                var pose = AnimationSampler.Sample(first, (float)(sample - first), skeleton, clip);
+                for (var bone = 0; bone < skeleton.BoneCount; ++bone)
+                    poses[frame * skeleton.BoneCount + bone] = pose.BoneTransforms[bone].WorldTransform;
+            }
+            var skinning = source.Select((vertex, index) => new EffekseerSkinWeight
+            {
+                Bone0 = vertex.BoneIndex[0], Bone1 = vertex.BoneIndex[1],
+                Bone2 = vertex.WeightCount == 4 ? vertex.BoneIndex[2] : 0,
+                Bone3 = vertex.WeightCount == 4 ? vertex.BoneIndex[3] : 0,
+                Weights = new(weights[index][0], weights[index][1],
+                    vertex.WeightCount == 4 ? weights[index][2] : 0, vertex.WeightCount == 4 ? weights[index][3] : 0),
+            }).ToArray();
+            var data = new VfxModelAnimationData(skinning, poses, skeleton.BoneCount, frames);
+            data.Sample(vertices, 0);
+            return new(vertices, indices, AnimationFrameCount: frames, AnimationCycles: cycles, AnimationData: data);
+        }
+        catch { budget.Release(reservedVertices, reservedIndices); throw; }
+    }
+
     private static Vector3 Unit(Vector3 value)
     {
         if (!Finite(value) || value.LengthSquared() <= .00000001f)
@@ -217,7 +259,7 @@ internal static class VfxModelAnimation
 
     private static AnimationFile ReadAnimation(byte[] bytes)
     {
-        if (bytes.Length < 16 || BitConverter.ToUInt32(bytes) is not (7 or 8))
+        if (bytes.Length < 16 || BitConverter.ToUInt32(bytes) is not (4 or 5 or 6 or 7 or 8))
             throw new VfxMappingException("RigidData/Animation", "Vfx.Preview.InvalidData");
         try { return AnimationFile.Create(new PackFile("animation.anim", new MemorySource(bytes))); }
         catch (Exception exception) when (exception is not OutOfMemoryException and not OperationCanceledException)

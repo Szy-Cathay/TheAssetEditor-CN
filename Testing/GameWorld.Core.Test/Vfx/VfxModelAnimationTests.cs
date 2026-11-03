@@ -120,7 +120,7 @@ public class VfxModelAnimationTests
     [Test]
     public void ExcessivePoseBudget_IsExplicitlyRejected()
     {
-        var conversion = Convert(1, 31);
+        var conversion = Convert(.01f, 20);
         Assert.That(conversion.Emitters, Is.Empty);
         Assert.That(conversion.Diagnostics.Any(d => d.Field == "RigidData/Animation" && d.ReasonKey == "Vfx.Preview.RangeUnsupported"), Is.True);
     }

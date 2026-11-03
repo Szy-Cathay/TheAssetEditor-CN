@@ -1,0 +1,640 @@
+{
+  "scope": "Complete unchanged manifest-owned roots for all R131 affected material/curve/model/motion source families. Known source failures are exact absent official paths, verified as diagnostics and never counted as full resource closure or native/game visual acceptance.",
+  "manifestSha256": "d60634dad045662ab12436e4457d0d361be046af15084dea374165c14e6a3785",
+  "roots": [
+    {
+      "path": "vfx\\_rat_test_lib.xml",
+      "sha256": "21ac40ae4d7ff78b3caed021285e45a80f6aa38461f3aad28bff3393d38f2b77",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [
+          "vfx\\0.xml"
+        ],
+        "1": [
+          "vfx\\0.xml"
+        ],
+        "2": [
+          "vfx\\0.xml"
+        ]
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\cine_flamethrower_breath.xml",
+      "sha256": "2522f6640687db5b7af21fcb56df9fae3d2cee3ad38f07db1b42e0e424212626",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc12_deliverance_of_itza_level1.xml",
+      "sha256": "f68a93b497cb89ad086e355b6f5fae6dab941348d8f9acae50ce98a72d1aacb7",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc12_enviro_meteor_arc.xml",
+      "sha256": "47f462942690678fc09f4a3148030fd9d7efc50c50ac53f45429e3bdaba4c4d0",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc12_lib_entity_engine_of_the_gods.xml",
+      "sha256": "86a41798a1e13ad9e9015fa47aefabcbfd227d50203f2da1f3187875e9195b05",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc12_lib_enviro_meteor_downwards.xml",
+      "sha256": "3a109b47ce1a7f0b77c7e9d20b85ecd4e78f6c8489f478fb73092bc4ae08fb20",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc12_lib_invocation_of_sotek_area.xml",
+      "sha256": "c72bc2ada25f2cab48e987a8b9514c223cbffe1d3d635b9983c0fbdf557bcfa0",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc13_lib_lzd_charging_beams.xml",
+      "sha256": "d757f66c1eac6cf6c209420509d9f12bf522ced7f9b35949b10bfb4617102434",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc14_lib_entity_buff_debuff.xml",
+      "sha256": "19091085d20d85b72b125100fcbf96b5ff27587d9b32a3531e08e6295652edce",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc14_lib_stealth_entity_buff_debuff.xml",
+      "sha256": "0e683d8c063e9b4c1df0f3b40d63e347df3ad2866e1fbc52e71cd860af5bb19b",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc15_lib_abilities_fermented_fungi.xml",
+      "sha256": "64b29123fb25c25d931c0f435590f8ab7f5741ae314138f0a8a38af547abdf82",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_dlc16_lib_enviro_witch_wood_hollow.xml",
+      "sha256": "a1dd982831a562e81f27154ce0b31c58d7f29580c7349233566555df09d683fc",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_abilities_channeling_spire.xml",
+      "sha256": "32b7c2a860c961a9f4cd4f0ebb46d5c8f85c952e7de108c8ff649d62c7147964",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_abilities_slann_forcefield.xml",
+      "sha256": "310220e48d0263acd9796088605c1560a7807e7fb326abc0e6355d93c87f0572",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_campaign_plague.xml",
+      "sha256": "7ead6d9f20ee817b3647cbcc2552f5e169e37b69d8dc7b45193cd99d64de4ca2",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_campaign_sea_storm.xml",
+      "sha256": "0638248ac0a97c675e255656567ce33cc6c2e766f1e288e82c0d51b052b4e8b4",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_enviro4.xml",
+      "sha256": "cd59a04b77bfbad71f876177728041c4833cb8a31d4415dc9cbda09ea16baf07",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_pestilent_breath_moving.xml",
+      "sha256": "6c22a879f925ca576a17bf514c1cb5f981f97624120c97d6070b378029a90e4e",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_plague_plague.xml",
+      "sha256": "89453553828614dd60d6133373a0b2aa4e31022f4846f0e3edc620a04c94f3ca",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_ruin_cracks_call.xml",
+      "sha256": "721c9e49244a09205cd2605352f8b99a3a3d57651fa68adb2a21bb27229bdfd5",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_swamp_bubbles.xml",
+      "sha256": "eb5da0c5a88936ff8f6950eb3cca9d71d149ac77b6b1516f422531776341ff5c",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh2_main_lib_weapon_warpfire_thrower.xml",
+      "sha256": "f0ba0ad84cde7dadeb65514533d8b894a3ce3f38bf5e73110fce2c5a9bdcea52",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc23_lib_enviro.xml",
+      "sha256": "91c0b290d35ec766b985ee831b53e85e76b06294887a991090e1e8d80768b717",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": true
+    },
+    {
+      "path": "vfx\\wh3_dlc24_lib_lore_of_the_hags.xml",
+      "sha256": "11082b2b21ad9d8219c6e74024add30f89537d7881c0c2096de5d3dd22b81cc4",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc24_lib_ostankya.xml",
+      "sha256": "dbc828442eb6961e11138cf035e3cee7424dd71dc970c345b2f5bac96e68a4bd",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc25_lib_soul_grinder_ror_vortex.xml",
+      "sha256": "f2d8881aaa2d6bfaa8bb9312d7275c2e0350a577b6b7d7ce4c0eb6143170830a",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": true
+    },
+    {
+      "path": "vfx\\wh3_dlc25_lib_toad_dragon_vomit_decal.xml",
+      "sha256": "791adbdb08e174da074653ff653fb6cf6c64968979c1eeaaaff86083e4d44926",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc26_entity_lord_skulltaker_punch.xml",
+      "sha256": "ca3f5a2d95ae4de5654534a7271825daec37cc9dfff5547f854140e971270c08",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc26_entity_lord_skulltaker_slash.xml",
+      "sha256": "7b57fc2d39fff465c9398b19268998a71fb42f7a3893a61fb577eaa841ce1c39",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc26_entity_lord_skulltaker_stab.xml",
+      "sha256": "0e54845c1eb54c3bfd47313bd8bac1748ad4259e3239a2cb226e7f5858da20cd",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc26_lib_entity_colossal_squig.xml",
+      "sha256": "be95d58d0ddc48287fff2116c80f0df517d40ea1634c7d402163310978839356",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc26_lib_kho_murderous_exhortation.xml",
+      "sha256": "1c1bbb73053c5c5421dd97f49bdd15f218c0f077a314d78c7f37a95f24f5cea0",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc26_lib_lore_of_waaagh_rework.xml",
+      "sha256": "83daf12a4f03655ff27d594c181ec27211ce4dbd59335b753fac16ffbab5e90c",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc26_ogr_lib_golgfag_maneater_abilities.xml",
+      "sha256": "ed1dd6a7f7d374fa364594d813a5a709cd0781bab94be84e908f5511e977bfdc",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc27_lib_sea_elemental.xml",
+      "sha256": "112d80ad70bd35aa5ebe01eb3519f7771e94f2252169d8f5a0dc1ab19b84ad39",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc27_lord_masque_attack_stab.xml",
+      "sha256": "e583d9cab0c013feb0113183235bcbef382c315c1c7e421be8f82140b025baff",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc29_lib_campaign_lighting.xml",
+      "sha256": "95740034f4e06b0bae4fc32b0a08976d2176e753a710614daa708abc73b03456",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc29_lib_comet_enviro.xml",
+      "sha256": "c80ba4a70747f55c24753bd5307d9947e38739e94c53b1203e8489fd67028c28",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc29_lib_high_liche_priest.xml",
+      "sha256": "1c4f7f02c93001259c0d7f84289a3522385c88dfd4b43be16e76ab1ead19d4fa",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc29_lib_nagash_campaign.xml",
+      "sha256": "6fe1f29c970b51a235475e9033f7174b7aa9f079dc82b78f12d55c300a7a606a",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc29_lib_skaven_comet_enviro.xml",
+      "sha256": "f29881570b4138e65dd679138c214107ffbe1e55cced0d8948dcf5aeaf9c26e4",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc29_lord_nagash.xml",
+      "sha256": "09febcdb5b8b1bb35880e7e937b08b66689bea9c090fd53ce4ea0555cdc4fcd5",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc29_undeath_campaign_ghosts.xml",
+      "sha256": "866d12921e649123a52f911aa90b93c9922d18585327374c1e0182a22a84c2e2",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_dlc_29_lib_lore_of_undeath.xml",
+      "sha256": "5865b40a4b983e63b3182d32d8839964469ebfceaf1718e6e90ce91785010c37",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_main_enviro_fireball_meteor_shower.xml",
+      "sha256": "2d82b273cb50a66803dcede7471eeed7b2034391e37d638173aaed8237621a57",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_main_lib_battle_impossible_fortress.xml",
+      "sha256": "58d09d61e6d2e0510a0d59bc9f1df0ce92e4226a5ba82cf61e068639165b6166",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_main_lib_campaign_chaos_realm.xml",
+      "sha256": "edafb7129eaa553c8ef65e33dcd6b3efab7c6eb9666bea31ddd5eebb776c1f2a",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_main_lib_campaign_magic.xml",
+      "sha256": "62ec3d6b30e7e737077166dcd56ee6503754c0eff0653e9a5f96bf3c2da2e213",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_main_lib_cataclysm_thorsens_thunderstorm.xml",
+      "sha256": "7ee6537bc5085ec091c5cde437ecd17dae5e36e87e7e55ff98667179177257b1",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [
+          "TestData\\vortex\\lightning_fork.rigid_model_v2"
+        ],
+        "1": [
+          "TestData\\vortex\\lightning_fork.rigid_model_v2"
+        ],
+        "2": [
+          "TestData\\vortex\\lightning_fork.rigid_model_v2"
+        ]
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_main_lib_cth_iron_dragon.xml",
+      "sha256": "0d125ea1b078e38509f58dc1b3ed8da592b78a3fd822aeabf75b6217cc7202af",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_main_lib_entity_bear.xml",
+      "sha256": "2f98d2e146b02d47c4491d83622a2e89f0a2f43d720a215f6292fa4eb76c7591",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_main_lib_enviro_tzeentch.xml",
+      "sha256": "e2a86ec54c02b8b1e8e5d89c20efd9dd3ecfa19f52f1ec8bbfcf8ee5a2c11dc9",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh3_main_lib_tempest_hawks_of_miska.xml",
+      "sha256": "75fa99189549cff7defb69b6d7ba6295946a51ea7b7ff725bd600ae01946d24c",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh_dlc02_lib_blood_explosion.xml",
+      "sha256": "39b80794424777d0722b6a6ca06fbe2c5b1ed031587344c323375d0fcb892d4a",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh_dlc05_lib_dwellers_below.xml",
+      "sha256": "bb56e5653d71e92554898ea3ab50bfe0f01eb3080c5554060acca642c3375376",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [],
+        "1": [],
+        "2": []
+      },
+      "lateChildStages": false
+    },
+    {
+      "path": "vfx\\wh_main_lib_shrapnel.xml",
+      "sha256": "52baaf6d0ea5917a8e28d27f2a58695ee8c348d553947c8f239324ee80a964a2",
+      "sourcePack": "vfx_desc.pack",
+      "expectedSourceFailures": {
+        "0": [
+          "variantmeshes\\wh_variantmodels\\hu5b\\grn\\grn_doomdiver\\tex\\grn_goblin_doomdiver_wings_base_colour.dds"
+        ],
+        "1": [
+          "variantmeshes\\wh_variantmodels\\hu5b\\grn\\grn_doomdiver\\tex\\grn_goblin_doomdiver_wings_base_colour.dds"
+        ],
+        "2": [
+          "variantmeshes\\wh_variantmodels\\hu5b\\grn\\grn_doomdiver\\tex\\grn_goblin_doomdiver_wings_base_colour.dds"
+        ]
+      },
+      "lateChildStages": false
+    }
+  ]
+}

@@ -151,32 +151,32 @@ public partial class EffectVfxPreviewTests
     }
 
     [Test]
-    public void EffectParameters_UnimplementedSettingsReportTheirOriginalSourceAndOwnerWithoutChangingValues()
+    public void EffectParameters_UnknownTypeReportsItsSourceWhileResolvedFlagsKeepTheirOriginalValues()
     {
         var current = (Effect_v12)ParameterEffect(12);
-        current.EffectType = 2; current.TerrainMutable = true; current.DistanceCulled = true; current.ScalesWithParent = false;
+        current.EffectType = 3; current.TerrainMutable = true; current.DistanceCulled = true; current.ScalesWithParent = false;
         var legacy = (Effect_v3)ParameterEffect(3); legacy.BoolUnknown = "true";
         var originalCurrentData = current.Data; var originalLegacyData = legacy.Data;
         var builder = ParameterBuilder(out _);
+        builder.EffectPreviewContext = new() { BypassTerrainSelection = true };
         var root = new GroupNode("actor");
         var result = builder.Build(new ParsedMetadataFile { Version = 10, Attributes = [current] },
             new ParsedMetadataFile { Version = 10, Attributes = [legacy] }, null, root, null!, new AnimationPlayer(), null);
         try
         {
-            var expected = new[] { "SuperView.Diagnostics.EffectTypeUnsupported", "SuperView.Diagnostics.EffectTerrainUnsupported",
-                "SuperView.Diagnostics.EffectDistanceCullingUnsupported", "SuperView.Diagnostics.EffectParentScaleUnsupported" };
+            var expected = new[] { "SuperView.Diagnostics.EffectTypeUnsupported" };
             foreach (var key in expected)
             {
                 var diagnostic = result.Diagnostics.Single(value => value.ReasonKey == key);
                 Assert.That(diagnostic.Source, Is.SameAs(current));
                 Assert.That(diagnostic.Owner, Is.EqualTo(MetaDataDocumentOwner.Persistent));
             }
-            var legacyDiagnostic = result.Diagnostics.Single(value => value.ReasonKey == "SuperView.Diagnostics.EffectLegacyFlagUnsupported");
             Assert.Multiple(() =>
             {
-                Assert.That(legacyDiagnostic.Source, Is.SameAs(legacy));
-                Assert.That(legacyDiagnostic.Owner, Is.EqualTo(MetaDataDocumentOwner.Animation));
-                Assert.That(current.EffectType, Is.EqualTo(2));
+                Assert.That(result.Diagnostics.Any(value => value.ReasonKey == "SuperView.Diagnostics.EffectLegacyFlagUnsupported"), Is.False);
+                Assert.That(result.Diagnostics.Any(value => value.ReasonKey == "SuperView.Diagnostics.EffectTerrainUnsupported"
+                    || value.ReasonKey == "SuperView.Diagnostics.EffectDistanceCullingUnsupported"), Is.False);
+                Assert.That(current.EffectType, Is.EqualTo(3));
                 Assert.That(current.TerrainMutable, Is.True);
                 Assert.That(current.DistanceCulled, Is.True);
                 Assert.That(current.ScalesWithParent, Is.False);

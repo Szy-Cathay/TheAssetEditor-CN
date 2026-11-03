@@ -21,9 +21,9 @@ inline std::string PrelitSpriteCode()
         $F4$ noise = $TEX_P0$noiseUV$TEX_S0$;
         $F2$ maskUV = uv1 + (noise.rg * 2 - 1) * mesh2.w;
         $F4$ maskTexture = $TEX_P1$maskUV$TEX_S1$;
-        // The shipped non-sun-scaled PS uses green and the tint multiplier, not emissive_colour.
-        $F3$ glow = maskTexture.g * mesh1.y * $F3$(mesh1.zw, mesh2.x) * customData2.a * textureAlpha;
-        $F1$ opacity = saturate(coverage + 0.0005 * mesh3.w * maskTexture.g * customData2.a * textureAlpha);
+        // Native sample destination Z with source yzxw consumes red; retain the non-sun-scaled tint multiplier.
+        $F3$ glow = maskTexture.r * mesh1.y * $F3$(mesh1.zw, mesh2.x) * customData2.a * textureAlpha;
+        $F1$ opacity = saturate(coverage + 0.0005 * mesh3.w * maskTexture.r * customData2.a * textureAlpha);
         // Preserve the intrinsic source terms; scene PBR, fog and MBOIT resolve remain diagnosed.
         $F3$ emissive = (colour * coverage + glow) / max(opacity, 0.00000001);
         $F1$ opacityMask = 1;

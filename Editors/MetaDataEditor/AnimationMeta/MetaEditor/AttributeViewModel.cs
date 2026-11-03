@@ -9,6 +9,7 @@ using Shared.ByteParsing.Parsers;
 using Shared.Core.ErrorHandling;
 using Shared.Core.Events;
 using Shared.Core.Misc;
+using Shared.GameFormats.AnimationMeta.Definitions;
 using Shared.Ui.BaseDialogs.MathViews;
 
 namespace Editors.AnimationMeta.Presentation
@@ -26,8 +27,10 @@ namespace Editors.AnimationMeta.Presentation
 
         public bool IsModified { get; set; } = false;
         public string PropertyName => _property.Name;
-        public bool IsStartTime => PropertyName == "StartTime";
-        public bool IsEndTime => PropertyName == "EndTime";
+        public bool IsStartTime => PropertyName == "StartTime" ||
+            _target is Effect_v1 && PropertyName == nameof(Effect_v1.EffectStartTime);
+        public bool IsEndTime => PropertyName == "EndTime" ||
+            _target is Effect_v1 && PropertyName == nameof(Effect_v1.EffectEndTime);
         public bool IsCombatPositionAnchor =>
             PropertyName == "StartPosition" ||
             (_target is global::Shared.GameFormats.AnimationMeta.Parsing.ParsedMetadataAttribute source &&

@@ -92,13 +92,13 @@ public class VfxStaticModelPivotTests
     }
 
     [Test]
-    public void AnimatedNonDefaultEntryPivot_RemainsDiagnosedUntilNativeAnimationIsCalibrated()
+    public void AnimatedNonFiniteEntryPivot_RemainsDiagnosed()
     {
         var document = VfxDocument.Read(VfxModelAnimationTests.Source());
-        document.Root.Descendants("PivotPoint").Single().SetAttributeValue("x", 1.5);
+        document.Root.Descendants("PivotPoint").Single().SetAttributeValue("x", "NaN");
         var conversion = TotalWarVfxConverter.Convert(new(document.Write(), "vfx/pivot.xml", VfxModelAnimationTests.Resolve));
         Assert.That(conversion.Emitters, Is.Empty);
-        Assert.That(conversion.Diagnostics.Any(d => d.Field == "RigidData/PivotPoint" && d.ReasonKey == "Vfx.Preview.GeometryUnsupported"), Is.True);
+        Assert.That(conversion.Diagnostics.Any(d => d.Field == "PivotPoint" && d.ReasonKey == "Vfx.Preview.InvalidData"), Is.True);
     }
 
     private static byte[] Source(Vector3 pivot)

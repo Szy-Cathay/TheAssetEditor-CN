@@ -6,6 +6,7 @@ using Shared.ByteParsing;
 using Shared.ByteParsing.Parsers;
 using Shared.Core.Events;
 using Shared.Core.Services;
+using Shared.GameFormats.AnimationMeta.Definitions;
 using Shared.GameFormats.AnimationMeta.Parsing;
 
 namespace Editors.AnimationMeta.Presentation
@@ -37,15 +38,31 @@ namespace Editors.AnimationMeta.Presentation
                         .Where(x => Attribute.IsDefined(x, typeof(MetaDataTagAttribute)))
                         .OrderBy(x => x.GetCustomAttributes<MetaDataTagAttribute>(false).Single().Order);
 
-            foreach (var prop in orderedPropertiesList)
+            foreach (var serializedProperty in orderedPropertiesList)
             {
-                var attributeInfo = prop.GetCustomAttributes<MetaDataTagAttribute>(false).Single();
+                var attributeInfo = serializedProperty.GetCustomAttributes<MetaDataTagAttribute>(false).Single();
+                var prop = serializedProperty;
+                var localizedName = prop.Name;
+                if (typedMetaItem is Effect_v1)
+                {
+                    var timeProperty = prop.Name switch
+                    {
+                        nameof(Effect_v1.UnknownIntBase_v0) => nameof(Effect_v1.EffectStartTime),
+                        nameof(Effect_v1.UnknownIntBase_v1) => nameof(Effect_v1.EffectEndTime),
+                        _ => null
+                    };
+                    if (timeProperty != null)
+                    {
+                        prop = typeof(Effect_v1).GetProperty(timeProperty)!;
+                        localizedName = timeProperty == nameof(Effect_v1.EffectStartTime) ? "StartTime" : "EndTime";
+                    }
+                }
                 var parser = ByteParserFactory.Create(prop.PropertyType);
                 var value = prop.GetValue(typedMetaItem);
 
-                var fieldName = GetLocalizedPropertyName(prop.Name);
+                var fieldName = GetLocalizedPropertyName(localizedName);
                 var itemDescription = GetLocalizedPropertyDescription(
-                    prop.Name);
+                    localizedName);
 
                 AttributeViewModel? editableItem = null;
                 if (value is bool boolean)

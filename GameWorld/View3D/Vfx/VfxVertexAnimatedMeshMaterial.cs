@@ -1,4 +1,4 @@
-﻿using System.Xml.Linq;
+using System.Xml.Linq;
 using Shared.GameFormats.Vfx;
 
 namespace GameWorld.Core.Vfx;
@@ -26,9 +26,17 @@ internal static class VfxVertexAnimatedMeshMaterial
 
     public static VfxScrollingMeshMaterial Read(XElement root)
     {
+        var shader = root.Element("shader")?.Value.Replace('\\', '/');
+        if (shader is null || !new[] { "shaders/wh_vfx_mesh_vertex_anim.xml.shader", "shaders/wh_vfx_mesh_vertex_anim_battle.xml.shader" }
+            .Contains(shader, StringComparer.OrdinalIgnoreCase))
+            throw new VfxMappingException(shader ?? "material", "Vfx.Preview.MaterialUnsupported");
+        var battle = string.Equals(root.Element("shader")?.Value.Replace('\\', '/'),
+            "shaders/wh_vfx_mesh_vertex_anim_battle.xml.shader", StringComparison.OrdinalIgnoreCase);
         var values = new List<float>(ParameterCount);
         foreach (var (name, components) in Fields)
         {
+            // The original 252-byte graph has no fog input; one selects the battle graph's no-fog branch.
+            if (!battle && name == "fog") { values.Add(1); continue; }
             var nodes = root.Elements("params").Elements("param").Where(node =>
                 string.Equals(node.Element("name")?.Value, name, StringComparison.OrdinalIgnoreCase)).ToArray();
             if (nodes.Length != 1) throw new VfxMappingException(name, "Vfx.Preview.AmbiguousField");

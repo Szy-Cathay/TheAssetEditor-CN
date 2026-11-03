@@ -158,7 +158,7 @@ public class VfxScrollingMeshMaterialTests
     }
 
     [Test]
-    public void OneShotMaterial_MovesItsMaskByParticlePhaseIndependentlyOfGlobalPanningTime()
+    public void OneShotMaterial_MovesItsMaskBySourceAgeIndependentlyOfGlobalTimeAndParticlePhase()
     {
         var graphics = new GraphicsDeviceServiceMock();
         try
@@ -178,8 +178,10 @@ public class VfxScrollingMeshMaterialTests
             var first = Render(device, preview, Vector4.One, 0, Vector4.Zero, 32);
             var globalTimeOnly = Render(device, preview, Vector4.One, 5, Vector4.Zero, 32);
             var particlePhase = Render(device, preview, Vector4.One, 0, Vector4.Zero, 32, appearancePhase: .25f);
+            var sourceAge = Render(device, preview, Vector4.One, 0, Vector4.Zero, 32, sourceAge: .25f);
             Assert.That(Vector4.Distance(first, globalTimeOnly), Is.LessThan(.0001f));
-            Assert.That(particlePhase.X - first.X, Is.GreaterThan(.1f));
+            Assert.That(Vector4.Distance(first, particlePhase), Is.LessThan(.0001f));
+            Assert.That(sourceAge.X - first.X, Is.GreaterThan(.1f));
         }
         finally { graphics.Release(); }
     }
@@ -214,14 +216,14 @@ public class VfxScrollingMeshMaterialTests
         new(){Position=new(1,1,0),Normal=Vector3.Backward,Tangent=Vector3.Right,Binormal=Vector3.Up,UV=new(1,0),Colour=colour},
     ];
 
-    private static Vector4 Render(GraphicsDevice device, EffekseerHandle preview, Vector4 colour, float seconds, Vector4 background, int x, SurfaceFormat format=SurfaceFormat.Vector4, int samples=0, bool occluded=false, float appearancePhase=0, bool reflected=true)
+    private static Vector4 Render(GraphicsDevice device, EffekseerHandle preview, Vector4 colour, float seconds, Vector4 background, int x, SurfaceFormat format=SurfaceFormat.Vector4, int samples=0, bool occluded=false, float appearancePhase=0, bool reflected=true, float sourceAge=0)
     {
         using var target=new RenderTarget2D(device,64,64,false,format,DepthFormat.Depth24,samples,RenderTargetUsage.PreserveContents);
         device.SetRenderTarget(target); device.Clear(ClearOptions.Target|ClearOptions.DepthBuffer,new Color(background),occluded ? 0 : 1,0); device.DepthStencilState=DepthStencilState.Default;
         var view=Matrix.CreateLookAt(new(0,0,10),Vector3.Zero,Vector3.Up);
         var projection=Matrix.CreateOrthographic(2,2,.1f,100);
         if (reflected) projection *= Matrix.CreateScale(-1,1,1);
-        var particle=new EffekseerParticle{Transform=Matrix.Identity,Colour=colour,UV=new(0,0,1,1),MaterialTime=seconds,AppearancePhase=appearancePhase};
+        var particle=new EffekseerParticle{Transform=Matrix.Identity,Colour=colour,UV=new(0,0,1,1),MaterialTime=seconds,AppearancePhase=appearancePhase,Time=sourceAge};
         var context=((SharpDX.Direct3D11.Device)device.Handle).ImmediateContext;
         using var previousTarget=context.OutputMerger.GetRenderTargets(1,out var previousDepth)[0]; using var previousDepthView=previousDepth;
         EffekseerNative.Check(EffekseerNative.AecnVfxDraw(preview,Values(view),Values(projection),[particle],1));

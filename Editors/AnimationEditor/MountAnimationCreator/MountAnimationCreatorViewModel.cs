@@ -24,7 +24,7 @@ using Clipboard = System.Windows.Clipboard;
 
 namespace AnimationEditor.MountAnimationCreator
 {
-    public class MountAnimationCreatorViewModel : EditorHostBase
+    public partial class MountAnimationCreatorViewModel : EditorHostBase
     {
         public override Type EditorViewModelType => typeof(EditorView);
         private readonly IFileSaveService _fileSaveService;
@@ -107,6 +107,7 @@ namespace AnimationEditor.MountAnimationCreator
             _rider.AnimationChanged += TryReGenerateAnimation;
             _rider.MeshChanged += RiderMeshChanged;
             AnimationSettings.SettingsChanged += SettingsChanged;
+            InitializePlaybackSources();
             _globalEvents.Register<PackFileContainerSetAsMainEditableEvent>(this, _ => RefreshViewAction());
             UpdateStates();
         }
@@ -400,6 +401,7 @@ namespace AnimationEditor.MountAnimationCreator
 
         public override void Close()
         {
+            ReleasePlaybackSources();
             _globalEvents.UnRegister(this);
             _mount.SkeletonChanged -= MountSkeletonChanged;
             _mount.AnimationChanged -= TryReGenerateAnimation;

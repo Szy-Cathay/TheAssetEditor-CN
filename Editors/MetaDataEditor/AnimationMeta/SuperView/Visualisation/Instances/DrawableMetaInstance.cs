@@ -84,17 +84,18 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
         {
             get
             {
-                var attachment = _animationResolver?.GetWorldTransform() ??
-                    Matrix.Identity;
+                var attachment = GetReferenceTransform();
                 return attachment * GetParentWorldTransform();
             }
         }
-        public Matrix WorldTransform =>
-            GetLocalTransform() * ReferenceWorldTransform;
+        public Matrix WorldTransform => _displayWorldTransform?.Invoke()
+            ?? GetLocalTransform() * ReferenceWorldTransform;
         public Vector3 FocusPosition => WorldTransform.Translation;
         public int? HighlightedBoneIndex => _highlightedBoneIndex;
 
         private SkeletonBoneAnimationResolver? _animationResolver;
+        private Func<Matrix>? _referenceTransform;
+        private Func<Matrix?>? _displayWorldTransform;
 
         public DrawableMetaInstance(
             SceneNode node,
@@ -159,6 +160,22 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
             }
         }
 
+        public void FollowTransform(Func<Matrix> referenceTransform, int? highlightedBoneIndex)
+        {
+            _referenceTransform = referenceTransform;
+            _highlightedBoneIndex = highlightedBoneIndex;
+        }
+
+        public void UseDisplayWorldTransform(Func<Matrix?> displayWorldTransform)
+        {
+            _displayWorldTransform = displayWorldTransform;
+            if (_node is SimpleDrawableNode drawable)
+                drawable.DisplayWorldTransform = displayWorldTransform;
+        }
+
+        private Matrix GetReferenceTransform() => _referenceTransform?.Invoke()
+            ?? _animationResolver?.GetWorldTransform() ?? Matrix.Identity;
+
         public void Update(float currentTime)
         {
             if (_hasError)
@@ -169,7 +186,7 @@ namespace Editors.AnimationMeta.SuperView.Visualisation.Instances
                 _currentTimeSeconds = currentTime;
                 ApplyVisibility();
                 _node.ModelMatrix = GetLocalTransform() *
-                    (_animationResolver?.GetWorldTransform() ?? Matrix.Identity);
+                    GetReferenceTransform();
             }
             catch (Exception e)
             {

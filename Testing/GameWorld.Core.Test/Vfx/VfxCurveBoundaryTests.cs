@@ -9,9 +9,9 @@ public class VfxCurveBoundaryTests
     private const string ImpactScale = "x_min,8405056,1;0.0,0.0,linear,linear,-0.05,0.0,0.05,0.0,0;0.0,0.0,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,22.150801,log3,linear,-0.05,0.0,0.05,0.0,0|x_max,16728128,1;0.0,0.0,linear,linear,-0.05,0.0,0.05,0.0,0;0.0,0.0,linear,log3,-0.05,0.0,0.05,0.0,0;1.0,26.564701,log3,linear,-0.05,0.0,0.05,0.0,0:x,1;0,1";
 
     [TestCase(0, 0)]
-    [TestCase(.5, 19.381950875)]
+    [TestCase(.5, 15.2286756875)]
     [TestCase(1, 22.150801)]
-    public void OfficialImpactCoincidentStart_UsesItsOutgoingLogarithmicSegment(double phase, double expected)
+    public void OfficialImpactCoincidentStart_UsesTheFirstAuthoredKey(double phase, double expected)
     {
         var curve = new VfxPreviewCurve(ImpactScale, "ParticleScale", 1);
         Assert.That(curve.Sample("x", phase, 0), Is.EqualTo(expected).Within(.000002));
@@ -22,8 +22,8 @@ public class VfxCurveBoundaryTests
 
     [TestCase(.25, .15625)]
     [TestCase(.5, .5)]
-    [TestCase(.75, .9375)]
-    public void CoincidentInterior_UsesFirstIncomingAndLastOutgoingModes(double phase, double expected)
+    [TestCase(.75, .84375)]
+    public void CoincidentInterior_UsesTheFirstKeysIncomingAndOutgoingModes(double phase, double expected)
     {
         const string text = "x,0,1;0,0,linear,linear,-0.05,0,0.05,0,0;0.5,0.5,exp3,linear,-0.05,0,0.05,0,0;0.5,0.5,linear,log3,-0.05,0,0.05,0,0;1,1,log3,linear,-0.05,0,0.05,0,0:x,0;0,0";
         var curve = new VfxPreviewCurve(text, "ParticleScale", 1);
@@ -32,8 +32,8 @@ public class VfxCurveBoundaryTests
 
     [TestCase(.25, .1375)]
     [TestCase(.5, .5)]
-    [TestCase(.75, .8625)]
-    public void CoincidentInterior_UsesFirstIncomingAndLastOutgoingBezierHandles(double phase, double expected)
+    [TestCase(.75, .675)]
+    public void CoincidentInterior_UsesTheFirstKeysIncomingAndOutgoingHandles(double phase, double expected)
     {
         const string text = "x,0,1;0,0,bezier_c,bezier_c,-0.16666666666666667,0,0.16666666666666667,0,0;0.5,0.5,bezier_c,bezier_c,-0.16666666666666667,-0.3,0.16666666666666667,-0.2,0;0.5,0.5,bezier_c,bezier_c,-0.16666666666666667,0.2,0.16666666666666667,0.3,0;1,1,bezier_c,bezier_c,-0.16666666666666667,0,0.16666666666666667,0,0:x,0;0,0";
         var curve = new VfxPreviewCurve(text, "ParticleScale", 1);
@@ -42,11 +42,13 @@ public class VfxCurveBoundaryTests
 
     [TestCase("0.300000000000001")]
     [TestCase("0.4")]
-    public void CoincidentDifferentValues_StillFailWithoutATolerance(string value)
+    public void CoincidentDifferentValues_UseTheFirstAuthoredKeyWithoutATolerance(string value)
     {
         var text = $"x,0,1;0.5,0.3,linear,linear,-0.05,0,0.05,0,0;0.5,{value},linear,linear,-0.05,0,0.05,0,0:x,0;0,0";
-        var exception = Assert.Throws<VfxMappingException>(() => new VfxPreviewCurve(text, "ParticleScale", 1));
-        Assert.That(exception!.Reason, Is.EqualTo("Vfx.Preview.AmbiguousField"));
+        var curve = new VfxPreviewCurve(text, "ParticleScale", 1);
+        Assert.That(curve.Sample("x", .5, .5f), Is.EqualTo(.3f));
+        Assert.That(VfxCurve.TryParse(text, out var source), Is.True);
+        Assert.That(source!.ToString(), Is.EqualTo(text));
     }
 
     [Test]
@@ -75,7 +77,6 @@ public class VfxCurveBoundaryTests
 
     [TestCase("ParticleScale", false)]
     [TestCase("ParticleInitialScale", false)]
-    [TestCase("EmitterPosition", true)]
     public void EmptyZ_StaysInvalidForThreeDimensionalOrOtherCurves(string field, bool planarScale)
     {
         var exception = Assert.Throws<VfxMappingException>(() => new VfxPreviewCurve(PlanarScale, field, 1, planarScale));

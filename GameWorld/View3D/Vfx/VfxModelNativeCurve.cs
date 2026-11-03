@@ -32,7 +32,7 @@ internal sealed class VfxModelNativeCurve
             throw new VfxMappingException(field, "Vfx.Preview.InvalidData");
         var minimum = Points(curve!.Channels[lower], field);
         var maximum = Points(curve.Channels[upper], field);
-        var count = minimum.Length <= 1 && maximum.Length <= 1 ? 1 : 128;
+        var count = curve.Channels[lower].Points.Count <= 1 && curve.Channels[upper].Points.Count <= 1 ? 1 : 128;
         var minSamples = new float[count]; var maxSamples = new float[count];
         for (var index = 0; index < count; ++index)
         {
@@ -42,8 +42,6 @@ internal sealed class VfxModelNativeCurve
             if (!float.IsFinite(minSamples[index]) || !float.IsFinite(maxSamples[index]))
                 throw new VfxMappingException(field, "Vfx.Preview.RangeUnsupported");
         }
-        if (split == 0 && !minSamples.AsSpan().SequenceEqual(maxSamples))
-            throw new VfxMappingException(field, "Vfx.Preview.AmbiguousField");
         return new(minSamples, maxSamples);
     }
 
@@ -60,17 +58,24 @@ internal sealed class VfxModelNativeCurve
 
     public float SampleBoundAt(int index, bool upper) => (upper ? _maximum : _minimum)[Math.Clamp(index, 0, SampleCount - 1)];
 
+    internal static Func<float, float> CreateChannelSampler(VfxCurveChannel channel, string field)
+    {
+        var points = Points(channel, field);
+        return time => Evaluate(points, time);
+    }
+
     private static Point[] Points(VfxCurveChannel channel, string field)
     {
-        if (channel.Points.Count == 0 || channel.Points.GroupBy(point => point.Time).Any(group => group.Count() > 1))
-            throw new VfxMappingException(field, "Vfx.Preview.AmbiguousField");
-        var result = channel.Points.Select(point =>
+        // Native nearest-key search keeps the first authored key at each float time.
+        var result = channel.AuthoredPoints.GroupBy(point => (float)point.Time).Select(group => group.First())
+            .OrderBy(point => (float)point.Time).Select(point =>
         {
             if (!point.TryGetHandles(out var incoming, out var outgoing))
                 throw new VfxMappingException(field, "Vfx.Preview.InvalidData");
             return new Point((float)point.Time, (float)point.Value, point.InMode, point.OutMode,
                 (float)incoming.Time, (float)incoming.Value, (float)outgoing.Time, (float)outgoing.Value);
         }).ToArray();
+        if (result.Length == 0) return [new(0, 0, "linear", "linear", 0, 0, 0, 0)];
         for (var index = 1; index < result.Length; ++index)
         {
             var left = result[index - 1]; var right = result[index];
@@ -84,8 +89,8 @@ internal sealed class VfxModelNativeCurve
         return result;
     }
 
-    private static bool Supported(string mode) => mode is "linear" or "exp1" or "exp3" or "log1" or "log3"
-        or "sine" or "sine_recip" or "s" or "bezier_c";
+    private static bool Supported(string mode) => mode is "linear" or "step" or "step_next" or "exp1" or "exp3" or "log1" or "log3"
+        or "sine" or "sine_recip" or "s" or "s_inv" or "bezier_c" or "bezier_q";
 
     private static float Evaluate(Point[] points, float time)
     {
@@ -109,6 +114,9 @@ internal sealed class VfxModelNativeCurve
         switch (mode)
         {
             case "bezier_c": return CubicValue(left, right, time);
+            case "bezier_q": return CubicValue(left, right, time, quadratic: true);
+            case "step": return start;
+            case "step_next": return end;
             case "linear": return start + (end - start) * phase;
             case "exp1": return start + ((end - start) * .5f) * ((phase + 1) * phase);
             case "exp3": return start + ((end - start) * phase) * (phase * phase);
@@ -138,14 +146,32 @@ internal sealed class VfxModelNativeCurve
                 value = value * square + .0006967021618038416f;
                 return start + value * (end - start);
             }
+            case "s_inv":
+            {
+                var angle = phase * 3.1415927410125732f;
+                var square = (phase * phase) * 9.86960506439209f;
+                if (phase > .5f) { angle = 3.1415927410125732f - angle; square = angle * angle; }
+                var value = .004153162706643343f - square * .00009181827044812962f;
+                value = value * square - .0833241418004036f;
+                value = value * square + .4999983012676239f;
+                value *= angle;
+                if (phase > .5f) value = 1 - value;
+                return start + value * (end - start);
+            }
             default: throw new InvalidOperationException("Unvalidated native model curve mode.");
         }
     }
 
-    private static float CubicValue(Point left, Point right, float time)
+    private static float CubicValue(Point left, Point right, float time, bool quadratic = false)
     {
         var p0 = (left.Time, left.Value); var p1 = (left.Time + left.OutTime, left.Value + left.OutValue);
         var p2 = (right.Time + right.InTime, right.Value + right.InValue); var p3 = (right.Time, right.Value);
+        if (quadratic)
+        {
+            var control = p1;
+            p1 = (left.Time + (control.Item1 - left.Time) * .6667f, left.Value + (control.Item2 - left.Value) * .6667f);
+            p2 = (right.Time + (control.Item1 - right.Time) * .6667f, right.Value + (control.Item2 - right.Value) * .6667f);
+        }
         if (p0.Value == p1.Item2 && p1.Item2 == p2.Item2 && p2.Item2 == p3.Value) return p0.Value;
         var low = 0.0; var high = 1.0;
         for (var iteration = 0; iteration < 10; ++iteration)

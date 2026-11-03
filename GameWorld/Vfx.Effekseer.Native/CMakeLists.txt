@@ -54,7 +54,7 @@ add_custom_command(OUTPUT "${compiled_scene_shaders}"
     VERBATIM)
 set(compiled_materials "${CMAKE_CURRENT_BINARY_DIR}/CompiledVfxMaterials.h")
 set(material_headers
-    "${CMAKE_CURRENT_SOURCE_DIR}/BulkSpriteShaderSources.h" "${CMAKE_CURRENT_SOURCE_DIR}/NativeMboitShaderSources.h" "${CMAKE_CURRENT_SOURCE_DIR}/CoverageMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/ScrollingMeshMaterial.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/BulkSpriteShaderSources.h" "${CMAKE_CURRENT_SOURCE_DIR}/NativeMboitShaderSources.h" "${CMAKE_CURRENT_SOURCE_DIR}/NativeFogBloodShaderSources.h" "${CMAKE_CURRENT_SOURCE_DIR}/SeaOverlayShaderSources.h" "${CMAKE_CURRENT_SOURCE_DIR}/CoverageMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/ScrollingMeshMaterial.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/OneShotMeshMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/BasicMeshMaterial.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/GemstoneMeshMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/AnimatedUvSpriteMaterial.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/BasicSpriteMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/PremultiplyAnimatedMaterial.h"
@@ -62,7 +62,8 @@ set(material_headers
     "${CMAKE_CURRENT_SOURCE_DIR}/SoulPanningMeshMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/GrowingVinesMaterial.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/RigidDissolveMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/DistortionMaterial.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/TidecallMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/VertexAnimatedMeshMaterial.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/RigidBasicDitherMaterial.h")
+    "${CMAKE_CURRENT_SOURCE_DIR}/RigidBasicDitherMaterial.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/NativeColourMeshMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/NativeSimpleMeshMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/RigidGlowMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/FungiMeshMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/MeshColourDistortionMaterial.h" "${CMAKE_CURRENT_SOURCE_DIR}/MeshDistortionMaterial.h")
 # Localized MSVC include output must not leave the generator or embedded shaders stale.
 set_source_files_properties(CompileMaterials.cpp PROPERTIES OBJECT_DEPENDS "${material_headers}")
 add_custom_command(OUTPUT "${compiled_materials}"
@@ -73,7 +74,7 @@ add_custom_target(AecnVfxCompiledResources DEPENDS "${compiled_materials}" "${co
 add_subdirectory(Runtime)
 add_dependencies(AssetEditor.CN.Effekseer AecnVfxCompiledResources)
 set_source_files_properties("${CMAKE_CURRENT_SOURCE_DIR}/Bridge.cpp" TARGET_DIRECTORY AssetEditor.CN.Effekseer PROPERTIES OBJECT_DEPENDS
-    "${compiled_materials};${compiled_scene_shaders};${CMAKE_CURRENT_SOURCE_DIR}/Bridge.h;${CMAKE_CURRENT_SOURCE_DIR}/FloatSceneTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/WeightedDistortionTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/SpriteUploadCache.h;${CMAKE_CURRENT_SOURCE_DIR}/BulkSpriteQueue.h;${CMAKE_CURRENT_SOURCE_DIR}/VfxRenderTiming.h;${CMAKE_CURRENT_SOURCE_DIR}/HalfResolutionScene.h")
+    "${compiled_materials};${compiled_scene_shaders};${CMAKE_CURRENT_SOURCE_DIR}/Bridge.h;${CMAKE_CURRENT_SOURCE_DIR}/FloatSceneTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/WeightedDistortionTarget.h;${CMAKE_CURRENT_SOURCE_DIR}/SpriteUploadCache.h;${CMAKE_CURRENT_SOURCE_DIR}/BulkSpriteQueue.h;${CMAKE_CURRENT_SOURCE_DIR}/VfxRenderTiming.h;${CMAKE_CURRENT_SOURCE_DIR}/HalfResolutionScene.h;${CMAKE_CURRENT_SOURCE_DIR}/CompactAnimatedModel.h")
 target_include_directories(AssetEditor.CN.Effekseer PRIVATE
     "${CMAKE_CURRENT_BINARY_DIR}"
     "${EFFEKSEER_SOURCE_DIR}/Dev/Cpp/Effekseer"

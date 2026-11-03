@@ -69,7 +69,7 @@ public class VfxPrelitSpriteTests
     }
 
     [Test]
-    public void EmissiveSample_UsesTheShippedGreenMaskAndTintIndependentlyOfDiffuseColour()
+    public void EmissiveSample_UsesTheShippedRedMaskAndTintIndependentlyOfDiffuseColour()
     {
         RequireGpu(); var graphics = new GraphicsDeviceServiceMock();
         try
@@ -77,8 +77,8 @@ public class VfxPrelitSpriteTests
             var green = VfxMaterialCompositingTests.Texture(0, 255);
             var red = VfxMaterialCompositingTests.Texture(0, 255);
             for (var offset = 128; offset < green.Length; offset += 4) { green[offset + 1] = 255; red[offset] = 255; }
-            var bright = Render(graphics.GraphicsDevice, Material(sample: 1), mask: green)[64 * 128 + 64];
-            var dark = Render(graphics.GraphicsDevice, Material(sample: 1), mask: red)[64 * 128 + 64];
+            var bright = Render(graphics.GraphicsDevice, Material(sample: 1), mask: red)[64 * 128 + 64];
+            var dark = Render(graphics.GraphicsDevice, Material(sample: 1), mask: green)[64 * 128 + 64];
             Assert.That(bright.X - dark.X, Is.EqualTo(1).Within(.004f));
         }
         finally { graphics.Release(); }

@@ -16,6 +16,8 @@ namespace
 #include "CoverageMaterial.h"
 #include "BulkSpriteShaderSources.h"
 #include "NativeMboitShaderSources.h"
+#include "NativeFogBloodShaderSources.h"
+#include "SeaOverlayShaderSources.h"
 #include "DistortionMaterial.h"
 #include "OneShotMeshMaterial.h"
 #include "BasicMeshMaterial.h"
@@ -32,10 +34,51 @@ namespace
 #include "ScrollingMeshMaterial.h"
 #include "TidecallMaterial.h"
 #include "VertexAnimatedMeshMaterial.h"
+#include "NativeColourMeshMaterial.h"
+#include "NativeSimpleMeshMaterial.h"
+#include "RigidGlowMaterial.h"
+#include "FungiMeshMaterial.h"
+#include "MeshColourDistortionMaterial.h"
+#include "MeshDistortionMaterial.h"
+
+bool IsNativeColourMesh(const Effekseer::MaterialFile& material)
+{
+    return material.GetUniformCount() == 6 && std::strcmp(material.GetUniformName(0), "colourMeshRender") == 0;
+}
+
+bool IsMeshDistortion(const Effekseer::MaterialFile& material)
+{
+    return material.GetUniformCount()==9 && std::strcmp(material.GetUniformName(0),"meshDistortion0")==0;
+}
+
+bool IsMeshColourDistortion(const Effekseer::MaterialFile& material)
+{
+    return std::strstr(material.GetGenericCode(), "AecnMeshColourDistortion(") != nullptr;
+}
+
+bool IsFungi(const Effekseer::MaterialFile& material)
+{
+    return material.GetUniformCount() == 11 && std::strcmp(material.GetUniformName(0), "fungiRender") == 0;
+}
+
+bool IsRigidGlow(const Effekseer::MaterialFile& material)
+{
+    return material.GetUniformCount() == 2 && std::strcmp(material.GetUniformName(0), "rigidGlowParameters") == 0;
+}
+
+bool IsNativeSimpleMesh(const Effekseer::MaterialFile& material)
+{
+    return material.GetUniformCount() == 2 && std::strcmp(material.GetUniformName(0), "simpleMesh0") == 0;
+}
 
 bool IsVertexAnimated(const Effekseer::MaterialFile& material)
 {
     return material.GetUniformCount() > 0 && std::strcmp(material.GetUniformName(0), "vertexAnimRender") == 0;
+}
+
+bool IsRigidDissolve(const Effekseer::MaterialFile& material)
+{
+    return material.GetUniformCount() == 16 && std::strcmp(material.GetUniformName(0), "mesh0") == 0;
 }
 
 bool IsTidecall(const Effekseer::MaterialFile& material)
@@ -81,6 +124,7 @@ std::string CoverageVertexSource(Effekseer::MaterialFile& material, Effekseer::M
     using namespace Effekseer;
     auto generator = DirectX::ShaderGenerator(DirectX::ShaderGeneratorTarget::DirectX11);
     auto code = generator.GenerateShader(&material, type, UserUniformSlotMax, UserTextureSlotMax, 0, 40).CodeVS;
+    if (IsNativeColourMesh(material)) code = NativeColourMeshParameters() + code;
     ReplaceRequired(code, "float4 PosP : TEXCOORD6;", "float4 PosP : TEXCOORD6;\n float AecnSoftViewZ : TEXCOORD10;");
     if (type == MaterialShaderType::Standard)
     {
@@ -109,16 +153,36 @@ std::string TrilinearPixelSource(Effekseer::MaterialFile& material, Effekseer::M
     using namespace Effekseer;
     auto generator = DirectX::ShaderGenerator(DirectX::ShaderGeneratorTarget::DirectX11);
     auto code = generator.GenerateShader(&material, type, UserUniformSlotMax, UserTextureSlotMax, 0, 40).CodePS;
+    if (IsNativeColourMesh(material))
+    {
+        code = NativeColourMeshParameters() + NativeColourMeshDepth() + code;
+        ReplaceRequired(code, "CalcDepthFade(screenUV, meshZ, colourMeshSoftDistance)",
+            "AecnColourMeshDepthFade(efk_depth_texture, Input.Position.xy, worldPos, colourMeshSoftDistance, "
+            "colourMeshInverse0, colourMeshInverse1, colourMeshInverse2, colourMeshInverse3, colourMeshViewport)");
+    }
+    if (IsMeshDistortion(material))
+    {
+        code=NativeColourMeshDepth()+code;
+        ReplaceRequired(code,"CalcDepthFade(screenUV, meshZ, distortionSoftDistance)",
+            "AecnColourMeshDepthFade(efk_depth_texture, Input.Position.xy, worldPos, distortionSoftDistance, "
+            "meshDistortionInverse0, meshDistortionInverse1, meshDistortionInverse2, meshDistortionInverse3, meshDistortionViewport)");
+    }
+    if (IsMeshDistortion(material) || IsNativeColourMesh(material) || IsNativeSimpleMesh(material) || IsVertexAnimated(material) || IsRigidGlow(material) || IsFungi(material))
+    {
+        ReplaceRequired(code, "return ConvertToScreen(Output);", "return Output;");
+        // Native premultiplied graphs can emit RGB with zero alpha; the blend scope handles it.
+        ReplaceRequired(code, "if(opacity <= 0.0) discard;", "");
+    }
+    if (IsMeshColourDistortion(material)) code = MeshColourDistortionHeader() + code;
+    if (IsFungi(material)) code = FungiParameterHeader() + code;
+    if (IsRigidDissolve(material)) code = LegacyRigidDissolveParameterHeader() + code;
     if (IsVertexAnimated(material))
     {
         code = "Texture2D vertexAnimDisplacementTexture : register(t8);\nSamplerState vertexAnimDisplacementSampler : register(s8);\n"
-            + VertexAnimatedParameterHeader() + code;
+            + VertexAnimatedParameterHeader() + NativeColourMeshDepth() + code;
         ReplaceRequired(code, "CalcDepthFade(screenUV, meshZ, vertexAnimSoftDistance)",
-            "CalcDepthFade(Input.Position.xy, meshZ, vertexAnimSoftDistance)");
-        ReplaceRequired(code, "float backgroundZ = efk_depth_texture.Sample(efk_depth_sampler, GetUVBack(screenUV)).x;",
-            "uint vertexAnimDepthWidth, vertexAnimDepthHeight; efk_depth_texture.GetDimensions(vertexAnimDepthWidth, vertexAnimDepthHeight);\n"
-            "int2 vertexAnimDepthPixel = clamp(int2(floor(screenUV)), int2(0,0), int2(vertexAnimDepthWidth,vertexAnimDepthHeight)-1);\n"
-            "float backgroundZ = efk_depth_texture.Load(int3(vertexAnimDepthPixel,0)).x;");
+            "AecnColourMeshDepthFade(efk_depth_texture, Input.Position.xy, worldPos, vertexAnimSoftDistance, "
+            "vertexAnimInverse0, vertexAnimInverse1, vertexAnimInverse2, vertexAnimInverse3, vertexAnimViewport)");
     }
     if (IsTidecall(material)) code = TidecallParameterHeader()
         + "Texture2D tideExtraTextures[5] : register(t8);\nSamplerState tideMaskSampler : register(s8);\n"
@@ -249,19 +313,28 @@ std::vector<uint8_t> Compile(std::vector<uint8_t> source)
     MaterialFile material;
     if (!material.Load(source.data(), static_cast<int32_t>(source.size())))
         throw std::runtime_error("Invalid VFX material source");
-    if (IsTidecall(material) || IsVertexAnimated(material))
+    if (IsTidecall(material) || IsVertexAnimated(material) || IsRigidDissolve(material) || IsNativeColourMesh(material) || IsFungi(material) || IsMeshColourDistortion(material))
     {
         auto vertex = [&](MaterialShaderType type) {
             auto generator = DirectX::ShaderGenerator(DirectX::ShaderGeneratorTarget::DirectX11);
             auto code = generator.GenerateShader(&material, type, UserUniformSlotMax, UserTextureSlotMax, 0, 40).CodeVS;
+            if (IsMeshColourDistortion(material)) return CompileShader(MeshColourDistortionHeader(true) + code, "vs_5_0");
+            if (IsFungi(material))
+            {
+                if (type == MaterialShaderType::Model)
+                    ReplaceRequired(code, "worldPos = worldPos + worldPositionOffset;", "worldPos = worldPos + worldPositionOffset;\n" + FungiVertexOffset());
+                return CompileShader(FungiParameterHeader(true) + code, "vs_5_0");
+            }
+            if (IsNativeColourMesh(material)) return CompileShader(NativeColourMeshParameters() + code, "vs_5_0");
+            if (IsRigidDissolve(material)) return CompileShader(LegacyRigidDissolveParameterHeader() + code, "vs_5_0");
             if (type == MaterialShaderType::Model)
                 ReplaceRequired(code, "worldPos = worldPos + worldPositionOffset;",
                     "worldPos = worldPos + worldPositionOffset;\n" + (IsVertexAnimated(material) ? VertexAnimatedVertexOffset() : TidecallVertexDisplacement()));
             if (IsVertexAnimated(material))
-                return CompileShader("Texture2D vertexAnimDisplacementTexture : register(t0);\nSamplerState vertexAnimDisplacementSampler : register(s0);\n"
+                return CompileShader("Texture2D vertexAnimDisplacementTexture : register(t8);\nSamplerState vertexAnimDisplacementSampler : register(s8);\n"
                     + VertexAnimatedParameterHeader() + code, "vs_5_0");
             return CompileShader(TidecallParameterHeader()
-                + "Texture2D tideDisplacementTexture : register(t0);\nSamplerState tideDisplacementSampler : register(s0);\n"
+                + "Texture2D tideDisplacementTexture : register(t8);\nSamplerState tideDisplacementSampler : register(s8);\n"
                 + "float4 AecnTideExtraSample(int slot, float2 uv) { return float4(0,0,0,0); }\n"
                 + code, "vs_5_0");
         };
@@ -308,14 +381,15 @@ int main(int argc, char** argv)
     try
     {
         if (argc != 2) throw std::runtime_error("Expected generated header path");
-        std::array<std::vector<uint8_t>, 18> sources = {PremultipliedMaterial(), PremultipliedMaterial(true),
+        std::array<std::vector<uint8_t>, 28> sources = {PremultipliedMaterial(), PremultipliedMaterial(true),
             ScrollingMeshMaterial(), ScrollingMeshMaterial(true), ScrollingMeshMaterial(false, true),
             ScrollingMeshMaterial(false, false, true), ScrollingMeshMaterial(false, false, false, true),
             ScrollingMeshMaterial(false, false, false, false, true), ScrollingMeshMaterial(false, false, false, false, false, true), ScrollingMeshMaterial(false, false, false, false, false, false, true), ScrollingMeshMaterial(false, false, false, false, false, false, false, true),
             ScrollingMeshMaterial(false, false, false, false, false, false, false, false, true),
             ScrollingMeshMaterial(false, false, false, false, false, false, false, false, false, true),
-            ScrollingMeshMaterial(false, false, false, false, false, false, false, false, false, false, true), DistortionMaterial(), TidecallMaterial(), VertexAnimatedMeshMaterial(), RigidBasicDitherMaterial()};
-        std::array<std::vector<uint8_t>, 18> materials;
+            ScrollingMeshMaterial(false, false, false, false, false, false, false, false, false, false, true), DistortionMaterial(), TidecallMaterial(), VertexAnimatedMeshMaterial(), RigidBasicDitherMaterial(),
+            NativeColourMeshMaterial(0), NativeColourMeshMaterial(1), NativeColourMeshMaterial(2), NativeColourMeshMaterial(3), NativeSimpleMeshMaterial(false), NativeSimpleMeshMaterial(true), RigidGlowMaterial(false), RigidGlowMaterial(true), FungiMeshMaterial(), MeshDistortionMaterial()};
+        std::array<std::vector<uint8_t>, 28> materials;
         for (size_t i = 0; i < sources.size(); ++i)
         {
             std::cout << "Compile VFX material " << i + 1 << " / " << sources.size() << std::endl;
@@ -331,7 +405,7 @@ int main(int argc, char** argv)
             CompileShader(BulkSpriteVertexSource(originalVertex), "vs_5_0"),
             CompileShader(BulkSpritePixelSource(originalPixel, false), "ps_5_0"),
             CompileShader(BulkSpritePixelSource(originalPixel, true), "ps_5_0")};
-        std::array<std::vector<uint8_t>, 10> halfShaders = {
+        std::array<std::vector<uint8_t>, 25> halfShaders = {
             CompileShader(HalfSceneVertexSource(originalVertex), "vs_5_0"),
             CompileShader(HalfSceneMomentPixelSource(originalPixel), "ps_5_0"),
             CompileShader(HalfSceneColourPixelSource(originalPixel), "ps_5_0"),
@@ -341,7 +415,22 @@ int main(int argc, char** argv)
             CompileShader(HalfSceneDepthPixelSource(), "ps_5_0"),
             CompileShader(HalfSceneMomentPixelSource(originalPixel, true), "ps_5_0"),
             CompileShader(HalfSceneColourPixelSource(originalPixel, true), "ps_5_0"),
-            CompileShader(HalfSceneComposePixelSource(true), "ps_5_0")};
+            CompileShader(HalfSceneComposePixelSource(true), "ps_5_0"),
+            CompileShader(SeaOverlayPixelSource(originalPixel), "ps_5_0"),
+            CompileShader(SeaOverlayComposePixelSource(), "ps_5_0"),
+            CompileShader(SeaOverlayPixelSource(originalPixel, true), "ps_5_0"),
+            CompileShader(SeaOverlayComposePixelSource(true), "ps_5_0"),
+            CompileShader(SeaOverlayVertexSource(originalVertex), "vs_5_0"),
+            CompileShader(NativeFogBloodMomentPixelSource(originalPixel, false), "ps_5_0"),
+            CompileShader(NativeFogBloodColourPixelSource(originalPixel, false), "ps_5_0"),
+            CompileShader(NativeFogBloodMomentPixelSource(originalPixel, false, true), "ps_5_0"),
+            CompileShader(NativeFogBloodColourPixelSource(originalPixel, false, true), "ps_5_0"),
+            CompileShader(NativeFogBloodMomentPixelSource(originalPixel, true), "ps_5_0"),
+            CompileShader(NativeFogBloodColourPixelSource(originalPixel, true), "ps_5_0"),
+            CompileShader(NativeFogBloodMomentPixelSource(originalPixel, true, true), "ps_5_0"),
+            CompileShader(NativeFogBloodColourPixelSource(originalPixel, true, true), "ps_5_0"),
+            CompileShader(HalfSceneSampleInputs(HalfSceneVertexSource(originalVertex)), "vs_5_0"),
+            CompileShader(HalfSceneSampleInputs(SeaOverlayVertexSource(originalVertex)), "vs_5_0")};
         std::ofstream output(argv[1], std::ios::binary | std::ios::trunc);
         output.exceptions(std::ios::badbit | std::ios::failbit);
         output << "#pragma once\n// Generated from the pinned compiler and current material sources.\n";

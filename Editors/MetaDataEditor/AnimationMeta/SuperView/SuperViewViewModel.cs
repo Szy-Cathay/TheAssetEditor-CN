@@ -416,7 +416,8 @@ namespace Editors.AnimationMeta.SuperView
             CombatMetaDataGizmoComponent combatGizmo,
             MetaDataMarkerPickerComponent markerPicker,
             SceneRenderParametersStore renderParameters,
-            ApplicationSettingsService settings)
+            ApplicationSettingsService settings,
+            IStandardDialogs? effectDialogs = null)
             : base(editorHostParameters)
         {
             if (GameWorld is D3D11Host host)
@@ -437,6 +438,8 @@ namespace Editors.AnimationMeta.SuperView
             _metaDataFileParser = metaDataFileParser;
             _metaDataFactory = metaDataFactory;
             _metaDataFactory.EnableInteractiveVfxPreview = true;
+            _metaDataFactory.EffectPreviewContext = (_metaDataFactory.EffectPreviewContext ?? new()) with { BypassTerrainSelection = true };
+            _effectDialogs = effectDialogs;
             _combatEditSession = combatEditSession;
             _combatGizmo = combatGizmo;
             _markerPicker = markerPicker;
@@ -463,6 +466,8 @@ namespace Editors.AnimationMeta.SuperView
             eventHub.Register<SceneObjectUpdateEvent>(this, OnSceneObjectUpdated);
             eventHub.Register<MetaDataAttributeChangedEvent>(this, OnMetaDataAttributeChanged);
             eventHub.Register<SelecteMetaDataAttributeChangedEvent>(this, OnSelectedMetaDataAttributeChanged);
+            eventHub.Register<global::Shared.Core.Events.Global.PackFileSavedEvent>(this, OnEffectResourceSaved);
+            eventHub.Register<global::Shared.Core.Events.Global.PackFileContainerManipulationEvent>(this, OnEffectPacksChanged);
         }
 
         private void OnSelectedMetaDataAttributeChanged(SelecteMetaDataAttributeChangedEvent @event)
@@ -661,7 +666,7 @@ namespace Editors.AnimationMeta.SuperView
         }
 
         private bool RefreshMetaDataPreview(
-            ParsedMetadataAttribute attribute)
+            ParsedMetadataAttribute attribute, bool forceRebuild = false)
         {
             _markerPicker.ClearInteractionState();
             if (!TryGetDocumentOwner(attribute, out var owner))
@@ -670,7 +675,7 @@ namespace Editors.AnimationMeta.SuperView
             var currentIndex = _asset.Data.MetaDataItems.FindIndex(item =>
                 item is IMetaDataPreview preview &&
                 ReferenceEquals(preview.Source, attribute));
-            if (currentIndex >= 0 && _asset.Data.MetaDataItems[currentIndex] is EffectMetaInstance existingEffect
+            if (!forceRebuild && currentIndex >= 0 && _asset.Data.MetaDataItems[currentIndex] is EffectMetaInstance existingEffect
                 && existingEffect.TryRefreshTransform())
             {
                 RebuildMetaDataInspectionIndex();

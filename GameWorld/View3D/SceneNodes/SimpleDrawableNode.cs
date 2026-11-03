@@ -14,6 +14,7 @@ namespace GameWorld.Core.SceneNodes
         private readonly List<VertexPositionColor> _lineVertexList = [];
         private readonly List<VertexPositionColor> _surfaceVertexList = [];
         private readonly List<EdgeData> _previewEdges = [];
+        public Func<Matrix?>? DisplayWorldTransform { get; set; }
 
         public SimpleDrawableNode(string name)
         {
@@ -46,7 +47,7 @@ namespace GameWorld.Core.SceneNodes
 
         public void Render(RenderEngineComponent renderEngine, Matrix parentWorld)
         {
-            var m = ModelMatrix * parentWorld;
+            var m = DisplayWorldTransform?.Invoke() ?? ModelMatrix * parentWorld;
             foreach (var item in _renderList)
             {
                 item.ModelMatrix = m;

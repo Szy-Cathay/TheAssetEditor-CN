@@ -1,6 +1,6 @@
 #pragma once
 
-// Zero colour-distortion branch of wh3_vfx_one_shot_mesh's shipped pixel shader.
+// wh3_vfx_one_shot_mesh's original source-age mask and colour-distortion inputs.
 std::string OneShotMeshCode()
 {
     return R"(
@@ -22,14 +22,21 @@ std::string OneShotMeshCode()
         mask *= lerp(pow(1 - ndv, mesh4.y), pow(ndv, mesh4.y), mesh4.x);
         $F2$ globalUV = (uv1 + sourceTime * mesh2.xy) * mesh2.zw;
         $F4$ globalMask = $TEX_P5$globalUV$TEX_S5$;
-        $F2$ oneShotUV = (uv1 + customData1.y * mesh4.zw) * mesh5.xy;
+        $F2$ oneShotUV = (uv1 + customData1.z * mesh4.zw) * mesh5.xy;
         oneShotUV.y = saturate(oneShotUV.y);
         $F4$ oneShotMask = $TEX_P4$oneShotUV$TEX_S4$;
         mask *= globalMask.r * saturate(oneShotMask.r);
         $F4$ vertexColour = lerp($F4$(1,1,1,1), vcolor, mesh13.x);
         mask *= mesh12.z * pow(abs(vertexColour.a), mesh12.w);
         mask *= lerp(1, floor(customData2.a * 1000) * 0.001, mesh13.y);
-        $F2$ colourUV = (uv1 + sourceTime * mesh0.yz) * mesh1.xy;
+        $F2$ colourBaseUV = uv1;
+        if (mesh0.x != 0)
+        {
+            $F2$ distortionUV = uv1 * -.35 + sourceTime * $F2$(0,.1);
+            $F4$ distortion = AecnMeshColourDistortion(distortionUV);
+            colourBaseUV += mesh0.x * distortion.rb * .1;
+        }
+        $F2$ colourUV = (colourBaseUV + sourceTime * mesh0.yz) * mesh1.xy;
         $F4$ overlay = $TEX_P3$colourUV$TEX_S3$;
         $F3$ colour = overlay.rgb * (1 + overlay.a * (mesh0.w - 1));
         colour *= vertexColour.rgb * mesh3.xyz * mesh3.w * customData2.rgb;

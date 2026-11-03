@@ -1,3 +1,5 @@
+﻿using Shared.GameFormats.AnimationMeta.Definitions;
+
 namespace Shared.GameFormats.AnimationMeta.Parsing;
 
 public enum ParsedMetadataZeroRangeBehavior
@@ -78,6 +80,12 @@ public readonly record struct ParsedMetadataTimeRange(
         ParsedMetadataAttribute attribute,
         out ParsedMetadataTimeRange timeRange)
     {
+        if (attribute is Effect_v1 effect)
+        {
+            timeRange = new(effect.EffectStartTime, effect.EffectEndTime, ParsedMetadataZeroRangeBehavior.Instant);
+            return true;
+        }
+
         if (attribute is DecodedMetaEntryBase_v2 version2)
         {
             timeRange = new(
@@ -107,6 +115,10 @@ public readonly record struct ParsedMetadataTimeRange(
     {
         switch (attribute)
         {
+            case Effect_v1 effect:
+                effect.EffectStartTime = startTime;
+                effect.EffectEndTime = endTime;
+                break;
             case DecodedMetaEntryBase_v2 version2:
                 version2.StartTime = startTime;
                 version2.EndTime = endTime;

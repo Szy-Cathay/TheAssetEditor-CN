@@ -8,6 +8,9 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using AssetEditor.Services.Settings;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Editors.AnimationMeta.SuperView;
 using Editors.AnimationMeta.SuperView.Inspection;
 using Editors.AnimationMeta.SuperView.Visualisation;
 using Microsoft.Extensions.DependencyInjection;
@@ -744,6 +747,7 @@ public class UiAnimationMetadataFamilyGallery
         return new GalleryModel
         {
             MetaDataFileVersion = 2,
+            ParsedFile = new Shared.GameFormats.AnimationMeta.Parsing.ParsedMetadataFile { Version = 2, Attributes = [tag._input] },
             Tags = new[] { tag },
             SelectedTag = tag,
             NewActionCommand = GalleryCommand.Instance,
@@ -1605,7 +1609,7 @@ public class UiAnimationMetadataFamilyGallery
         }
     }
 
-    internal sealed class MetadataSuperViewGalleryModel : Editors.Shared.Core.Common.BaseControl.IEditorViewModelTypeProvider
+    internal sealed class MetadataSuperViewGalleryModel : ObservableObject, Editors.Shared.Core.Common.BaseControl.IEditorViewModelTypeProvider
     {
         public Type EditorViewModelType => typeof(MetadataSuperView);
         public GridLength LeftColumnWidth { get; set; } = new(3, GridUnitType.Star);
@@ -1643,6 +1647,26 @@ public class UiAnimationMetadataFamilyGallery
         public bool CanPreviewFlagWind { get; set; }
         public string PreviewWindX { get; set; } = "0";
         public string PreviewWindZ { get; set; } = "0";
+        private int _previewTerrainType = -1;
+        private bool _previewDistanceCulling;
+        private bool _previewEffectIdFilter;
+        private int _previewEffectId;
+        private string _previewAuraResource = "";
+        private string _previewWeaponResource = "";
+        public IReadOnlyList<EffectTerrainChoice> EffectTerrainChoices { get; } = Enumerable.Range(-1, 18)
+            .Select(value => new EffectTerrainChoice(value, LocalizationManager.Instance.Get("SuperView.Effects.Terrain." + value))).ToArray();
+        public int PreviewTerrainType { get => _previewTerrainType; set => SetProperty(ref _previewTerrainType, value); }
+        public bool PreviewDistanceCulling { get => _previewDistanceCulling; set => SetProperty(ref _previewDistanceCulling, value); }
+        public bool PreviewEffectIdFilter { get => _previewEffectIdFilter; set => SetProperty(ref _previewEffectIdFilter, value); }
+        public int PreviewEffectId { get => _previewEffectId; set => SetProperty(ref _previewEffectId, value); }
+        public string PreviewAuraResource { get => _previewAuraResource; set => SetProperty(ref _previewAuraResource, value); }
+        public string PreviewWeaponResource { get => _previewWeaponResource; set => SetProperty(ref _previewWeaponResource, value); }
+        public ICommand BrowseAuraResourceCommand { get; }
+        public ICommand BrowseWeaponResourceCommand { get; }
+        public ICommand ClearAuraResourceCommand { get; }
+        public ICommand ClearWeaponResourceCommand { get; }
+        public int AuraBrowseRequests { get; private set; }
+        public int WeaponBrowseRequests { get; private set; }
         public bool ShowCombatMetaDataDuringActiveTime { get; set; } = true;
         public bool ShowCombatMetaDataForEntireAnimation { get; set; }
         public bool CanFocusSelectedMetaData => HasAnimationMetaFile;
@@ -1698,6 +1722,18 @@ public class UiAnimationMetadataFamilyGallery
             SelectedTabControllerIndex = selectedTabControllerIndex;
             Player = CreateAnimationPlayerModel(MetaDataTimeline);
             MetaDataProblems = CreateProblemListModel(hasAnimationMetaFile);
+            BrowseAuraResourceCommand = new RelayCommand(() =>
+            {
+                AuraBrowseRequests++;
+                PreviewAuraResource = @"vfx\预览测试\很长的光环资源路径用于检查右侧栏宽度\diagnostic_aura.xml";
+            });
+            BrowseWeaponResourceCommand = new RelayCommand(() =>
+            {
+                WeaponBrowseRequests++;
+                PreviewWeaponResource = @"vfx\预览测试\很长的武器资源路径用于检查右侧栏宽度\diagnostic_weapon.xml";
+            });
+            ClearAuraResourceCommand = new RelayCommand(() => PreviewAuraResource = "");
+            ClearWeaponResourceCommand = new RelayCommand(() => PreviewWeaponResource = "");
         }
 
         public void CreatePersistentMetaFile()
@@ -1814,6 +1850,8 @@ public class UiAnimationMetadataFamilyGallery
         public object? MeshBones { get; set; }
         public object? MeshSkeletonName { get; set; }
         public object? MetaDataFileVersion { get; set; }
+        public object? ParsedFile { get; set; }
+        public bool IsDirty { get; set; }
         public object? MetaEditor { get; set; }
         public object? MetaFile { get; set; }
         public object? MetaFileName { get; set; }

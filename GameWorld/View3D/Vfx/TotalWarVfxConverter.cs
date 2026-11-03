@@ -12,7 +12,7 @@ namespace GameWorld.Core.Vfx;
 
 internal sealed record VfxPreviewModel(EffekseerVertex[] Vertices, int[] Indices,
     EffekseerVertex[]? AnimationVertices = null, int AnimationFrameCount = 1, float AnimationCycles = 0, bool OpaqueMaterial = false, bool RigidAnimation = false,
-    string? ApproximateMaterialShader = null);
+    string? ApproximateMaterialShader = null, VfxModelAnimationData? AnimationData = null);
 internal enum VfxTextureUsage { Diffuse, DistortionNormal, ShadingNormal, MaterialValue, GradientValue, SolidWhite, OpaqueDiffuse }
 internal sealed class VfxConversion
 {
@@ -37,7 +37,7 @@ internal static class TotalWarVfxConverter
     private sealed class ConversionContext
     {
         private readonly Dictionary<(string Path, string Hash), VfxDocument> _documents = [];
-        private readonly Dictionary<(string? Text, string Field, int Fallback, bool Planar), VfxPreviewCurve> _curves = [];
+        private readonly Dictionary<(string? Text, string Field, int Fallback, bool Planar, bool ModelTable), VfxPreviewCurve> _curves = [];
         public VfxModelAnimationBudget AnimationBudget { get; } = new();
         public VfxPreviewEditorInfoBuilder? Editor { get; set; }
         public bool CollectEditorInfo { get; init; } = true;
@@ -56,12 +56,12 @@ internal static class TotalWarVfxConverter
             return document;
         }
 
-        public VfxPreviewCurve ReadCurve(string? text, string field, float fallback, bool planarScale = false)
+        public VfxPreviewCurve ReadCurve(string? text, string field, float fallback, bool planarScale = false, bool nativeModelTable = false)
         {
-            var key = (text, field, BitConverter.SingleToInt32Bits(fallback), planarScale);
+            var key = (text, field, BitConverter.SingleToInt32Bits(fallback), planarScale, nativeModelTable);
             if (_curves.TryGetValue(key, out var existing)) return existing;
             // Numeric curves are immutable; particle randomness and diagnostics remain with each caller.
-            var curve = new VfxPreviewCurve(text, field, fallback, planarScale);
+            var curve = new VfxPreviewCurve(text, field, fallback, planarScale, nativeModelTable);
             _curves.Add(key, curve);
             return curve;
         }
@@ -180,6 +180,15 @@ internal static class TotalWarVfxConverter
                 var enabled = Get("Enable");
                 if (Scalar(enabled, 1) == 0)
                 { result.DisabledEmitterCount++; editorState = VfxPreviewFieldState.Disabled; continue; }
+                if (layer.Type == "continuous_rigid" && properties.TryGetValue("SoundRecord", out var sound)
+                    && !string.IsNullOrWhiteSpace((string?)sound.Attribute("value"))
+                    && properties.Keys.All(name => name is "SoundRecord" or "Enable")
+                    && !(behaviour?.Elements().Any() ?? false) && render.Length == 0)
+                {
+                    Get("SoundRecord"); Note("SoundRecord", "Vfx.Preview.SoundOnlyLayer");
+                    editorState = VfxPreviewFieldState.Ignored;
+                    continue;
+                }
                 if (layer.Type is not ("continuous_mesh" or "continuous_rigid")) Fail("type", "Vfx.Preview.GeometryUnsupported");
                 var native = EffekseerLayer.Create();
                 native.Kind = layer.Type == "continuous_rigid" ? 1 : 0;
@@ -230,6 +239,7 @@ internal static class TotalWarVfxConverter
                 { result.DisabledEmitterCount++; editorState = VfxPreviewFieldState.Disabled; continue; }
 
                 var pass = render.LastOrDefault(x => (string?)x.Attribute("name") == "scene_view_type");
+                var seaOverlay = (string?)pass?.Attribute("value") == "SEA_OVERLAY";
                 if (pass != null)
                 {
                     consumed.Add(pass);
@@ -242,7 +252,7 @@ internal static class TotalWarVfxConverter
                         Note("scene_view_type", "Vfx.Preview.ProjectedDecalCandidate");
                     }
                     else if (value == "HALFRES_DEFERRED_ALPHA") Note("scene_view_type", "Vfx.Preview.HalfResolutionUnsupported");
-                    else if (value is not ("FULLRES_DEFERRED_ALPHA" or "HALFRES_DEFERRED_ALPHA" or "HIRES_VFXUI3D"))
+                    else if (value is not ("FULLRES_DEFERRED_ALPHA" or "HALFRES_DEFERRED_ALPHA" or "HIRES_VFXUI3D" or "SEA_OVERLAY"))
                         Fail("scene_view_type", "Vfx.Preview.PassUnsupported");
                 }
                 var scale = Curve("ParticleScale", 1, planarScale: native.Kind == 0);
@@ -376,25 +386,28 @@ internal static class TotalWarVfxConverter
                 }
                 var coveredColourMultiplier = 1f;
                 var lighting = Modifier("ps_lighting");
-                var alphaLightingPass = pass == null || (string?)pass.Attribute("value") is "FULLRES_DEFERRED_ALPHA" or "HALFRES_DEFERRED_ALPHA";
+                var lightingMapped = lighting == null;
+                var alphaLightingPass = pass == null || (string?)pass.Attribute("value") is "FULLRES_DEFERRED_ALPHA" or "HALFRES_DEFERRED_ALPHA" or "SEA_OVERLAY";
                 var defaultTextureEmission = native.Kind == 0 && native.Distortion == 0 && premultiplied
                     && lighting == null && behaviour?.Elements("modifier").Any(x => (string?)x.Attribute("fragment") == "ps_emissive") != true;
                 var additiveField = Behaviour("additive_blend_mul");
                 var additive = Scalar(additiveField, defaultTextureEmission ? 1 : 0);
                 if (pass == null && native.Kind == 0 && native.Distortion == 0 && gradient == null && premultiplied && additive > 0)
                     native.EmissionShapeWeight = Math.Clamp(additive, 0, 1);
+                if (seaOverlay && premultiplied && additive > 0) native.EmissionShapeWeight = 1;
                 if (defaultTextureEmission && additiveField == null) Note("pre_multiplied_alpha", "Vfx.Preview.DefaultTextureEmissionCandidate");
                 if (lighting != null)
                 {
                     var simple = render.LastOrDefault(node => Name(node) == "enable_simple_lighting");
                     var emissive = lighting.Elements("property").Where(node => Name(node) == "emissive").ToArray();
-                    if (alphaLightingPass && native.Kind == 0 && native.Distortion == 0 && (additive == 0 || premultiplied)
+                    if (alphaLightingPass && native.Kind == 0 && native.Distortion == 0 && (additive == 0 || premultiplied || seaOverlay)
                         && (string?)simple?.Attribute("value") == "true" && emissive.Length == 1
                         && (string?)emissive[0].Attribute("type") == "float"
                         && VfxCurve.TryNumber((string?)emissive[0].Attribute("value") ?? "", out var strength)
                         && strength >= 1 && strength <= 10)
                     {
                         coveredColourMultiplier = (float)strength;
+                        lightingMapped = true;
                         consumed.Add(simple!); consumed.Add(emissive[0]);
                         Note("emissive", "Vfx.Preview.SimpleEmissiveCalibrated");
                     }
@@ -402,7 +415,7 @@ internal static class TotalWarVfxConverter
                     {
                         Note("ps_lighting", "Vfx.Preview.LightingCandidate");
                         var simpleLighting = (string?)simple?.Attribute("value") == "true";
-                        if (alphaLightingPass && native.Kind == 0 && native.Distortion == 0 && (alignment is 0 or 3 || alignment == 1 && simpleLighting) && (additive == 0 || premultiplied)
+                        if (alphaLightingPass && native.Kind == 0 && native.Distortion == 0 && (alignment is 0 or 3 || alignment == 1 && simpleLighting || seaOverlay && alignment == 5) && (additive == 0 || premultiplied || seaOverlay)
                             && emissive.Length == 1 && (string?)emissive[0].Attribute("type") == "float"
                             && VfxCurve.TryNumber((string?)emissive[0].Attribute("value") ?? "", out var weatherEmissive)
                             && weatherEmissive >= 0 && weatherEmissive <= 8)
@@ -412,11 +425,13 @@ internal static class TotalWarVfxConverter
                             var directionality = Scalar(Behaviour("directionality"), .4f);
                             var average = Scalar(Behaviour("average_size"), .6f);
                             if (simpleLighting || small >= 0 && small <= 1 && large >= 0 && large <= 1
-                                && (directionality is 0 or .4f || directionality == 1 && large == 0) && average > 0 && average <= 2.4f)
+                                && (directionality is 0 or .4f || directionality == 1 && large == 0 || seaOverlay && directionality >= 0 && directionality <= 1)
+                                && average > 0 && average <= 2.4f)
                             {
                                 native.LightingMode = simpleLighting ? 1 : 2; native.Emissive = (float)weatherEmissive;
                                 native.SmallParticles = small; native.LargeParticles = large;
                                 native.Directionality = directionality; native.AverageSize = average;
+                                lightingMapped = true;
                                 if (simple != null) consumed.Add(simple);
                                 consumed.Add(emissive[0]);
                                 Note("ps_lighting", "Vfx.Preview.WeatherLightingCandidate");
@@ -569,8 +584,18 @@ internal static class TotalWarVfxConverter
                 var flatTerrain = false;
                 var spawnOnTerrain = false;
                 var modelTerrainBirth = false;
+                var modelTerrainNormal = false;
                 var terrainSpawnDirection = 2;
-                if (relativeMode == 2)
+                if (relativeMode == 2 && native.Kind == 1 && (!speed.IsZero || !orientation.IsZero
+                    || !Curve("ForceA", 0).IsZero || !Curve("ForceB", 0).IsZero || !Curve("ForceC", 0).IsZero
+                    || Scalar(Get("ParticlesFollowTerrain"), 0) != 0 || Scalar(Get("AllowEmitFromMesh"), 0) != 0
+                    || Scalar(Get("EffectedByWindFactor"), 0) != 0 || Scalar(Get("WindVarianceFactor"), 0) != 0))
+                {
+                    modelTerrainNormal = true;
+                    spawnOnTerrain = Scalar(Get("ParticlesSpawnOnTerrain"), 0) != 0;
+                    Note("ParticleRelativeSpawnOrientation", "Vfx.Preview.ModelTerrainNormalCandidate");
+                }
+                if (relativeMode == 2 && !modelTerrainNormal)
                 {
                     spawnOnTerrain = Scalar(Get("ParticlesSpawnOnTerrain"), 0) != 0;
                     if ((string?)relative.Attribute("value") != "RELATIVE_TO_TERRAIN_NORMAL"
@@ -597,9 +622,9 @@ internal static class TotalWarVfxConverter
                     Note("ParticleRelativeSpawnOrientation", native.Kind == 2 ? "Vfx.Preview.TerrainDecalCandidate" : "Vfx.Preview.FlatTerrainCandidate");
                 }
                 var force = Curve("ForceA", 0);
-                var additionalForces = false;
-                foreach (var name in new[] { "ForceB", "ForceC" })
-                    if (!Curve(name, 0).IsZero) { additionalForces = true; Note(name, "Vfx.Preview.ForceUnsupported"); }
+                var forceB = Curve("ForceB", 0);
+                var forceC = Curve("ForceC", 0);
+                var additionalForces = !forceB.IsZero || !forceC.IsZero;
                 var spinDeceleration = Curve("ParticleSpinDeceleration", 0);
                 if (!spinDeceleration.IsZero) additionalForces = true;
                 var deceleration = Curve("ParticleDeceleration", 0);
@@ -607,18 +632,31 @@ internal static class TotalWarVfxConverter
                 float? constantForceDamping = null;
                 var particleForceCurve = false;
                 var modelConstantForce = false;
-                if (!force.IsZero)
+                VfxModelNativeForce? modelForceCurve = null;
+                if (!force.IsZero || native.Kind == 1 && additionalForces)
                 {
                     if (native.Kind == 1 && simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY"
-                        && force.TryConstantVector(out _) && Curve("ForceB", 0).IsZero && Curve("ForceC", 0).IsZero
                         && deceleration.IsConstant && deceleration.Range("x", 0) is var modelDamping
                         && modelDamping.Min >= 0 && modelDamping.Min == modelDamping.Max
                         && Scalar(Get("ParticlesFollowTerrain"), 0) == 0 && Scalar(Get("EnableCollisions"), 0) == 0
                         && Scalar(Get("EffectedByWindFactor"), 0) == 0 && Scalar(Get("WindVarianceFactor"), 0) == 0
-                        && Scalar(Get("AllowEmitFromMesh"), 0) == 0 && Scalar(Get("EventEnable"), 0) == 0)
+                        && Scalar(Get("AllowEmitFromMesh"), 0) == 0)
                     {
-                        modelConstantForce = true;
-                        Note("ForceA/ParticleDeceleration", "Vfx.Preview.ModelConstantForceCandidate");
+                        if (forceB.IsZero && forceC.IsZero && force.TryConstantVector(out _))
+                        {
+                            modelConstantForce = true;
+                            Note("ForceA/ParticleDeceleration", "Vfx.Preview.ModelConstantForceCandidate");
+                        }
+                        else
+                        {
+                            try
+                            {
+                                modelForceCurve = VfxModelNativeForce.Create(Get("ForceA")?.Value, Get("ForceB")?.Value, Get("ForceC")?.Value);
+                                Note(forceB.IsZero && forceC.IsZero ? "ForceA/ParticleDeceleration"
+                                    : "ForceA/ForceB/ForceC/ParticleDeceleration", "Vfx.Preview.ModelForceCurveCandidate");
+                            }
+                            catch (VfxMappingException) { Note("ForceA", "Vfx.Preview.ForceUnsupported"); }
+                        }
                     }
                     else if (native.Kind == 0 && speed.IsZero && deceleration.IsZero && orientation.IsZero
                         && force.TryConstantVector(out var constantForce) && constantForce.X == 0 && constantForce.Z == 0)
@@ -676,7 +714,12 @@ internal static class TotalWarVfxConverter
                         foreach (var name in new[] { "EffectedByWindFactor", "WindVarianceFactor" })
                             if (Scalar(Get(name), 0) != 0) Note(name, "Vfx.Preview.Unmapped");
                     }
-                    else Note("ForceA", "Vfx.Preview.ForceUnsupported");
+                    else if (!force.IsZero) Note("ForceA", "Vfx.Preview.ForceUnsupported");
+                }
+                if (modelForceCurve == null)
+                {
+                    if (!forceB.IsZero) Note("ForceB", "Vfx.Preview.ForceUnsupported");
+                    if (!forceC.IsZero) Note("ForceC", "Vfx.Preview.ForceUnsupported");
                 }
                 if (constantForceDamping == null)
                 {
@@ -691,7 +734,7 @@ internal static class TotalWarVfxConverter
                 foreach (var name in new[] { "ParticleLifeTimeLoopAnim", "ParticleInitialSpeedLoopAnim", "SpawnAreaLoopAnim" })
                     if (Scalar(Get(name), 0) != 0) Note(name, "Vfx.Preview.EmitterTimelineCandidate");
                 foreach (var name in new[] { "AllowEmitFromMesh", "ParticlesFollowTerrain" })
-                    if (Scalar(Get(name), 0) != 0) Note(name, "Vfx.Preview.Unmapped");
+                    if (Scalar(Get(name), 0) != 0 && !(seaOverlay && name == "ParticlesFollowTerrain")) Note(name, "Vfx.Preview.Unmapped");
                 var particleCull = Get("ParticleCullDistances");
                 Vector4? particleCullDistances = null;
                 if (native.Kind is 0 or 1 && particleCull != null)
@@ -748,8 +791,6 @@ internal static class TotalWarVfxConverter
                         var animation = (string?)entry.Element("AnimFile")?.Attribute("value") ?? "";
                         var animationSpeed = Scalar(entry.Element("AnimSpeed"), 1);
                         var pivot = Vector(entry.Element("PivotPoint"), new(.5f));
-                        if (!string.IsNullOrWhiteSpace(animation) && pivot != new Vector3(.5f))
-                            Fail("RigidData/PivotPoint", "Vfx.Preview.GeometryUnsupported");
                         var first = ReadModel(modelPath, 0, pivot, animation, animationSpeed, life.Maximum);
                         var parts = new List<(VfxPreviewModel Model, string Texture, VfxScrollingMeshMaterial? Material)>
                             { (first.Model, first.Texture, first.Material) };
@@ -769,17 +810,15 @@ internal static class TotalWarVfxConverter
                         Note("RigidData/material", "Vfx.Preview.OpaqueCharacterCandidate");
                     foreach (var shader in modelVariants.SelectMany(parts => parts).Select(part => part.Model.ApproximateMaterialShader).OfType<string>().Distinct())
                         Note(shader, "Vfx.Preview.ModelMaterialFallback");
-                    if (relativeMode == 1 && Scalar(Get("ParticlesSpawnOnTerrain"), 0) != 0)
+                    if ((relativeMode == 1 || modelTerrainNormal) && Scalar(Get("ParticlesSpawnOnTerrain"), 0) != 0)
                     {
                         spawnOnTerrain = true;
                         modelTerrainBirth = simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY"
-                            && modelVariants.SelectMany(parts => parts).All(part => part.Model.AnimationVertices == null);
+                            && modelVariants.SelectMany(parts => parts).All(part => part.Model.AnimationVertices == null && part.Model.AnimationData == null);
                         Note("ParticlesSpawnOnTerrain", modelTerrainBirth
                             ? "Vfx.Preview.ModelTerrainBirthCandidate" : "Vfx.Preview.ModelTerrainBirthUnsupported");
                     }
                     (model, texturePath, meshMaterial) = modelVariants[0][0];
-                    if (modelVariants.SelectMany(parts => parts).Any(part => (part.Material == null) != (meshMaterial == null)))
-                        Fail("RigidData", "Vfx.Preview.MaterialUnsupported");
                     if (result.MeshMaterials.Count + modelVariants.Sum(parts => parts.Count(part => part.Material != null)) > 256)
                         Fail("RigidData", "Vfx.Preview.RangeUnsupported");
                     additionalParts.AddRange(modelVariants[0].Skip(1));
@@ -796,7 +835,7 @@ internal static class TotalWarVfxConverter
                         : meshMaterial.Parameters.Length == VfxVertexAnimatedMeshMaterial.ParameterCount ? "Vfx.Preview.VertexAnimatedMaterialCandidate"
                         : meshMaterial.Parameters.Length == VfxTidecallMaterial.ParameterCount ? "Vfx.Preview.TidecallMaterialCandidate"
                         : meshMaterial.Parameters.Length == VfxRigidBasicDitherMaterial.ParameterCount ? "Vfx.Preview.RigidBasicDitherCandidate"
-                        : meshMaterial.Parameters.Length == 60 ? "Vfx.Preview.RigidDissolveCandidate"
+                        : meshMaterial.Parameters.Length is 60 or VfxLegacyRigidDissolveMaterial.ParameterCount ? "Vfx.Preview.RigidDissolveCandidate"
                         : meshMaterial.Parameters.Length == 12 ? "Vfx.Preview.GrowingVinesCandidate"
                         : meshMaterial.Parameters.Length == 56 ? "Vfx.Preview.SolidMeshCandidate"
                         : meshMaterial.Parameters.Length == 32 ? "Vfx.Preview.PremultiplyAnimatedMaterialCandidate"
@@ -808,11 +847,21 @@ internal static class TotalWarVfxConverter
                 {
                     if (native.Kind == 0 && Modifier("ps_custom_shader") != null)
                     {
-                        if (textureModifier != null || native.Distortion != 0 || gradient != null || normalModifier != null
-                            || Modifier("ps_lighting") != null || Modifier("ps_emissive") != null)
+                        if (native.Distortion != 0 || gradient != null || normalModifier != null || Modifier("ps_emissive") != null)
                             Fail("ps_custom_shader", "Vfx.Preview.MaterialUnsupported");
                         var path = (string?)Behaviour("material", "ps_custom_shader")?.Attribute("path") ?? "";
                         var spriteMaterial = VfxCustomSpriteMaterial.Read(Read(path));
+                        var customAnimatedUv = spriteMaterial.Material.Parameters.Length == 36;
+                        if (lighting != null && !customAnimatedUv)
+                            Fail("ps_custom_shader", "Vfx.Preview.MaterialUnsupported");
+                        if (lighting != null)
+                        {
+                            native.LightingMode = 0; coveredColourMultiplier = 1; lightingMapped = true;
+                            Note("ps_lighting", "Vfx.Preview.CustomShaderLightingUnused");
+                        }
+                        if (textureModifier != null && !(VfxFogBloodMaterial.IsFog(spriteMaterial.Material.Parameters.Length)
+                            && textureModifier.DescendantsAndSelf().Attributes("path").All(attribute => string.IsNullOrWhiteSpace(attribute.Value))))
+                            Fail("ps_custom_shader", "Vfx.Preview.MaterialUnsupported");
                         meshMaterial = spriteMaterial.Material;
                         if (result.MeshMaterials.Count >= 256) Fail("material", "Vfx.Preview.RangeUnsupported");
                         texturePath = meshMaterial.TexturePaths[0];
@@ -852,14 +901,14 @@ internal static class TotalWarVfxConverter
                     {
                         var bytes = ModelTexture(path);
                         indexes.Add(result.Textures.Count); result.Textures.Add(bytes); result.TexturePaths.Add(path);
-                        result.TextureUsages.Add(meshMaterial.Parameters.Length == VfxRigidBasicDitherMaterial.ParameterCount && indexes.Count == 1 ? VfxTextureUsage.Diffuse
-                            : meshMaterial.Parameters.Length == 60 && indexes.Count == 1 ? VfxTextureUsage.OpaqueDiffuse
+                        result.TextureUsages.Add((meshMaterial.Parameters.Length is VfxRigidBasicDitherMaterial.ParameterCount or VfxFungiMeshMaterial.ParameterCount) && indexes.Count == 1 ? VfxTextureUsage.Diffuse
+                            : (meshMaterial.Parameters.Length is 60 or VfxLegacyRigidDissolveMaterial.ParameterCount) && indexes.Count == 1 ? VfxTextureUsage.OpaqueDiffuse
                             : meshMaterial.Parameters.Length == 24 && indexes.Count == 4
                             ? VfxTextureUsage.Diffuse : VfxTextureUsage.MaterialValue);
                     }
                     native.MeshMaterialIndex = result.MeshMaterials.Count;
                     result.MeshMaterials.Add(new(indexes.ToArray(), meshMaterial.Parameters));
-                    native.TextureIndex = indexes[0];
+                    native.TextureIndex = indexes.Count == 0 ? -1 : indexes[0];
                 }
                 else native.TextureIndex = geometryDistortion ? -1 : result.Textures.Count;
                 if (model != null) { native.ModelIndex = result.Models.Count; native.OpaqueModel = model.OpaqueMaterial ? 1 : 0; }
@@ -913,8 +962,9 @@ internal static class TotalWarVfxConverter
                 VfxModelNativeMotion? nativeModelMotion = null;
                 var modelDampingSupported = spinDeceleration.IsConstant || !spinDeceleration.HasBezierSegments;
                 var fullLocalModel = native.Kind == 1 && simulation == "LOCAL_SPACE_POSITION_ROTATION"
-                    && (relativeMode is null or 0 or 1) && meshLoop == null;
-                if (native.Kind == 1 && meshLoop == null && (eventNodes.Length == 0 || fullLocalModel))
+                    && (relativeMode is null or 0 or 1 || modelTerrainNormal) && meshLoop == null;
+                // Native rigid particles update their own angular state before updating child events.
+                if (native.Kind == 1 && meshLoop == null)
                 {
                     if (spinDeceleration.HasBezierSegments || spinDeceleration.Minimum < 0 || spinDeceleration.Maximum > 5)
                     {
@@ -942,12 +992,12 @@ internal static class TotalWarVfxConverter
                     catch (VfxMappingException exception) { Note(exception.Field, exception.Reason); }
                 }
                 var modelQuaternionSpin = native.Kind == 1 && modelDampingSupported
-                    && (spinMin.X != 0 || spinMin.Y != 0 || spinMax.X != 0 || spinMax.Y != 0
+                    && (modelTerrainNormal || spinMin.X != 0 || spinMin.Y != 0 || spinMax.X != 0 || spinMax.Y != 0
                         || (!spinDeceleration.IsConstant || nativeModelDamping != null)
                             && (spinMin.Z != 0 || spinMax.Z != 0)
                         || simulation == "LOCAL_SPACE_POSITION_ROTATION")
-                    && meshLoop == null && (eventNodes.Length == 0 || nativeModelMotion != null)
-                    && (relativeMode is null or 0 or 1)
+                    && meshLoop == null
+                    && (relativeMode is null or 0 or 1 || modelTerrainNormal)
                     && ((simulation is "WORLD_SPACE" or "LOCAL_SPACE_POSITION_ONLY")
                         || simulation == "LOCAL_SPACE_POSITION_ROTATION" && (orientation.IsConstant || nativeModelOrientation != null))
                     && (spinMin.X == 0 && spinMax.X == 0 || float.IsFinite(spinDirection.X))
@@ -963,8 +1013,22 @@ internal static class TotalWarVfxConverter
                 }
                 if (spinMin != Vector3.Zero || spinMax != Vector3.Zero)
                     Note("ParticleSpin_Min/ParticleSpin_Max", "Vfx.Preview.SpinCandidate");
+                if (seaOverlay)
+                {
+                    // The preview receiver is an explicit horizontal plane, without ocean waves or terrain slopes.
+                    spawnOnTerrain = Scalar(Get("ParticlesSpawnOnTerrain"), 0) != 0;
+                    if (native.Kind != 0 || alignment != 5 || meshMaterial != null || meshLoop != null || !spawnOnTerrain
+                        || !lightingMapped || Scalar(Behaviour("overlay_colour"), 0) != 0
+                        || !speed.IsZero || !force.IsZero || !Curve("ForceB", 0).IsZero || !Curve("ForceC", 0).IsZero
+                        || !position.IsZero || !orientation.IsZero || !box.IsZero || !radius.IsZero
+                        || spinMin.X != 0 || spinMin.Y != 0 || spinMax.X != 0 || spinMax.Y != 0
+                        || Scalar(Get("AllowEmitFromMesh"), 0) != 0 || eventEnabled)
+                        Fail("scene_view_type", "Vfx.Preview.PassUnsupported");
+                    flatTerrain = true;
+                    Note("ParticlesSpawnOnTerrain/ParticlesFollowTerrain", "Vfx.Preview.FlatTerrainCandidate");
+                }
                 var spriteTables = native.Kind == 0 && native.Distortion == 0 && meshMaterial == null && meshLoop == null
-                    && (string?)pass?.Attribute("value") is "FULLRES_DEFERRED_ALPHA" or "HALFRES_DEFERRED_ALPHA";
+                    && (string?)pass?.Attribute("value") is "FULLRES_DEFERRED_ALPHA" or "HALFRES_DEFERRED_ALPHA" or "SEA_OVERLAY";
                 var projected = new VfxPreviewEmitter
                 {
                     Name = layer.Name, Render = native, Emission = emission, Life = life, Scale = scale,
@@ -981,6 +1045,7 @@ internal static class TotalWarVfxConverter
                     CalibratedVerticalAcceleration = verticalAcceleration,
                     ParticleForceCurve = particleForceCurve,
                     ModelConstantForce = modelConstantForce,
+                    ModelForceCurve = modelForceCurve,
                     DestroyOnExplicitStop = native.Kind == 1 && Scalar(Get("ParticleDestroyImmediately"), 0) != 0,
                     ConstantForceDamping = constantForceDamping,
                     Start = start, Duration = duration, HasExplicitDuration = durationNode != null, Infinite = infinite, MaximumParticles = Math.Min(TotalWarVfxSimulation.ParticleLimit, maxParticles),
@@ -1000,6 +1065,7 @@ internal static class TotalWarVfxConverter
                     ModelEmitterBirthLoop = nativeModelOrientation != null && Scalar(Get("EmitterOrientationLoopAnim"), 0) != 0,
                     ModelEmitterFollowLoop = Scalar(Get("InfiniteLife"), 0) != 0,
                     RequiresFlatTerrain = flatTerrain, SpawnOnTerrain = spawnOnTerrain, ModelTerrainBirth = modelTerrainBirth,
+                    ModelTerrainNormal = modelTerrainNormal,
                     TerrainSpawnDirection = terrainSpawnDirection,
                     ParticleCullDistances = particleCullDistances,
                     SpawnAngle = angle, SpawnSpread = spread, ZeroSpawnArc = zeroSpawnArc, DefaultVerticalSpawn = defaultVerticalSpawn,
@@ -1012,6 +1078,7 @@ internal static class TotalWarVfxConverter
                     MinimumPixelHalfResolution = (string?)pass?.Attribute("value") == "HALFRES_DEFERRED_ALPHA",
                     HalfResolution = (string?)pass?.Attribute("value") == "HALFRES_DEFERRED_ALPHA",
                     FullResolution = (string?)pass?.Attribute("value") == "FULLRES_DEFERRED_ALPHA",
+                    SeaOverlay = seaOverlay,
                     PremultipliedAlpha = meshMaterial == null && premultiplied && native.Distortion == 0, AdditiveMultiplier = additive,
                     AlphaCrush = alphaCrush, SharpAlphaCrush = sharpAlphaCrush,
                     CoveredColourMultiplier = coveredColourMultiplier,
@@ -1071,11 +1138,11 @@ internal static class TotalWarVfxConverter
                         {
                             var bytes = ModelTexture(path);
                             indexes.Add(result.Textures.Count); result.Textures.Add(bytes); result.TexturePaths.Add(path);
-                            result.TextureUsages.Add(material.Parameters.Length == VfxRigidBasicDitherMaterial.ParameterCount && indexes.Count == 1
-                                ? VfxTextureUsage.Diffuse : material.Parameters.Length == 60 && indexes.Count == 1
+                            result.TextureUsages.Add((material.Parameters.Length is VfxRigidBasicDitherMaterial.ParameterCount or VfxFungiMeshMaterial.ParameterCount) && indexes.Count == 1
+                                ? VfxTextureUsage.Diffuse : (material.Parameters.Length is 60 or VfxLegacyRigidDissolveMaterial.ParameterCount) && indexes.Count == 1
                                 ? VfxTextureUsage.OpaqueDiffuse : VfxTextureUsage.MaterialValue);
                         }
-                        partLayer.TextureIndex = indexes[0]; partLayer.MeshMaterialIndex = result.MeshMaterials.Count;
+                        partLayer.TextureIndex = indexes.Count == 0 ? -1 : indexes[0]; partLayer.MeshMaterialIndex = result.MeshMaterials.Count;
                         result.MeshMaterials.Add(new(indexes.ToArray(), material.Parameters));
                     }
                     else
@@ -1149,7 +1216,8 @@ internal static class TotalWarVfxConverter
             VfxPreviewCurve MakeCurve(XElement? node, string name, float fallback, bool planarScale = false)
             {
                 var curve = node?.Attribute("value") != null
-                    ? context.ReadCurve(null, name, Scalar(node, fallback)) : context.ReadCurve(node?.Value, name, fallback, planarScale);
+                    ? context.ReadCurve(null, name, Scalar(node, fallback))
+                    : context.ReadCurve(node?.Value, name, fallback, planarScale, nativeModelTable: layer.Type == "continuous_rigid" && name == "curve_alpha");
                 if (curve.HasBezierSegments) Note(name, "Vfx.Preview.BezierCandidate");
                 if (curve.HasAnalyticSegments) Note(name, "Vfx.Preview.AnalyticCurveCalibrated");
                 return curve;
@@ -1451,13 +1519,27 @@ internal static class TotalWarVfxConverter
                 : animated ? VfxModelAnimation.Bake(part.Mesh.VertexList, vertices, indices, file.Header.SkeletonName,
                 Read(@"animations\skeletons\" + file.Header.SkeletonName + ".anim"), Read(animation), animationSpeed, maximumLife, animationBudget)
                 : new VfxPreviewModel(vertices, indices);
-            if (scrolling?.Parameters.Length is VfxRigidBasicDitherMaterial.ParameterCount or 12 or 40 or 56 or 60 or VfxTidecallMaterial.ParameterCount) geometry = geometry with { OpaqueMaterial = true };
+            if (animated && pivot != new Vector3(.5f))
+            {
+                var entryOffset = new Vector3(.5f) - pivot;
+                if (geometry.AnimationData is { } compact)
+                    geometry = geometry with { AnimationData = new(compact.Weights, compact.Poses, compact.BoneCount, compact.FrameCount, entryOffset) };
+                else
+                {
+                    for (var index = 0; index < geometry.Vertices.Length; ++index) geometry.Vertices[index].Position += entryOffset;
+                    if (geometry.AnimationVertices is { } baked)
+                        for (var index = 0; index < baked.Length; ++index) baked[index].Position += entryOffset;
+                }
+            }
+            if (scrolling?.Parameters.Length is VfxRigidBasicDitherMaterial.ParameterCount or 12 or 40 or 56 or 60 or VfxLegacyRigidDissolveMaterial.ParameterCount or VfxTidecallMaterial.ParameterCount) geometry = geometry with { OpaqueMaterial = true };
+            if (scrolling != null && VfxNativeSimpleMeshMaterial.IsOpaque(scrolling)) geometry = geometry with { OpaqueMaterial = true };
+            if (scrolling?.Parameters.Length == VfxFungiMeshMaterial.ParameterCount) geometry = geometry with { OpaqueMaterial = true };
             if (scrolling == null && material is { Alpha: false } && material.Name.Contains("alpha_off", StringComparison.OrdinalIgnoreCase)
                 && string.Equals(material.ShaderPath.Replace('\\', '/'), "shaders/rigid_character.xml.shader", StringComparison.OrdinalIgnoreCase))
                 geometry = geometry with { OpaqueMaterial = true };
             if (scrolling == null && material != null && !geometry.OpaqueMaterial)
                 geometry = geometry with { ApproximateMaterialShader = material.ShaderPath };
-            var converted = (geometry, scrolling?.TexturePaths[0] ?? texture, scrolling, file.ModelList[0].Length);
+            var converted = (geometry, scrolling == null ? texture : scrolling.TexturePaths.FirstOrDefault() ?? "", scrolling, file.ModelList[0].Length);
             modelCache.Add(cacheKey, converted);
             return converted;
         }

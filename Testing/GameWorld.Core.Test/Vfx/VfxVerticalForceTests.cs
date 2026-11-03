@@ -39,28 +39,28 @@ public class VfxVerticalForceTests
         Assert.That(VfxDocument.Read(snapshot.GameBytes).Write(), Is.EqualTo(snapshot.GameBytes));
     }
 
-    [TestCase("scale")]
-    [TestCase("rotation")]
-    [TestCase("time")]
-    public void UncalibratedAttachmentOrReferenceSpeed_ReportsAndOmitsTheForce(string control)
+    [TestCase("nonuniform")]
+    [TestCase("mirror")]
+    [TestCase("shear")]
+    public void UnsupportedAffineAttachments_ReportAndOmitTheForce(string control)
     {
         var conversion = TotalWarVfxConverter.Convert(Snapshot());
-        if (control == "time")
-            conversion.Emitters[0].References = [new(new(1, 1), Vector3.Zero, Vector3.Zero, new(0, 0), 2,
-                new(1, 1), new(0, 0), new(0, 0), Vector4.One, Vector4.One)];
-        var attachment = control == "scale" ? Matrix.CreateScale(2, 1, 1) : control == "rotation" ? Matrix.CreateRotationZ(.3f) : Matrix.Identity;
+        var attachment = control switch
+        {
+            "nonuniform" => Matrix.CreateScale(2, 1, 1),
+            "mirror" => Matrix.CreateScale(-1, 1, 1) * Matrix.CreateRotationZ(.3f),
+            _ => Matrix.Identity,
+        };
+        if (control == "shear") attachment.M21 = .25f;
         var simulation = new TotalWarVfxSimulation(conversion); simulation.Seek(1, attachment);
         Assert.Multiple(() =>
         {
             Assert.That(simulation.ForceBasisUnsupported, Is.True);
             Assert.That(simulation.Frame(Camera).Single().Transform.Translation, Is.EqualTo(Vector3.Zero));
         });
-        if (control != "time")
-        {
-            simulation.Seek(0, Matrix.Identity); simulation.Seek(1, Matrix.Identity);
-            Assert.That(simulation.ForceBasisUnsupported, Is.False);
-            Assert.That(simulation.Frame(Camera).Single().Transform.Translation.Y, Is.EqualTo(.5f).Within(.005f));
-        }
+        simulation.Seek(0, Matrix.Identity); simulation.Seek(1, Matrix.Identity);
+        Assert.That(simulation.ForceBasisUnsupported, Is.False);
+        Assert.That(simulation.Frame(Camera).Single().Transform.Translation.Y, Is.EqualTo(.5f).Within(.005f));
     }
 
     [Test]

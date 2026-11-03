@@ -1,0 +1,191 @@
+{
+  "scope": "Complete unmodified official material, native 176-byte reflection; standard deferred lighting is a separately diagnosed preview boundary.",
+  "reflection": "artifacts\\vfx-event-rejections-r131\\material\\compiled\\shaders_wh3_vfx_rigid_emissive_dissolve_xml_hlsl_511b7ef3dca744e3e79b6df714618fa8.asm.txt",
+  "reflectionSha256": "1501d668f57eecfb02bb8613d95af863071677b3388fc0ca95f59712eed0979b",
+  "layout": [
+    {
+      "name": "diffuse_tint",
+      "byteOffset": 0,
+      "components": 3
+    },
+    {
+      "name": "disintegrate_1_direction",
+      "byteOffset": 12,
+      "components": 2
+    },
+    {
+      "name": "disintegrate_1_tiling",
+      "byteOffset": 20,
+      "components": 2
+    },
+    {
+      "name": "disintegrate_mask_direction",
+      "byteOffset": 28,
+      "components": 2
+    },
+    {
+      "name": "disintegrate_mask_tiling",
+      "byteOffset": 36,
+      "components": 2
+    },
+    {
+      "name": "edge_emissive_colour",
+      "byteOffset": 44,
+      "components": 3
+    },
+    {
+      "name": "edge_emissive_intensity",
+      "byteOffset": 56,
+      "components": 1
+    },
+    {
+      "name": "emissive_a_brightness",
+      "byteOffset": 60,
+      "components": 1
+    },
+    {
+      "name": "emissive_a_channels",
+      "byteOffset": 64,
+      "components": 4
+    },
+    {
+      "name": "emissive_a_direction",
+      "byteOffset": 80,
+      "components": 2
+    },
+    {
+      "name": "emissive_a_tiling",
+      "byteOffset": 88,
+      "components": 2
+    },
+    {
+      "name": "emissive_b_brightness",
+      "byteOffset": 96,
+      "components": 1
+    },
+    {
+      "name": "emissive_b_channels",
+      "byteOffset": 100,
+      "components": 4
+    },
+    {
+      "name": "emissive_b_direction",
+      "byteOffset": 116,
+      "components": 2
+    },
+    {
+      "name": "emissive_b_tiling",
+      "byteOffset": 124,
+      "components": 2
+    },
+    {
+      "name": "emissive_intensity",
+      "byteOffset": 132,
+      "components": 1
+    },
+    {
+      "name": "emissive_tint",
+      "byteOffset": 136,
+      "components": 3
+    },
+    {
+      "name": "global_mask_pan",
+      "byteOffset": 148,
+      "components": 2
+    },
+    {
+      "name": "global_mask_tiling",
+      "byteOffset": 156,
+      "components": 2
+    },
+    {
+      "name": "manual_dither_wangle",
+      "byteOffset": 164,
+      "components": 1
+    },
+    {
+      "name": "threshold_source",
+      "byteOffset": 168,
+      "components": 1
+    },
+    {
+      "name": "threshold_value",
+      "byteOffset": 172,
+      "components": 1
+    }
+  ],
+  "materials": [
+    {
+      "path": "materials/vfx/wh3_dlc26_lil_waaagh_night_shroud_mushroom_dissolve.xml.material",
+      "sha256": "90e5c0f824036f014245677138ed75aebb51dc7c0e211c844a9f4666dd9db66f",
+      "originalBase64": "PG1hdGVyaWFsPg0KIDxuYW1lPndoM19kbGMyNl9saWxfd2FhYWdoX25pZ2h0X3Nocm91ZF9tdXNocm9vbV9kaXNzb2x2ZS54bWw8L25hbWU+DQogPHNoYWRlcj5zaGFkZXJzL3doM192ZnhfcmlnaWRfZW1pc3NpdmVfZGlzc29sdmUueG1sLnNoYWRlcjwvc2hhZGVyPg0KIDxzb3J0X292ZXJyaWRlPjI1NTwvc29ydF9vdmVycmlkZT4NCiA8dGV4dHVyZXM+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfYmFzZV9jb2xvdXI8L3Nsb3Q+DQogICA8c291cmNlPlJpZ2lkTW9kZWxzL0J1aWxkaW5ncy9UZXh0dXJlcy9naWFudF9tdXNocm9vbV9iYXNlX2NvbG91ci5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX2Rpc2ludGVncmF0ZV8xX3RleHR1cmU8L3Nsb3Q+DQogICA8c291cmNlPnZmeC9UZXh0dXJlcy9ub2lzZV9tZWRfZGlmZnVzZS5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX2Rpc2ludGVncmF0ZV9tYXNrX3RleHR1cmU8L3Nsb3Q+DQogICA8c291cmNlPmNvbW1vbnRleHR1cmVzL2RlZmF1bHRfd2hpdGUuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9lbWlzc2l2ZV9hPC9zbG90Pg0KICAgPHNvdXJjZT5jb21tb250ZXh0dXJlcy9kZWZhdWx0X3doaXRlLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogIDx0ZXh0dXJlPg0KICAgPHNsb3QgdmVyc2lvbj0iMiI+dF94bWxfZW1pc3NpdmVfYjwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvZGVmYXVsdF93aGl0ZS5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX2VtaXNzaXZlX21hc2s8L3Nsb3Q+DQogICA8c291cmNlPmNvbW1vbnRleHR1cmVzL2RlZmF1bHRfd2hpdGUuZGRzPC9zb3VyY2U+DQogIDwvdGV4dHVyZT4NCiAgPHRleHR1cmU+DQogICA8c2xvdCB2ZXJzaW9uPSIyIj50X3htbF9nbG9iYWxfbWFzazwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvZGVmYXVsdF93aGl0ZS5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX21hdGVyaWFsX21hcDwvc2xvdD4NCiAgIDxzb3VyY2U+UmlnaWRNb2RlbHMvQnVpbGRpbmdzL1RleHR1cmVzL2dpYW50X211c2hyb29tX21hdGVyaWFsX21hcC5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX25vcm1hbDwvc2xvdD4NCiAgIDxzb3VyY2U+UmlnaWRNb2RlbHMvQnVpbGRpbmdzL1RleHR1cmVzL2dpYW50X211c2hyb29tX25vcm1hbC5kZHM8L3NvdXJjZT4NCiAgPC90ZXh0dXJlPg0KICA8dGV4dHVyZT4NCiAgIDxzbG90IHZlcnNpb249IjIiPnRfeG1sX2RpdGhlcjwvc2xvdD4NCiAgIDxzb3VyY2U+Y29tbW9udGV4dHVyZXMvZGl0aGVyLmRkczwvc291cmNlPg0KICA8L3RleHR1cmU+DQogPC90ZXh0dXJlcz4NCiA8cGFyYW1zPg0KICA8cGFyYW0+DQogICA8bmFtZT5kaWZmdXNlX3RpbnQ8L25hbWU+DQogICA8dHlwZT5mbG9hdDM8L3R5cGU+DQogICA8dmFsdWU+MC45NTY4NjMsMSwwLjA5NDExNzY8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5kaXNpbnRlZ3JhdGVfMV9kaXJlY3Rpb248L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+LTAuMDUsMC4wNTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmRpc2ludGVncmF0ZV8xX3RpbGluZzwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLjIsMC4yPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZGlzaW50ZWdyYXRlX21hc2tfZGlyZWN0aW9uPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPi0wLjA1LDAuMDU8L3ZhbHVlPg0KICA8L3BhcmFtPg0KICA8cGFyYW0+DQogICA8bmFtZT5kaXNpbnRlZ3JhdGVfbWFza190aWxpbmc8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MC44LDAuODwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmVkZ2VfZW1pc3NpdmVfY29sb3VyPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQzPC90eXBlPg0KICAgPHZhbHVlPjAuMTQxMTc2LDAuNDcwNTg4LDAuMDM5MjE1NzwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmVkZ2VfZW1pc3NpdmVfaW50ZW5zaXR5PC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+Mi41PC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfYV9icmlnaHRuZXNzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfYV9jaGFubmVsczwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0NDwvdHlwZT4NCiAgIDx2YWx1ZT4wLDAsMCwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfYV9kaXJlY3Rpb248L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfYV90aWxpbmc8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfYl9icmlnaHRuZXNzPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfYl9jaGFubmVsczwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0NDwvdHlwZT4NCiAgIDx2YWx1ZT4wLDAsMCwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfYl9kaXJlY3Rpb248L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfYl90aWxpbmc8L25hbWU+DQogICA8dHlwZT5mbG9hdDI8L3R5cGU+DQogICA8dmFsdWU+MSwxPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfaW50ZW5zaXR5PC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC4xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+ZW1pc3NpdmVfdGludDwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MzwvdHlwZT4NCiAgIDx2YWx1ZT4xMjgsMTI4LDEyODwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPmdsb2JhbF9tYXNrX3BhbjwvbmFtZT4NCiAgIDx0eXBlPmZsb2F0MjwvdHlwZT4NCiAgIDx2YWx1ZT4wLC0xPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+Z2xvYmFsX21hc2tfdGlsaW5nPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQyPC90eXBlPg0KICAgPHZhbHVlPjEsMTwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPm1hbnVhbF9kaXRoZXJfd2FuZ2xlPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MDwvdmFsdWU+DQogIDwvcGFyYW0+DQogIDxwYXJhbT4NCiAgIDxuYW1lPnRocmVzaG9sZF9zb3VyY2U8L25hbWU+DQogICA8dHlwZT5mbG9hdDwvdHlwZT4NCiAgIDx2YWx1ZT4wPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiAgPHBhcmFtPg0KICAgPG5hbWU+dGhyZXNob2xkX3ZhbHVlPC9uYW1lPg0KICAgPHR5cGU+ZmxvYXQ8L3R5cGU+DQogICA8dmFsdWU+MC4zPC92YWx1ZT4NCiAgPC9wYXJhbT4NCiA8L3BhcmFtcz4NCjwvbWF0ZXJpYWw+DQo=",
+      "expectedNativeFloats": [
+        0.956863,
+        1.0,
+        0.0941176,
+        -0.05,
+        0.05,
+        0.2,
+        0.2,
+        -0.05,
+        0.05,
+        0.8,
+        0.8,
+        0.141176,
+        0.470588,
+        0.0392157,
+        2.5,
+        0.1,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.1,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        0.1,
+        128.0,
+        128.0,
+        128.0,
+        0.0,
+        -1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        0.3
+      ],
+      "logicalTextures": [
+        "RigidModels/Buildings/Textures/giant_mushroom_base_colour.dds",
+        "vfx/Textures/noise_med_diffuse.dds",
+        "commontextures/default_white.dds",
+        "commontextures/dither.dds",
+        "commontextures/default_white.dds",
+        "commontextures/default_white.dds",
+        "commontextures/default_white.dds",
+        "commontextures/default_white.dds",
+        "RigidModels/Buildings/Textures/giant_mushroom_material_map.dds",
+        "RigidModels/Buildings/Textures/giant_mushroom_normal.dds"
+      ],
+      "origin": [
+        {
+          "path": "materials\\vfx\\wh3_dlc26_lil_waaagh_night_shroud_mushroom_dissolve.xml.material",
+          "sourcePack": "E:\\Steam\\steamapps\\common\\Total War WARHAMMER III\\data\\data.pack",
+          "bytes": 4052,
+          "sha256": "90e5c0f824036f014245677138ed75aebb51dc7c0e211c844a9f4666dd9db66f",
+          "export": "artifacts\\vfx-event-rejections-r131\\material\\official-originals\\materials\\vfx\\wh3_dlc26_lil_waaagh_night_shroud_mushroom_dissolve.xml.material"
+        }
+      ]
+    }
+  ]
+}

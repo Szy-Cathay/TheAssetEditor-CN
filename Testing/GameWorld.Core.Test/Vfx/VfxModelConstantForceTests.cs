@@ -15,7 +15,7 @@ using Shared.GameFormats.Vfx;
 namespace GameWorld.Core.Test.Vfx;
 
 [NonParallelizable]
-public class VfxModelConstantForceTests
+public partial class VfxModelConstantForceTests
 {
     private const double Step = 1.0 / 120;
     private static readonly BindingFlags Private = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;

@@ -11,7 +11,7 @@ using Test.TestingUtility.Shared;
 
 namespace GameWorld.Core.Test.Vfx;
 
-public class VfxModelQuaternionSpinTests
+public partial class VfxModelQuaternionSpinTests
 {
     private const double Tick = 1.0 / 120;
     private const float Tolerance = .00001f;
@@ -168,12 +168,10 @@ public class VfxModelQuaternionSpinTests
         Near(simulation.Frame(Camera).Single().Transform, Birth(BirthAngles + spin * (float)time));
     }
 
-    [TestCase("events")]
     [TestCase("unknown-axis-direction")]
     public void UncalibratedCombinations_KeepTheExistingModelPath(string combination)
     {
         var source = VfxDocument.Read(Source()); var emitter = Emitter(source);
-        if (combination == "events") emitter.Add(new XElement("property_event", new XAttribute("name", "OnParticleSpawn"), new XAttribute("vfx_name", "child")));
         if (combination == "unknown-axis-direction") Set(emitter, "ParticleSpinDirectionX", "unknown");
         Assert.That(UsesNativeModelSpin(Convert(source.Write()).Emitters.Single()), Is.False);
     }
@@ -205,11 +203,17 @@ public class VfxModelQuaternionSpinTests
         });
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
+    [TestCase(false, "none")]
+    [TestCase(true, "none")]
+    [TestCase(false, "spawn")]
+    [TestCase(true, "spawn")]
+    [TestCase(false, "death")]
+    [TestCase(true, "death")]
+    [TestCase(false, "disabled")]
+    [TestCase(true, "disabled")]
     [NonParallelizable]
     [Apartment(System.Threading.ApartmentState.STA)]
-    public void ModelQuaternionRotation_ReachesTheGpuAsItsIndependentStaticPose(bool reflected)
+    public void ModelQuaternionRotation_ReachesTheGpuAsItsIndependentStaticPose(bool reflected, string eventMode)
     {
         if (Environment.GetEnvironmentVariable("ASSETEDITOR_VFX_HEADLESS_TEST") != "1")
             Assert.Ignore("Native offscreen rendering requires explicit opt-in.");
@@ -219,7 +223,10 @@ public class VfxModelQuaternionSpinTests
             MathF.Atan2(expected.M12, expected.M11));
         var angles = radians * (180 / MathHelper.Pi);
         Near(Birth(angles), expected);
-        var source = Source(); var reference = VfxDocument.Read(source); var emitter = Emitter(reference);
+        var document = VfxDocument.Read(Source());
+        if (eventMode != "none") AddAngularEvent(Emitter(document), eventMode == "death" ? "OnParticleDeath" : "OnParticleSpawn",
+            eventMode == "disabled" ? "disabled" : "enabled");
+        var source = document.Write(); var reference = VfxDocument.Read(source); var emitter = Emitter(reference);
         foreach (var name in new[] { "ParticleOrientationMin", "ParticleOrientationMax" })
             emitter.Elements().Single(e => (string?)e.Attribute("name") == name).ReplaceWith(VectorProperty(name, angles));
         foreach (var name in new[] { "ParticleSpin_Min", "ParticleSpin_Max" })
@@ -228,7 +235,8 @@ public class VfxModelQuaternionSpinTests
         // A constant coloured texture isolates pose transmission from texture-filter quantization.
         // The independent double pose differs by a few float ulps after the Euler round trip.
         var texture = VfxModelVariantPixelTests.Dds(new Color(70, 180, 230, 155));
-        byte[]? Resolve(string path) => path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) ? texture : VfxModelVariantTests.Resolve(path);
+        byte[]? Resolve(string path) => IsAngularChild(path) ? EmptyAngularChild
+            : path.EndsWith(".dds", StringComparison.OrdinalIgnoreCase) ? texture : VfxModelVariantTests.Resolve(path);
         VfxPreviewSnapshot Snapshot(byte[] bytes) => new(bytes, "diagnostic/model-spin-pixels.xml", Resolve);
         var converted = TotalWarVfxConverter.Convert(Snapshot(source));
         Assert.That(converted.Emitters, Has.Count.EqualTo(1)); Assert.That(converted.Models, Has.Count.EqualTo(1));

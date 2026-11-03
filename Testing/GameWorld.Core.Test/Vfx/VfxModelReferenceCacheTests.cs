@@ -106,7 +106,8 @@ public class VfxModelReferenceCacheTests
         var branch = Composition(("first", first));
         var parent = Composition(("branch", branch), ("first", first), ("other", other));
         parent.Layers.First(layer => layer.Kind == "Reference").Element.SetAttributeValue("simulation_speed_multiplier", 0);
-        var conversion = Convert(parent, new() { ["branch"] = branch, ["first"] = first, ["other"] = other }, LargeModel(),
+        // Each compact model fits the original budget, but two distinct animations cannot coexist within it.
+        var conversion = Convert(parent, new() { ["branch"] = branch, ["first"] = first, ["other"] = other }, LargeModel(150000),
             path => path.Replace('\\', '/') == "animations/other.anim" ? VfxModelAnimationTests.Animation(false) : null);
         Assert.That(conversion.Emitters, Has.Count.EqualTo(1), "A failed branch must not leave reusable geometry with no charged budget.");
         Assert.That(conversion.Models, Has.Count.EqualTo(1));
@@ -141,7 +142,7 @@ public class VfxModelReferenceCacheTests
         layers[2].Element.Descendants("AnimFile").Single().SetAttributeValue("value", "animations/other.anim");
         var conversion = TotalWarVfxConverter.Convert(new(document.Write(), "vfx/layers.xml", path => path.Replace('\\', '/') switch
         {
-            "vfx/model-0.rigid_model_v2" => LargeModel(), "vfx/missing.rigid_model_v2" => null,
+            "vfx/model-0.rigid_model_v2" => LargeModel(150000), "vfx/missing.rigid_model_v2" => null,
             "animations/other.anim" => VfxModelAnimationTests.Animation(false), _ => VfxModelAnimationTests.Resolve(path),
         }));
         Assert.That(conversion.Emitters, Has.Count.EqualTo(1));
@@ -166,11 +167,11 @@ public class VfxModelReferenceCacheTests
             return extra?.Invoke(path) ?? (normalized == "vfx/model-0.rigid_model_v2" && model != null ? model : VfxModelAnimationTests.Resolve(path));
         }));
 
-    private static byte[] LargeModel()
+    private static byte[] LargeModel(int vertices = 4300)
     {
         var file = ModelFactory.Create().Load(VfxModelAnimationTests.Model());
         var part = file.ModelList[0][0]; var original = part.Mesh.VertexList;
-        part.Mesh.VertexList = Enumerable.Range(0, 4300).Select(index => original[index % original.Length]).ToArray();
+        part.Mesh.VertexList = Enumerable.Range(0, vertices).Select(index => original[index % original.Length]).ToArray();
         file.RecalculateOffsets();
         return ModelFactory.Create().Save(file);
     }

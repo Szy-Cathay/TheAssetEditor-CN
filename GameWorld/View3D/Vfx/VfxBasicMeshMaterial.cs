@@ -35,11 +35,11 @@ internal static class VfxBasicMeshMaterial
                 parameters.Add((float)number);
             }
         }
-        // Six public user texture slots suffice only when colour distortion is disabled.
-        if (parameters[34] != 0) throw new VfxMappingException("distortion_colour_switch", "Vfx.Preview.MaterialUnsupported");
         if (parameters[5] < 0 || parameters[49] < 0 || parameters[50] < 0 || parameters[52] < 0)
             throw new VfxMappingException("material", "Vfx.Preview.RangeUnsupported");
-        var paths = new[] { "t_xml_diffuse_1", "t_xml_diffuse_2", "t_xml_diffuse_3", "t_xml_colour_overlay", "t_xml_mask_1", "t_xml_mask_2" }.Select(slot =>
+        var slots = new[] { "t_xml_diffuse_1", "t_xml_diffuse_2", "t_xml_diffuse_3", "t_xml_colour_overlay", "t_xml_mask_1", "t_xml_mask_2" };
+        if (parameters[34] != 0) slots = [.. slots, "t_xml_distortion_texture"];
+        var paths = slots.Select(slot =>
         {
             var nodes = root.Element("textures")?.Elements("texture").Where(n => string.Equals((string?)n.Element("slot"), slot, StringComparison.OrdinalIgnoreCase)).ToArray() ?? [];
             if (nodes.Length != 1 || string.IsNullOrWhiteSpace((string?)nodes[0].Element("source")))

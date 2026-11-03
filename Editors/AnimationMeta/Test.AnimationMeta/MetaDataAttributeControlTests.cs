@@ -1,4 +1,4 @@
-using Editors.AnimationMeta.Presentation;
+﻿using Editors.AnimationMeta.Presentation;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
@@ -150,7 +150,7 @@ namespace Test.AnimationMeta
                 Assert.That(
                     declaredFields.Count(field =>
                         field.Property.PropertyType == typeof(bool)),
-                    Is.EqualTo(21));
+                    Is.EqualTo(26));
                 Assert.That(
                     declaredFields.Count(field =>
                         field.Property.PropertyType == typeof(string) &&
@@ -183,7 +183,13 @@ namespace Test.AnimationMeta
                 foreach (var variable in entry.Variables)
                 {
                     var property = type.GetProperty(variable.PropertyName)!;
-                    var definition = property.GetCustomAttribute<MetaDataTagAttribute>(
+                    var serializedPropertyName = metadata is Effect_v1 ? property.Name switch
+                    {
+                        nameof(Effect_v1.EffectStartTime) => nameof(Effect_v1.UnknownIntBase_v0),
+                        nameof(Effect_v1.EffectEndTime) => nameof(Effect_v1.UnknownIntBase_v1),
+                        _ => property.Name
+                    } : property.Name;
+                    var definition = type.GetProperty(serializedPropertyName)!.GetCustomAttribute<MetaDataTagAttribute>(
                         false)!;
 
                     if (property.PropertyType == typeof(bool))

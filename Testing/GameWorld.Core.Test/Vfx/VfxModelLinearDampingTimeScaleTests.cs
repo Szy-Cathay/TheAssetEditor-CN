@@ -117,15 +117,15 @@ public class VfxModelLinearDampingTimeScaleTests
         Assert.That(simulation.ModelSpinBasisUnsupported, Is.False);
     }
 
-    [TestCase(0)]
-    [TestCase(2)]
-    public void SpriteAndDecalKeepTheirExistingPreviewDeltaDamping(int kind)
+    [TestCase(0, 2f)]
+    [TestCase(2, 1f)]
+    public void SpriteDampingUsesSourceSecondsWhileDecalKeepsItsExistingClock(int kind, float sourceSpeed)
     {
         var simulation = Simulation(Source(kind), 2);
         simulation.Seek(0, Matrix.Identity); var birth = Snapshot(simulation);
         Assert.That(birth.Kind, Is.EqualTo(kind));
         simulation.Seek(.4f, Matrix.Identity);
-        AssertConstantDecay(simulation, birth, 1, 2);
+        AssertConstantDecay(simulation, birth, sourceSpeed, 2);
     }
 
     [Test]

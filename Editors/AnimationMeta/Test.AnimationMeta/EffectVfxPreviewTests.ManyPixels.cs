@@ -43,6 +43,7 @@ public partial class EffectVfxPreviewTests
             var devices = new Mock<IDeviceResolver>(); devices.SetupGet(value => value.Device).Returns(graphics.GraphicsDevice);
             var builder = new MetaDataBuilder(null!, null!, null!, official.Files.Object, null!, new EffekseerVfxPreviewFactory(), devices.Object, new());
             var root = new GroupNode("complete-official-metadata");
+            builder.EffectPreviewContext = new() { BypassTerrainSelection = true };
             var result = builder.Build(null, parsed, null, root, null!, new AnimationPlayer(), null);
             try
             {
@@ -70,7 +71,7 @@ public partial class EffectVfxPreviewTests
                 ManyEvidence(label + "-complete.json", new { Path = path, original.Pack, Sha256 = Convert.ToHexString(SHA256.HashData(bytes)),
                     OriginalCount = expectedCount, RuntimeCount = effects.Length, ActiveRuntimeCount = active.Length, Time = time,
                     Entries = state, Sources = official.Origins.Values, LookupMisses = official.Missing.ToArray(),
-                    Scope = "Complete unmodified official META loaded through the real builder, original positions/timing/scales/VFX/dependencies preserved. Static attachment fallback without a skeleton/animation pose; no claim about native bone motion or visual equivalence. Separate 16-instance diagnostics test each visible contribution." });
+                    Scope = "Complete unmodified official META loaded through the real builder with the native standalone preview's explicit original-resource terrain bypass. Original positions/timing/scales/VFX/dependencies preserved. Static attachment fallback without a skeleton/animation pose; no claim about native bone motion or visual equivalence. Separate 16-instance diagnostics test each visible contribution." });
                 Assert.Multiple(() =>
                 {
                     Assert.That(active.Length, Is.GreaterThan(2), "More than two real official entries must reach drawing at the authored overlapping stage.");

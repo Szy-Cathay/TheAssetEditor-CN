@@ -93,7 +93,12 @@ public class VfxRawHalfSubmissionTests
         var plan = Plan(control == "unmarked" ? null : "HALFRES_DEFERRED_ALPHA");
         var layer = plan.Emitters[0].Render;
         if (control == "distortion") layer.Distortion = 1;
-        if (control == "mesh") layer.MeshMaterialIndex = 0;
+        if (control == "mesh")
+        {
+            var material = VfxCustomSpriteMaterial.Read(VfxAnimatedUvSpriteTests.Material()).Material;
+            plan.MeshMaterials.Add(new(Enumerable.Repeat(0, material.TexturePaths.Length).ToArray(), material.Parameters));
+            layer.MeshMaterialIndex = 0;
+        }
         if (control == "gradient") layer.GradientIndex = 0;
         if (control == "model") layer.Kind = 1;
         if (control == "opaque") layer.OpaqueModel = 1;

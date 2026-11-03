@@ -104,9 +104,9 @@ public class VfxParticleEventTests
         Assert.That(conversion.Diagnostics.Any(d => d.ReasonKey == "Vfx.Preview.ParticleEventEmitterUnsupported"), Is.True);
     }
 
-    [TestCase(true, 7f)]
-    [TestCase(false, 5f)]
-    public void VisibleRigidEventAnchor_UsesBirthPointAndStopsFollowingAfterParentDeath(bool track, float expected)
+    [TestCase(true)]
+    [TestCase(false)]
+    public void VisibleRigidEventAnchor_FollowsActualMotionAndFreezesAfterParentDeath(bool track)
     {
         var parent = VfxDocument.Read(Source(true, "true")); var emitter = parent.Root.Descendants("emitter").Single();
         emitter.Add(new XElement("property", new XAttribute("name", "ParticleInitialSpeed"), Curve(["x"], 2)),
@@ -123,10 +123,16 @@ public class VfxParticleEventTests
         var simulation = new TotalWarVfxSimulation(TotalWarVfxConverter.Convert(new(parent.Write(), "vfx/parent.xml",
             path => path.EndsWith("child.xml", StringComparison.OrdinalIgnoreCase) ? child.Write() : VfxModelVariantTests.Resolve(path))));
         simulation.Seek(.2f, Matrix.CreateTranslation(5, 0, 0));
-        Assert.That(simulation.Frame(Camera).Single(p => p.Layer != 0).Transform.Translation.X, Is.EqualTo(5).Within(.00001));
+        var alive = simulation.Frame(Camera);
+        var parentPosition = alive.Single(p => p.Layer == 0).Transform.Translation;
+        Assert.That(parentPosition.X, Is.GreaterThan(5.3f), "The visible parent must actually move before checking its child.");
+        Assert.That(Vector3.Distance(alive.Single(p => p.Layer != 0).Transform.Translation,
+            track ? parentPosition : new Vector3(5, 0, 0)), Is.LessThan(.00001f));
         simulation.Seek(1.02f, Matrix.CreateTranslation(7, 0, 0));
+        var frozen = simulation.Frame(Camera).Single().Transform.Translation;
+        Assert.That(frozen.X, track ? Is.GreaterThan(7.5f) : Is.EqualTo(5).Within(.00001));
         simulation.Seek(1.3f, Matrix.CreateTranslation(11, 0, 0));
-        Assert.That(simulation.Frame(Camera).Single().Transform.Translation.X, Is.EqualTo(expected).Within(.00001));
+        Assert.That(Vector3.Distance(simulation.Frame(Camera).Single().Transform.Translation, frozen), Is.LessThan(.00001f));
     }
 
     [Test]

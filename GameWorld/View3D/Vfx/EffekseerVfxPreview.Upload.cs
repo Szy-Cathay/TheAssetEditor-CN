@@ -220,11 +220,13 @@ public sealed partial class EffekseerVfxPreview
                     palette.Add(textures[2]);
                     textures = palette.ToArray();
                 }
-                else if (textures.Length == 10 && parameters.Length == 60)
+                else if (textures.Length == 10 && parameters.Length is 60 or VfxLegacyRigidDissolveMaterial.ParameterCount)
                 {
+                    var rectangleOffset = parameters.Length == VfxLegacyRigidDissolveMaterial.ParameterCount
+                        ? VfxLegacyRigidDissolveMaterial.SourceParameterCount : 46;
                     var packedIndex = textures[0]; parameters = (float[])parameters.Clone();
-                    Array.Clear(parameters, 46, 12);
-                    for (var rectangle = 46; rectangle < 58; rectangle += 4)
+                    Array.Clear(parameters, rectangleOffset, 12);
+                    for (var rectangle = rectangleOffset; rectangle < rectangleOffset + 12; rectangle += 4)
                         parameters[rectangle + 2] = parameters[rectangle + 3] = 1;
                     if (!textures.Any(failedTextures.Contains))
                     {
@@ -242,7 +244,7 @@ public sealed partial class EffekseerVfxPreview
                                 EffekseerNative.Check(EffekseerNative.AecnVfxTextureRgba(handle, atlas.Pixels, atlas.Pixels.Length, atlas.Width, atlas.Height, srgb ? 1 : 0));
                                 packed = (nextPackedIndex++, atlas.Rectangles); packedRigidMasks.Add(key, packed);
                             }
-                            packedIndex = packed.Index; packed.Rectangles.CopyTo(parameters, 46);
+                            packedIndex = packed.Index; packed.Rectangles.CopyTo(parameters, rectangleOffset);
                         }
                         catch (Exception exception) when (exception is NotSupportedException or InvalidOperationException)
                         {
@@ -273,7 +275,12 @@ public sealed partial class EffekseerVfxPreview
                     EffekseerNative.Check(EffekseerNative.AecnVfxModelAlias(handle, sourceIndex));
                 else
                 {
-                    if (model.AnimationVertices is { } frames)
+                    if (model.AnimationData is { } animation)
+                        EffekseerNative.Check(EffekseerNative.AecnVfxModelSkinned(handle, model.Vertices, model.Vertices.Length,
+                            model.Indices, model.Indices.Length, animation.Weights, System.Runtime.InteropServices.Marshal.SizeOf<EffekseerSkinWeight>(),
+                            animation.Poses, animation.Poses.Length, animation.BoneCount, animation.FrameCount, model.AnimationCycles,
+                            animation.Offset.X, animation.Offset.Y, animation.Offset.Z));
+                    else if (model.AnimationVertices is { } frames)
                         EffekseerNative.Check(EffekseerNative.AecnVfxModelFrames(handle, frames, frames.Length, model.Vertices.Length,
                             model.AnimationFrameCount, model.Indices, model.Indices.Length, model.AnimationCycles));
                     else EffekseerNative.Check(EffekseerNative.AecnVfxModel(handle, model.Vertices, model.Vertices.Length, model.Indices, model.Indices.Length));

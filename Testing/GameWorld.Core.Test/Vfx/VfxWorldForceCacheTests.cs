@@ -1,4 +1,4 @@
-#nullable enable
+﻿#nullable enable
 using System.Collections;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -124,7 +124,7 @@ public class VfxWorldForceCacheTests
         var emitter = plan.Emitters.Single();
         typeof(VfxPreviewEmitter).GetProperty(nameof(VfxPreviewEmitter.SimulationSpace))!.SetValue(emitter, space);
         var simulation = new TotalWarVfxSimulation(plan);
-        simulation.Seek(.1f, rotate ? Matrix.CreateRotationY(MathHelper.PiOver4) : Matrix.Identity);
+        simulation.Seek(.1f, rotate ? Matrix.CreateScale(1, 2, 1) * Matrix.CreateRotationY(MathHelper.PiOver4) : Matrix.Identity);
         var particle = Particles(simulation).First();
         var basis = Field(particle, "WorldForceBasisSupported");
         if (space == 2) Assert.That(basis, Is.EqualTo(!rotate));

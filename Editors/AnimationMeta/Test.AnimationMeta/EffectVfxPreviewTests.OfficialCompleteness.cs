@@ -62,6 +62,7 @@ public partial class EffectVfxPreviewTests
         { ModelMatrix = Matrix.CreateRotationY(.4f) * Matrix.CreateTranslation(7, 0, -3) });
         var builder = new MetaDataBuilder(null!, null!, null!, official.Files.Object, null!, factory,
             Mock.Of<IDeviceResolver>(), new());
+        builder.EffectPreviewContext = new() { BypassTerrainSelection = true };
         var result = builder.Build(null, parsed, null, root, provider.Object, player, null);
         var effects = result.Instances.OfType<EffectMetaInstance>().ToArray();
         var records = new List<object>();
@@ -95,13 +96,13 @@ public partial class EffectVfxPreviewTests
                     Assert.That(preview.Snapshot.RootSelection, Is.Null, "An editor-local layer subset must not filter a META Effect.");
                     Assert.That(preview.Time, Is.EqualTo(age).Within(.00001f));
                     var authoredScale = ((Effect_v12)source).Scale;
-                    var attachmentScale = preview.Attachment.Right.Length() / instance.WorldTransform.Right.Length();
+                    var attachmentScale = preview.Attachment.Right.Length();
                     Assert.That(attachmentScale, Is.EqualTo(authoredScale).Within(.00001f));
                     Assert.That(Vector3.Distance(preview.Attachment.Translation, instance.FocusPosition), Is.LessThan(.0001f));
                     Assert.That(preview.History, Is.Not.Null);
                     var birth = preview.History!(0);
                     var now = preview.History(age);
-                    var expectedBirthRightLength = Matrix.CreateFromQuaternion(new Quaternion(source.Orientation)).Right.Length() * authoredScale;
+                    var expectedBirthRightLength = authoredScale;
                     Assert.That(birth.Right.Length(), Is.EqualTo(expectedBirthRightLength).Within(.00001f));
                     Assert.That(Vector3.Distance(now.Translation, preview.Attachment.Translation), Is.LessThan(.0001f));
                     if (source.Tracking)
@@ -129,7 +130,7 @@ public partial class EffectVfxPreviewTests
                 Path = path, Sha256 = expectedHash, OriginalEffects = expectedEffects,
                 Instances = records, Diagnostics = result.Diagnostics, Sources = official.Origins.Values,
                 Missing = official.Missing.ToArray(),
-                Scope = "Complete unchanged official META and root resources. A controlled multi-bone animation checks attachment routing/history, not the original game pose or native visual equivalence. No metadata position, time, scale or source subset is changed."
+                Scope = "Complete unchanged official META and root resources under the native standalone preview's explicit original-resource terrain bypass. A controlled multi-bone animation checks attachment routing/history, not the original game pose or native visual equivalence. No metadata position, time, scale or source subset is changed."
             });
         }
         finally { foreach (var instance in result.Instances) instance.CleanUp(); }
@@ -179,6 +180,7 @@ public partial class EffectVfxPreviewTests
             var provider = new Mock<ISkeletonProvider>(); provider.SetupGet(value => value.Skeleton).Returns(skeleton);
             var builder = new MetaDataBuilder(null!, null!, null!, official.Files.Object, null!,
                 new EffekseerVfxPreviewFactory(), devices.Object, new());
+            builder.EffectPreviewContext = new() { BypassTerrainSelection = true };
             var root = new GroupNode("complete-official-bear");
             var result = builder.Build(null, parsed, null, root, provider.Object, player, null);
             try
@@ -227,7 +229,7 @@ public partial class EffectVfxPreviewTests
                     ProjectedParticleCount = projected.Length, ContributingPixels = contributingPixels,
                     SceneGroundHeight = node.FlatGroundHeight, Animation = animationPath, Skeleton = skeletonPath,
                     Diagnostics = node.Diagnostics, Sources = official.Origins.Values, Missing = official.Missing.ToArray(),
-                    Scope = "Complete original META, original animation/bear skeleton, VFX root and dependencies through the real shared preview. Authored position, orientation, scale and tracking40 are preserved. Actual node drawing supplies the explicit world-Y0 scene receiver. This proves visible contribution, not native visual equivalence."
+                    Scope = "Complete original META, original animation/bear skeleton, VFX root and dependencies through the real shared preview with the native standalone preview's explicit original-resource terrain bypass. Authored position, orientation, scale and tracking40 are preserved. Actual node drawing supplies the explicit world-Y0 scene receiver. This proves visible contribution, not native visual equivalence."
                 });
             }
             finally { foreach (var instance in result.Instances) instance.CleanUp(); }
@@ -320,12 +322,17 @@ public partial class EffectVfxPreviewTests
         var data = Environment.GetEnvironmentVariable("ASSETEDITOR_VFX_GAME_DATA")!;
         var manifest = File.ReadAllLines(Path.Combine(data, "manifest.txt")).Select(line => line.Split('\t'))
             .Where(parts => parts.Length > 1).ToDictionary(parts => parts[0], parts => parts[1], StringComparer.OrdinalIgnoreCase);
-        const string additionalPack = "warmachines_dds.pack";
-        var path = Path.Combine(data, additionalPack);
-        Assert.That(new FileInfo(path).Length, Is.EqualTo(long.Parse(manifest[additionalPack], CultureInfo.InvariantCulture)));
-        var pack = new PackFileContainerLoader(null!).Load(path)!;
-        foreach (var resource in pack.FileList)
-            official.Index[resource.Key.Replace('/', '\\').ToLowerInvariant()] = (resource.Value, pack.SystemFilePath);
+        foreach (var additionalPack in new[] { "warmachines_dds.pack", "db.pack" })
+        {
+            var path = Path.Combine(data, additionalPack);
+            Assert.That(new FileInfo(path).Length, Is.EqualTo(long.Parse(manifest[additionalPack], CultureInfo.InvariantCulture)));
+            var pack = new PackFileContainerLoader(null!).Load(path)!;
+            official.Files.Object.GetAllPackfileContainers().Add(pack);
+            foreach (var resource in pack.FileList.Where(pair => additionalPack != "db.pack"
+                || pair.Key.StartsWith(@"db\battle_entity_effects_tables\", StringComparison.OrdinalIgnoreCase)
+                || pair.Key.StartsWith(@"db\particle_effects_tables\", StringComparison.OrdinalIgnoreCase)))
+                official.Index[resource.Key.Replace('/', '\\').ToLowerInvariant()] = (resource.Value, pack.SystemFilePath);
+        }
         _completenessResources = official;
         return official;
     }
