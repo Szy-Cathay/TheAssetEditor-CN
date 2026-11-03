@@ -1,4 +1,4 @@
-﻿using GameWorld.Core.Rendering;
+using GameWorld.Core.Rendering;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Shared.Core.ErrorHandling;
@@ -179,7 +179,7 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
             throw new InvalidOperationException("An empty configuration requires a fresh native playback handle.");
         if (configuration.Layers.Length > 0)
             EffekseerNative.Check(EffekseerNative.AecnVfxConfigure(handle, configuration.Layers, configuration.Layers.Length));
-        if ((configuration.HalfLayers.Length > 0 || configuration.FullLayers.Length > 0)
+        if ((configuration.HalfLayers.Length > 0 || configuration.FullLayers.Length > 0 || configuration.SeaLayers.Length > 0)
             && System.Runtime.InteropServices.Marshal.SizeOf<EffekseerHalfLayer>() != EffekseerHalfLayer.Bytes)
             throw new InvalidOperationException("Unexpected raw-alpha layer configuration size.");
         if (configuration.HalfLayers.Length > 0)
@@ -188,6 +188,9 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
         if (configuration.FullLayers.Length > 0)
             EffekseerNative.Check(EffekseerNative.AecnVfxConfigureFull(handle, configuration.FullLayers,
                 configuration.FullLayers.Length, EffekseerHalfLayer.Bytes));
+        if (configuration.SeaLayers.Length > 0)
+            EffekseerNative.Check(EffekseerNative.AecnVfxConfigureSea(handle, configuration.SeaLayers,
+                configuration.SeaLayers.Length, EffekseerHalfLayer.Bytes));
         if (_applyingInteractiveReload) { }
         else if (_interactivePrewarmEnabled && VfxInteractivePrewarm.CanPrepare(_conversion!))
         {
@@ -202,10 +205,13 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
         _handle = handle;
     }
 
-    internal (EffekseerLayer[] Layers, EffekseerHalfLayer[] HalfLayers, EffekseerHalfLayer[] FullLayers) BuildRenderLayers(byte?[] constantAlphas)
+    internal (EffekseerLayer[] Layers, EffekseerHalfLayer[] HalfLayers, EffekseerHalfLayer[] FullLayers, EffekseerHalfLayer[] SeaLayers) BuildRenderLayers(byte?[] constantAlphas)
     {
         var layers = new List<EffekseerLayer>();
         var candidates = new List<HalfCandidate>();
+        var seaLayers = new List<EffekseerHalfLayer>();
+        var halfLayers = new List<EffekseerHalfLayer>();
+        var fullLayers = new List<EffekseerHalfLayer>();
         _opaqueLayers.Clear();
         _renderLayers = new RenderLayers[_conversion!.Emitters.Count][];
         for (var index = 0; index < _conversion.Emitters.Count; ++index)
@@ -215,11 +221,52 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
             _renderLayers[index] = Enumerable.Range(0, emitter.ModelVariants.Count + 1).Select(variant =>
             {
                 var coverage = new List<int>(); var emissive = new List<int>();
+                var nativeModels = new List<bool>(); var clampModelAlpha = new List<bool>(); var rawParts = new List<bool>();
                 foreach (var part in emitter.RenderParts(variant))
                 {
                     var layer = part;
+                    var meshDistortion = part.Kind == 1 && part.MeshMaterialIndex >= 0
+                        && _conversion.MeshMaterials[part.MeshMaterialIndex].Parameters.Length == VfxMeshDistortionMaterial.ParameterCount;
+                    var nativeModel = part.Kind == 1 && part.MeshMaterialIndex >= 0
+                        && (meshDistortion || VfxNativeColourMeshMaterial.UsesRawParticleAlpha(_conversion.MeshMaterials[part.MeshMaterialIndex].Parameters));
+                    nativeModels.Add(nativeModel);
+                    clampModelAlpha.Add(part.Kind == 1 && part.OpaqueModel == 0 && !nativeModel);
+                    var customMboit = part.Kind == 0 && part.MeshMaterialIndex >= 0
+                        && VfxFogBloodMaterial.IsFamily(_conversion.MeshMaterials[part.MeshMaterialIndex].Parameters.Length);
+                    rawParts.Add(emitter.SeaOverlay || customMboit);
+                    if (meshDistortion)
+                    {
+                        layer.Distortion = 1; layer.MaterialMode = 0; layer.OpaqueModel = 0; layer.NativeSoftDepth = 0;
+                        coverage.Add(layers.Count); layers.Add(layer); emissive.Add(-1);
+                        continue;
+                    }
+                    if (customMboit)
+                    {
+                        layer.MaterialMode = 0; layer.Blend = 1;
+                        var rawIndex = layers.Count; layers.Add(layer); coverage.Add(rawIndex); emissive.Add(-1);
+                        (emitter.HalfResolution ? halfLayers : fullLayers).Add(new()
+                        {
+                            LayerIndex = rawIndex, LegacyCoverageIndex = -1, LegacyEmissionIndex = -1,
+                            Premultiplied = 0, CoveredColourMultiplier = 1, EmissionMultiplier = 0,
+                        });
+                        continue;
+                    }
+                    if (emitter.SeaOverlay)
+                    {
+                        var rawIndex = layers.Count;
+                        layer.MaterialMode = emitter.PremultipliedAlpha ? 1 : 0;
+                        layer.Blend = 1;
+                        layers.Add(layer); coverage.Add(rawIndex); emissive.Add(-1);
+                        seaLayers.Add(new()
+                        {
+                            LayerIndex = rawIndex, LegacyCoverageIndex = -1, LegacyEmissionIndex = -1,
+                            Premultiplied = emitter.PremultipliedAlpha ? 1 : 0,
+                            CoveredColourMultiplier = emitter.CoveredColourMultiplier, EmissionMultiplier = emitter.AdditiveMultiplier,
+                        });
+                        continue;
+                    }
                     var regularDecal = layer.Kind == 2 && layer.MaterialMode < 3;
-                    var split = emitter.PremultipliedAlpha && layer.Kind != 2 && layer.OpaqueModel == 0;
+                    var split = !nativeModel && emitter.PremultipliedAlpha && layer.Kind != 2 && layer.OpaqueModel == 0;
                     var plainTexture = split && layer.Kind != 2 && layer.MeshMaterialIndex < 0 && layer.GradientIndex < 0;
                     var alpha = layer.TextureIndex >= 0 && layer.TextureIndex < constantAlphas.Length ? constantAlphas[layer.TextureIndex] : null;
                     // Constant alpha survives filtering. MAX alpha is unchanged by either empty pass.
@@ -237,17 +284,23 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
                     {
                         emissive.Add(layers.Count); layer.MaterialMode = !drawCoverage ? EffekseerLayer.PreciseEmissionMode : 2; layer.Blend = 2; layers.Add(layer);
                     }
+                    else if (nativeModel && _conversion.MeshMaterials[part.MeshMaterialIndex].Parameters.Length == VfxRigidGlowMaterial.ParameterCount)
+                    {
+                        var distortion = part; distortion.Distortion = 1; distortion.MaterialMode = 0;
+                        distortion.OpaqueModel = 0; distortion.NativeSoftDepth = 0;
+                        emissive.Add(layers.Count); layers.Add(distortion);
+                    }
                     else emissive.Add(-1);
                     if ((emitter.HalfResolution || emitter.FullResolution) && part.Kind == 0 && part.Distortion == 0 && part.ModelIndex < 0 && part.TextureIndex >= 0
                         && part.OpaqueModel == 0 && part.MeshMaterialIndex < 0 && part.GradientIndex < 0
                         && part.MaterialMode is 0 or 1 && (part.Blend == 1 || emitter.PremultipliedAlpha))
                         candidates.Add(new(emitterIndex, variant, coverage.Count - 1, part));
                 }
-                return new RenderLayers(coverage.ToArray(), emissive.ToArray()) { RawHalf = new bool[coverage.Count] };
+                return new RenderLayers(coverage.ToArray(), emissive.ToArray())
+                { RawHalf = rawParts.ToArray(),
+                    NativeModels = nativeModels.ToArray(), ClampModelAlpha = clampModelAlpha.ToArray() };
             }).ToArray();
         }
-        var halfLayers = new List<EffekseerHalfLayer>();
-        var fullLayers = new List<EffekseerHalfLayer>();
         // Reserve the complete legacy configuration first, including its constant-alpha optimizations.
         foreach (var candidate in candidates)
         {
@@ -270,7 +323,7 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
             mapping.Emissive[candidate.Part] = -1;
             mapping.RawHalf[candidate.Part] = true;
         }
-        return (layers.ToArray(), halfLayers.ToArray(), fullLayers.ToArray());
+        return (layers.ToArray(), halfLayers.ToArray(), fullLayers.ToArray(), seaLayers.ToArray());
     }
 
     private static (byte[] Pixels, int Width, int Height, bool Srgb, int MipLevels) DecodeTexture(byte[] gameBytes, VfxTextureUsage usage)
@@ -447,9 +500,12 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
             Diagnostics = [.. Diagnostics, new(_sourcePath, "", "weather", "Vfx.Preview.WeatherMissing")];
         if (_simulation.VelocityScaleUnsupported && !Diagnostics.Any(x => x.ReasonKey == "Vfx.Preview.VelocityScaleUnsupported"))
             Diagnostics = [.. Diagnostics, new(_sourcePath, "", "velocity_stretch_mul", "Vfx.Preview.VelocityScaleUnsupported")];
-        if (particleCount > 0 && _conversion!.Emitters.Any(x => x.Render.SoftDistance > 0 || x.Render.DistortionSoftDepth != 0)
+        var meshDistortionDepth = _conversion!.Emitters.Any(emitter => Enumerable.Range(0, emitter.ModelVariants.Count + 1)
+            .SelectMany(emitter.RenderParts).Any(part => part.MeshMaterialIndex >= 0
+                && _conversion.MeshMaterials[part.MeshMaterialIndex].Parameters.Length == VfxMeshDistortionMaterial.ParameterCount));
+        if (particleCount > 0 && (meshDistortionDepth || _conversion.Emitters.Any(x => x.Render.SoftDistance > 0 || x.Render.DistortionSoftDepth != 0))
             && EffekseerNative.AecnVfxDepthAvailable(_handle) == 0 && !Diagnostics.Any(x => x.ReasonKey == "Vfx.Preview.SceneDepthUnavailable"))
-            Diagnostics = [.. Diagnostics, new(_sourcePath, "", "soft_factor", "Vfx.Preview.SceneDepthUnavailable")];
+            Diagnostics = [.. Diagnostics, new(_sourcePath, "", meshDistortionDepth ? "depth_fade" : "soft_factor", "Vfx.Preview.SceneDepthUnavailable")];
         else if (particleCount > 0 && EffekseerNative.AecnVfxDepthAvailable(_handle) != 0
             && Diagnostics.Any(x => x.ReasonKey == "Vfx.Preview.SceneDepthUnavailable"))
             Diagnostics = Diagnostics.Where(x => x.ReasonKey != "Vfx.Preview.SceneDepthUnavailable").ToArray();
@@ -485,7 +541,8 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
             var layers = _renderLayers[particle.Layer][projected.ModelVariant];
             for (var index = 0; index < layers.Coverage.Length; index++)
             {
-                var submitted = index < layers.RawHalf.Length && layers.RawHalf[index] ? rawCoverage : coverage;
+                var submitted = index < layers.RawHalf.Length && layers.RawHalf[index] || index < layers.NativeModels.Length && layers.NativeModels[index] ? rawCoverage : coverage;
+                if (index < layers.ClampModelAlpha.Length && layers.ClampModelAlpha[index]) submitted.Colour.W = Math.Clamp(submitted.Colour.W, 0, 1);
                 submitted.Layer = layers.Coverage[index];
                 if (submitted.Layer >= 0)
                 {
@@ -493,6 +550,7 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
                 }
                 if (layers.Emissive[index] < 0) continue;
                 var emissive = particle; emissive.Layer = layers.Emissive[index];
+                if (index < layers.ClampModelAlpha.Length && layers.ClampModelAlpha[index]) emissive.Colour.W = Math.Clamp(emissive.Colour.W, 0, 1);
                 var multiplier = _conversion.Emitters[particle.Layer].AdditiveMultiplier;
                 emissive.Colour.X *= multiplier; emissive.Colour.Y *= multiplier; emissive.Colour.Z *= multiplier;
                 rendered.Add(emissive);
@@ -627,6 +685,8 @@ public sealed partial class EffekseerVfxPreview(GraphicsDevice device) : IVfxPre
     {
         // Both explicit alpha resolutions submit one unscaled source particle.
         public bool[] RawHalf { get; init; } = [];
+        public bool[] NativeModels { get; init; } = [];
+        public bool[] ClampModelAlpha { get; init; } = [];
     }
     private sealed record HalfCandidate(int Emitter, int Variant, int Part, EffekseerLayer Layer);
     private sealed record BoundsSnapshot(BoundingBox? Value);

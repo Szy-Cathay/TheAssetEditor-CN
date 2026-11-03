@@ -53,3 +53,10 @@ struct AecnVertex
 {
     float Position[3], Normal[3], Tangent[3], Binormal[3], UV[2], Colour[4];
 };
+
+struct AecnSkinWeight
+{
+    int32_t Bones[4];
+    float Weights[4];
+};
+static_assert(sizeof(AecnSkinWeight) == 32, "Invalid skinning vertex ABI");

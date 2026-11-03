@@ -1,0 +1,39 @@
+<UserControl x:Class="AnimationEditor.MountAnimationCreator.Views.PlaybackSourcesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui">
+    <Expander IsExpanded="True" Header="{loc:Loc MountAnim.Playback.Header}">
+        <StackPanel Margin="8,4,8,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Label Style="{StaticResource AeForm.Label}" Content="{loc:Loc MountAnim.Playback.Main}" />
+                <ComboBox x:Name="MainPlaybackSource" Grid.Column="1" MinWidth="0"
+                          ItemsSource="{Binding AvailablePlaybackSources}"
+                          SelectedItem="{Binding SelectedPlaybackSource, Mode=TwoWay}"
+                          DisplayMemberPath="Name" IsEnabled="{Binding HasPlaybackSources.Value}"
+                          AutomationProperties.Name="{loc:Loc MountAnim.Playback.Main}"
+                          ToolTip="{loc:Loc MountAnim.Playback.Hint}" />
+            </Grid>
+            <ItemsControl x:Name="AnimationSourceSummaries" ItemsSource="{Binding AnimationPlaybackSources}" Margin="0,4,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" SharedSizeGroup="PlaybackSourceLabel" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="{Binding Name}" Style="{StaticResource AeText.Label}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Summary.Value}" Style="{StaticResource AeText.Technical}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{loc:Loc MountAnim.Playback.Hint}" Style="{StaticResource AeText.Caption}"
+                       Foreground="{DynamicResource AeBrush.TextSecondary}" TextWrapping="Wrap" Margin="0,8,0,0" />
+        </StackPanel>
+    </Expander>
+</UserControl>

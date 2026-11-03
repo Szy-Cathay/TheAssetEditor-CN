@@ -32,6 +32,10 @@ internal static class VfxPlaybackResourceIdentity
                 model.OpaqueMaterial ? 1 : 0, model.RigidAnimation ? 1 : 0, model.ApproximateMaterialShader == null ? 0 : 1]);
             Append<float>(hash, [model.AnimationCycles]);
             Append<EffekseerVertex>(hash, model.AnimationVertices ?? []);
+            Append<int>(hash, [model.AnimationData?.BoneCount ?? 0]);
+            Append<EffekseerSkinWeight>(hash, model.AnimationData?.Weights ?? []);
+            Append<Microsoft.Xna.Framework.Matrix>(hash, model.AnimationData?.Poses ?? []);
+            if (model.AnimationData is { } compact) Append<Microsoft.Xna.Framework.Vector3>(hash, [compact.Offset]);
             Append<byte>(hash, Encoding.UTF8.GetBytes(model.ApproximateMaterialShader ?? ""));
         }
         Append<int>(hash, [conversion.MeshMaterials.Count]);

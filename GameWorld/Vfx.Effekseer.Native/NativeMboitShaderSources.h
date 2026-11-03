@@ -144,6 +144,8 @@ cbuffer AecnHalfScene : register(b1)
     float4 AecnHalfSource; // premultiplied, covered multiplier, emission multiplier, absorption kill
     float4 AecnHalfSurface; // half allocation width/height, full allocation width/height
     float4 AecnHalfWarp; // moment coordinate scale, reserved, reciprocal full allocation
+    float4 AecnSeaReceiver; // explicit flat receiver flag, world height, depth half-quantum, reserved
+    float4x4 AecnSeaInverseViewProjection;
 };
 )";
 }

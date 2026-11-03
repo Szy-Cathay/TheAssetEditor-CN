@@ -6,6 +6,11 @@ internal sealed partial class TotalWarVfxSimulation
 {
     internal bool ModelTerrainBirthUnsupported { get; private set; }
 
+    private bool PrepareModelTerrainNormal(EmitterState state, Matrix root)
+        => state.Definition.ModelTerrainNormal && state.Parent == null
+            && _groundHeight is { } ground && float.IsFinite(ground)
+            && TryModelForceRoot(root, out _, out _);
+
     private bool PrepareModelTerrainBirth(EmitterState state, Matrix root, float emitterY, ref Vector3 position)
     {
         if (!state.Definition.ModelTerrainBirth) return false;

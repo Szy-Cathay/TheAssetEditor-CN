@@ -46,6 +46,12 @@ namespace GameWorld.Core.Animation
 
         public TimeSpan Duration { get; set; }
 
+        public float? SourceFrameRate { get; private set; }
+        public TimeSpan SourceDuration { get; private set; }
+        public int SourceFrameCount { get; private set; }
+        public Quaternion? SourceRootReferenceRotation { get; private set; }
+        public string? SourceRootName { get; private set; }
+
         public AnimationTimebase? Timebase
         {
             get
@@ -98,6 +104,14 @@ namespace GameWorld.Core.Animation
 
             Duration = TimeSpan.FromSeconds(
                 file.Header.AnimationTotalPlayTimeInSec);
+            SourceFrameRate = file.Header.FrameRate;
+            SourceDuration = Duration;
+            SourceFrameCount = DynamicFrames.Count;
+            if (skeleton.BoneCount > 0)
+            {
+                SourceRootReferenceRotation = skeleton.Rotation[0];
+                SourceRootName = skeleton.BoneNames[0];
+            }
         }
 
         private List<KeyFrame> CreateFramesWithDifferentHierarchy(AnimationFile file, GameSkeleton skeleton, int[] targetBoneIndices)
@@ -432,6 +446,11 @@ namespace GameWorld.Core.Animation
             foreach (var item in DynamicFrames)
                 copy.DynamicFrames.Add(item.Clone());
             copy.Duration = Duration;
+            copy.SourceFrameRate = SourceFrameRate;
+            copy.SourceDuration = SourceDuration;
+            copy.SourceFrameCount = SourceFrameCount;
+            copy.SourceRootReferenceRotation = SourceRootReferenceRotation;
+            copy.SourceRootName = SourceRootName;
 
             return copy;
         }

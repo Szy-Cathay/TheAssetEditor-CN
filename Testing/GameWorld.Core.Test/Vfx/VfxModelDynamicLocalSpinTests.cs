@@ -44,15 +44,17 @@ public class VfxModelDynamicLocalSpinTests
     }
 
     [Test]
-    public void StepDamping_RemainsDiagnosedUntilTheNativeBakedImportContractIsVerified()
+    public void InvalidDampingTableLink_RemainsDiagnosedAndOmitsSpin()
     {
-        var conversion = Convert(Source(damping: Damping("step")));
+        var conversion = Convert(Source(damping: Damping("step").Replace(":x,0;0,0", ":x,0;0,9", StringComparison.Ordinal)));
         Assert.Multiple(() =>
         {
             Assert.That(UsesNativeModelSpin(conversion.Emitters.Single()), Is.False);
             Assert.That(conversion.Emitters.Single().SpinMax, Is.EqualTo(Vector3.Zero));
             Assert.That(conversion.Diagnostics.Any(d => d.Field == "ParticleSpinDeceleration"
                 && d.ReasonKey == "Vfx.Preview.ForceUnsupported"), Is.True);
+            Assert.That(conversion.Diagnostics.Any(d => d.Field == "ParticleSpinDeceleration"
+                && d.ReasonKey == "Vfx.Preview.InvalidData"), Is.True);
         });
     }
 

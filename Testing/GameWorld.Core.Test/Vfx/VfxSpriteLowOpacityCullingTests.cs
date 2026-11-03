@@ -100,6 +100,11 @@ public class VfxSpriteLowOpacityCullingTests
         Vector4? distances = null, int kind = 0, int meshMaterialIndex = -1)
     {
         var conversion = Conversion(initialAlpha, lifeAlpha, tintAlpha, distances);
+        if (meshMaterialIndex >= 0)
+        {
+            var material = VfxCustomSpriteMaterial.Read(VfxAnimatedUvSpriteTests.Material()).Material;
+            conversion.MeshMaterials.Add(new(Enumerable.Repeat(0, material.TexturePaths.Length).ToArray(), material.Parameters));
+        }
         var layer = conversion.Emitters.Single().Render; layer.Kind = kind; layer.MeshMaterialIndex = meshMaterialIndex;
         conversion.Emitters.Single().Render = layer;
         var simulation = new TotalWarVfxSimulation(conversion); simulation.Seek(.1f, Matrix.Identity);

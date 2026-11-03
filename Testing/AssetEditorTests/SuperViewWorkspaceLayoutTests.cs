@@ -1,5 +1,7 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -12,6 +14,8 @@ using Editors.AnimationMeta.SuperView.Inspection;
 using NUnit.Framework;
 using Shared.Core.Services;
 using Shared.Core.Settings;
+using Shared.GameFormats.AnimationMeta.Definitions;
+using Shared.GameFormats.AnimationMeta.Parsing;
 using Assert = NUnit.Framework.Assert;
 using MetadataPanel = Editors.AnimationMeta.SuperView.EditorView;
 using WorkspaceModel = AssetEditorTests.UiAnimationMetadataFamilyGallery.MetadataSuperViewGalleryModel;
@@ -40,6 +44,7 @@ public class SuperViewWorkspaceLayoutTests
             Layout(view, 1440d * 96 / dpi, 900d * 96 / dpi);
             var wind = (Grid)view.FindName("FlagWindControls");
             Assert.That(wind.Visibility, Is.EqualTo(Visibility.Visible));
+            ScrollToElement((ScrollViewer)view.FindName("PreviewSettingsScroll"), wind, view, 1440d * 96 / dpi, 900d * 96 / dpi);
             AssertInside(wind, view);
             var inputs = Descendants<TextBox>(wind).ToArray();
             Assert.That(inputs, Has.Length.EqualTo(2));
@@ -52,6 +57,174 @@ public class SuperViewWorkspaceLayoutTests
             view.DataContext = new WorkspaceModel(false, true, 1) { CanPreviewFlagWind = false };
             Layout(view, 1440d * 96 / dpi, 900d * 96 / dpi);
             Assert.That(wind.Visibility, Is.EqualTo(Visibility.Collapsed));
+        });
+    }
+
+    [TestCaseSource(nameof(LayoutCases))]
+    public void EffectPreviewControls_BindAllSceneInputsWithoutChangingDocumentsOrPlayback(ThemeType theme, int dpi)
+    {
+        WithTheme(theme, () =>
+        {
+            var model = new WorkspaceModel(true, true, 1) { SelectedInspectorTabIndex = 2 };
+            var persistentEditor = model.PersistentMetaEditor;
+            var animationEditor = model.MetaEditor;
+            var documents = new[] { (ParsedMetadataFile)persistentEditor.ParsedFile!, (ParsedMetadataFile)animationEditor.ParsedFile! };
+            var sourceLists = documents.Select(document => document.Attributes).ToArray();
+            var sources = sourceLists.SelectMany(attributes => attributes).Cast<SplashAttack_v10>().ToArray();
+            var originalFields = sources.Select(source => (source.StartTime, source.EndTime, source.StartPosition, source.EndPosition)).ToArray();
+            var originalData = sources.Select(source => source.Data).ToArray();
+            var originalBytes = sources.Select(source => source.Data?.ToArray()).ToArray();
+            var persistentTag = persistentEditor.SelectedTag;
+            var animationTag = animationEditor.SelectedTag;
+            var player = model.Player;
+            var playerFrame = (GalleryModel)player.SelectedAnimationCurrentFrame!;
+            var playerTime = (GalleryModel)player.SelectedAnimationCurrentTime!;
+            var frame = playerFrame.Value;
+            var time = playerTime.Value;
+            var timeline = model.MetaDataTimeline;
+            var problems = model.MetaDataProblems;
+            var view = new SuperViewWorkspaceView { DataContext = model };
+            var width = 1440d * 96 / dpi;
+            var height = 900d * 96 / dpi;
+            Layout(view, width, height);
+            Assert.That(Window.GetWindow(view), Is.Null, "This regression must remain an unhosted offscreen visual.");
+            var panel = (StackPanel)view.FindName("EffectPreviewControls");
+            var settings = (ScrollViewer)view.FindName("PreviewSettingsScroll");
+            var terrain = (ComboBox)view.FindName("EffectPreviewTerrain");
+            var distance = (CheckBox)view.FindName("EffectPreviewDistanceCulling");
+            var filter = (CheckBox)view.FindName("EffectPreviewIdFilter");
+            var id = (TextBox)view.FindName("EffectPreviewId");
+            var paths = Descendants<TextBox>(panel).Where(input => !ReferenceEquals(input, id)).ToArray();
+            Assert.That(paths, Has.Length.EqualTo(2));
+            var aura = paths.Single(input => BindingOperations.GetBinding(input, TextBox.TextProperty)!.Path.Path == nameof(model.PreviewAuraResource));
+            var weapon = paths.Single(input => BindingOperations.GetBinding(input, TextBox.TextProperty)!.Path.Path == nameof(model.PreviewWeaponResource));
+            var buttons = Descendants<Button>(panel).ToDictionary(button => BindingOperations.GetBinding(button, Button.CommandProperty)!.Path.Path);
+            Assert.Multiple(() =>
+            {
+                Assert.That(terrain.ItemsSource, Is.SameAs(model.EffectTerrainChoices));
+                Assert.That(terrain.Items.Cast<EffectTerrainChoice>().Select(choice => choice.Value), Is.EqualTo(Enumerable.Range(-1, 18)));
+                Assert.That(terrain.Items.Cast<EffectTerrainChoice>().Select(choice => choice.Label),
+                    Is.EqualTo(Enumerable.Range(-1, 18).Select(value => LocalizationManager.Instance.Get("SuperView.Effects.Terrain." + value))));
+                Assert.That(terrain.SelectedValue, Is.EqualTo(-1));
+                Assert.That(aura.IsReadOnly && weapon.IsReadOnly, Is.True);
+                Assert.That(BindingOperations.GetBinding(aura, TextBox.TextProperty)!.Mode, Is.EqualTo(BindingMode.OneWay));
+                Assert.That(BindingOperations.GetBinding(weapon, TextBox.TextProperty)!.Mode, Is.EqualTo(BindingMode.OneWay));
+                Assert.That(buttons, Has.Count.EqualTo(4));
+                Assert.That(buttons[nameof(model.BrowseAuraResourceCommand)].Command, Is.SameAs(model.BrowseAuraResourceCommand));
+                Assert.That(buttons[nameof(model.BrowseWeaponResourceCommand)].Command, Is.SameAs(model.BrowseWeaponResourceCommand));
+                Assert.That(buttons[nameof(model.ClearAuraResourceCommand)].Command, Is.SameAs(model.ClearAuraResourceCommand));
+                Assert.That(buttons[nameof(model.ClearWeaponResourceCommand)].Command, Is.SameAs(model.ClearWeaponResourceCommand));
+                Assert.That(distance.IsChecked, Is.False);
+                Assert.That(filter.IsChecked, Is.False);
+                Assert.That(id.IsEnabled, Is.False);
+            });
+            foreach (var choice in Enumerable.Range(-1, 18))
+            {
+                terrain.SetCurrentValue(Selector.SelectedValueProperty, choice);
+                terrain.GetBindingExpression(Selector.SelectedValueProperty)!.UpdateSource();
+                Assert.That(model.PreviewTerrainType, Is.EqualTo(choice));
+            }
+            model.PreviewTerrainType = 6;
+            buttons[nameof(model.BrowseAuraResourceCommand)].Command!.Execute(null);
+            buttons[nameof(model.BrowseWeaponResourceCommand)].Command!.Execute(null);
+            Layout(view, width, height);
+            Assert.That(terrain.SelectedValue, Is.EqualTo(6));
+            Assert.That(model.AuraBrowseRequests, Is.EqualTo(1));
+            Assert.That(model.WeaponBrowseRequests, Is.EqualTo(1));
+            Assert.That(aura.Text, Is.EqualTo(model.PreviewAuraResource).And.Not.Empty);
+            Assert.That(weapon.Text, Is.EqualTo(model.PreviewWeaponResource).And.Not.Empty);
+            var originalAura = model.PreviewAuraResource;
+            aura.SetCurrentValue(TextBox.TextProperty, "attempted metadata edit");
+            Assert.That(model.PreviewAuraResource, Is.EqualTo(originalAura));
+            aura.GetBindingExpression(TextBox.TextProperty)!.UpdateTarget();
+            distance.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+            distance.GetBindingExpression(ToggleButton.IsCheckedProperty)!.UpdateSource();
+            filter.SetCurrentValue(ToggleButton.IsCheckedProperty, true);
+            filter.GetBindingExpression(ToggleButton.IsCheckedProperty)!.UpdateSource();
+            Layout(view, width, height);
+            Assert.That(model.PreviewDistanceCulling, Is.True);
+            Assert.That(model.PreviewEffectIdFilter, Is.True);
+            Assert.That(id.IsEnabled, Is.True);
+            Assert.That(Microsoft.Xaml.Behaviors.Interaction.GetBehaviors(id), Is.Empty,
+                "Signed native IDs must use integer binding validation without an unsigned-only input filter.");
+            foreach (var valid in new[] { int.MinValue, -1, int.MaxValue })
+            {
+                SetEffectIdText(valid.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                Assert.That(model.PreviewEffectId, Is.EqualTo(valid));
+                Assert.That(Validation.GetHasError(id), Is.False);
+            }
+            SetEffectIdText("420");
+            Assert.That(model.PreviewEffectId, Is.EqualTo(420));
+            Assert.That(Validation.GetHasError(id), Is.False);
+            foreach (var invalid in new[] { "not-an-id", "2147483648", "-2147483649", "1.5" })
+            {
+                SetEffectIdText(invalid);
+                Assert.That(Validation.GetHasError(id), Is.True);
+                Assert.That(model.PreviewEffectId, Is.EqualTo(420), "Conversion errors must not overwrite the last valid ID.");
+            }
+            SetEffectIdText("17");
+            Assert.That(model.PreviewEffectId, Is.EqualTo(17));
+            Assert.That(Validation.GetHasError(id), Is.False);
+
+            var presenter = Descendants<ScrollContentPresenter>(settings).First();
+            foreach (var control in new FrameworkElement[] { terrain, aura, weapon, distance, filter, id }.Concat(buttons.Values))
+            {
+                ScrollToElement(settings, control, view, width, height);
+                AssertHorizontalInside(control, panel);
+                AssertInside(control, presenter);
+            }
+            Assert.That(settings.ScrollableWidth, Is.EqualTo(0), "The inspector must not hide overflow behind horizontal scrolling.");
+            ScrollToElement(settings, panel, view, width, height);
+            Snapshot(view, $"superview-effect-preview-{theme}-{dpi}-populated.png", dpi);
+            buttons[nameof(model.ClearAuraResourceCommand)].Command!.Execute(null);
+            buttons[nameof(model.ClearWeaponResourceCommand)].Command!.Execute(null);
+            model.PreviewDistanceCulling = false;
+            model.PreviewEffectIdFilter = false;
+            Layout(view, width, height);
+            Assert.That(aura.Text, Is.Empty);
+            Assert.That(weapon.Text, Is.Empty);
+            Assert.That(distance.IsChecked, Is.False);
+            Assert.That(filter.IsChecked, Is.False);
+            Assert.That(id.IsEnabled, Is.False);
+            foreach (var category in new[] { 1, 3, 2 })
+            {
+                ((TabControl)view.FindName("InspectorCategories")).SetCurrentValue(Selector.SelectedIndexProperty, category);
+                Layout(view, width, height);
+            }
+            Assert.Multiple(() =>
+            {
+                Assert.That(model.PersistentMetaEditor, Is.SameAs(persistentEditor));
+                Assert.That(model.MetaEditor, Is.SameAs(animationEditor));
+                Assert.That(persistentEditor.ParsedFile, Is.SameAs(documents[0]));
+                Assert.That(animationEditor.ParsedFile, Is.SameAs(documents[1]));
+                Assert.That(persistentEditor.IsDirty || animationEditor.IsDirty, Is.False);
+                Assert.That(persistentEditor.SelectedTag, Is.SameAs(persistentTag));
+                Assert.That(animationEditor.SelectedTag, Is.SameAs(animationTag));
+                Assert.That(model.Player, Is.SameAs(player));
+                Assert.That(model.MetaDataTimeline, Is.SameAs(timeline));
+                Assert.That(model.MetaDataProblems, Is.SameAs(problems));
+                Assert.That(playerFrame.Value, Is.EqualTo(frame));
+                Assert.That(playerTime.Value, Is.EqualTo(time));
+                Assert.That(model.SelectedTabControllerIndex, Is.EqualTo(1));
+                Assert.That(documents[0].Attributes, Is.SameAs(sourceLists[0]));
+                Assert.That(documents[1].Attributes, Is.SameAs(sourceLists[1]));
+                Assert.That(documents.SelectMany(document => document.Attributes), Is.EqualTo(sources));
+                Assert.That(sources.Select(source => (source.StartTime, source.EndTime, source.StartPosition, source.EndPosition)),
+                    Is.EqualTo(originalFields));
+                for (var index = 0; index < sources.Length; index++)
+                {
+                    Assert.That(sources[index].Data, Is.SameAs(originalData[index]));
+                    Assert.That(sources[index].Data, Is.EqualTo(originalBytes[index]));
+                }
+            });
+
+            void SetEffectIdText(string text)
+            {
+                ScrollToElement(settings, id, view, width, height);
+                id.SetCurrentValue(TextBox.TextProperty, text);
+                id.GetBindingExpression(TextBox.TextProperty)!.UpdateSource();
+                Layout(view, width, height);
+            }
         });
     }
 
@@ -120,7 +293,8 @@ public class SuperViewWorkspaceLayoutTests
                 else if (category == 2)
                 {
                     var settings = (ScrollViewer)view.FindName("PreviewSettingsScroll");
-                    var toggles = Descendants<CheckBox>(settings).ToArray();
+                    var toggles = Descendants<CheckBox>(settings)
+                        .Where(toggle => BindingOperations.GetBinding(toggle, ToggleButton.IsCheckedProperty)?.Path.Path.StartsWith("Show", StringComparison.Ordinal) == true).ToArray();
                     Assert.That(toggles, Has.Length.EqualTo(4));
                     Assert.That(toggles.All(toggle => toggle.IsChecked == true), Is.True);
                     AssertInside(settings, view);
@@ -250,6 +424,14 @@ public class SuperViewWorkspaceLayoutTests
         Assert.That(bounds.Right, Is.LessThanOrEqualTo(root.ActualWidth + 1));
     }
 
+    private static void ScrollToElement(ScrollViewer scroll, FrameworkElement item, FrameworkElement workspace, double width, double height)
+    {
+        var content = (FrameworkElement)scroll.Content;
+        var top = item.TranslatePoint(new Point(), content).Y;
+        scroll.ScrollToVerticalOffset(Math.Max(0, top - 4));
+        Layout(workspace, width, height);
+    }
+
     internal static void WithTheme(ThemeType theme, Action action) =>
         WpfTestApplicationHost.InvokeWithThemeResources(WpfTestApplicationHost.EmptyServices, () =>
         {
@@ -294,11 +476,11 @@ public class SuperViewWorkspaceLayoutTests
     internal static void Snapshot(FrameworkElement element, string name, int dpi)
     {
         var output = Environment.GetEnvironmentVariable("AE_UI_QA_OUTPUT");
-        if (string.IsNullOrWhiteSpace(output)) return;
-        Directory.CreateDirectory(output);
         var bitmap = new RenderTargetBitmap((int)Math.Ceiling(element.ActualWidth * dpi / 96),
             (int)Math.Ceiling(element.ActualHeight * dpi / 96), dpi, dpi, PixelFormats.Pbgra32);
         bitmap.Render(element);
+        if (string.IsNullOrWhiteSpace(output)) return;
+        Directory.CreateDirectory(output);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = File.Create(Path.Combine(output, name));

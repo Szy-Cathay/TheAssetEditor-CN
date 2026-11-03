@@ -32,6 +32,9 @@ public:
         std::array<ID3D11ShaderResourceView*, 3> Textures{};
         ID3D11ShaderResourceView* SoftDepth = nullptr;
         bool HalfResolution = true;
+        bool SeaOverlay = false;
+        int FogBlood = 0;
+        const float* FogBloodParameters = nullptr;
     };
 private:
     struct Surface
@@ -47,6 +50,11 @@ private:
         UINT Width = 0, Height = 0, Samples = 0;
     } full_[2];
     FullSet* activeFull_ = nullptr;
+    struct SeaSet
+    {
+        Surface Colour, Normal, Revealage;
+        UINT Width = 0, Height = 0, Samples = 0;
+    } sea_[2];
     struct Vertex
     {
         float Position[3], Colour[4];
@@ -59,13 +67,17 @@ private:
     std::vector<Vertex> vertices_;
     std::vector<Prepared> prepared_;
     size_t preparedCount_ = 0;
-    Ptr<ID3D11VertexShader> vertex_, fullscreen_;
+    Ptr<ID3D11VertexShader> vertex_,vertex4_, fullscreen_;
+    Ptr<ID3D11VertexShader> seaVertex_,seaVertex4_;
     Ptr<ID3D11PixelShader> moments_, colourShader_, merge_, compose_, downsample_, moments4_, colour4_, compose4_;
+    Ptr<ID3D11PixelShader> seaShader_, seaCompose_, seaShader4_, seaCompose4_;
+    std::array<Ptr<ID3D11PixelShader>,2> fogBloodMoments_,fogBloodColour_,fogBloodMoments4_,fogBloodColour4_;
     Ptr<ID3D11InputLayout> layout_;
-    Ptr<ID3D11Buffer> vertexBuffer_, indexBuffer_, vertexConstants_, pixelConstants_, halfConstants_;
-    Ptr<ID3D11SamplerState> sampler_;
+    Ptr<ID3D11Buffer> vertexBuffer_, indexBuffer_, vertexConstants_, pixelConstants_, halfConstants_,fogBloodConstants_;
+    Ptr<ID3D11SamplerState> sampler_,repeatSampler_;
     Ptr<ID3D11RasterizerState> raster_;
     Ptr<ID3D11BlendState> additive_, composite_, replace_;
+    Ptr<ID3D11BlendState> seaAccumulate_, seaComposite_;
     Ptr<ID3D11DepthStencilState> readDepth_, noDepth_, writeDepth_;
     Ptr<ID3D11DepthStencilView> originalDepth_, fullReadOnlyDepth_;
     UINT width_ = 0, height_ = 0;
@@ -117,7 +129,7 @@ private:
         std::array<Ptr<ID3D11RenderTargetView>, 8> Targets;
         std::array<Ptr<ID3D11UnorderedAccessView>, D3D11_PS_CS_UAV_REGISTER_COUNT> Unordered;
         Ptr<ID3D11DepthStencilView> Depth;
-        Ptr<ID3D11Buffer> VertexExtra, PixelExtra;
+        Ptr<ID3D11Buffer> VertexExtra, PixelExtra, MaterialExtra;
         std::array<D3D11_VIEWPORT, D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE> Viewports;
         UINT ViewportCount = static_cast<UINT>(Viewports.size()), TargetCount = 0;
         Restore(ID3D11Device* device, ID3D11DeviceContext* context) : Device(device), Context(context)
@@ -130,6 +142,7 @@ private:
             for (UINT i = 0; i < Unordered.size(); ++i) Unordered[i].Attach(unordered[i]);
             context->VSGetConstantBuffers(1, 1, VertexExtra.GetAddressOf());
             context->PSGetConstantBuffers(1, 1, PixelExtra.GetAddressOf());
+            context->PSGetConstantBuffers(2, 1, MaterialExtra.GetAddressOf());
             context->RSGetViewports(&ViewportCount, Viewports.data());
         }
         ~Restore()
@@ -138,6 +151,7 @@ private:
             Pipeline.LoadState(Device, Context);
             auto v = VertexExtra.Get(), p = PixelExtra.Get();
             Context->VSSetConstantBuffers(1, 1, &v); Context->PSSetConstantBuffers(1, 1, &p);
+            auto m=MaterialExtra.Get();Context->PSSetConstantBuffers(2,1,&m);
             ID3D11RenderTargetView* targets[8]{};
             for (UINT i = 0; i < Targets.size(); ++i) targets[i] = Targets[i].Get();
             ID3D11UnorderedAccessView* unordered[D3D11_PS_CS_UAV_REGISTER_COUNT]{};
@@ -176,12 +190,19 @@ private:
             const auto& v = CompiledHalfSceneShaders[0]; const auto& f = CompiledHalfSceneShaders[3];
             Check(device->CreateVertexShader(v.Data, v.Size, nullptr, vertex_.GetAddressOf()));
             Check(device->CreateVertexShader(f.Data, f.Size, nullptr, fullscreen_.GetAddressOf()));
+            const auto& v4=CompiledHalfSceneShaders[23];
+            Check(device->CreateVertexShader(v4.Data,v4.Size,nullptr,vertex4_.GetAddressOf()));
             auto pixel = [&](size_t i, Ptr<ID3D11PixelShader>& shader) {
                 const auto& code = CompiledHalfSceneShaders[i];
                 Check(device->CreatePixelShader(code.Data, code.Size, nullptr, shader.GetAddressOf()));
             };
             pixel(1, moments_); pixel(2, colourShader_); pixel(4, merge_); pixel(5, compose_); pixel(6, downsample_);
             pixel(7, moments4_); pixel(8, colour4_); pixel(9, compose4_);
+            for(int family=0;family<2;++family)
+            {
+                pixel(15+family*4,fogBloodMoments_[family]);pixel(16+family*4,fogBloodColour_[family]);
+                pixel(17+family*4,fogBloodMoments4_[family]);pixel(18+family*4,fogBloodColour4_[family]);
+            }
             const D3D11_INPUT_ELEMENT_DESC input[] = {
                 {"POSITION",0,DXGI_FORMAT_R32G32B32_FLOAT,0,0,D3D11_INPUT_PER_VERTEX_DATA,0},
                 {"NORMAL",0,DXGI_FORMAT_R32G32B32A32_FLOAT,0,12,D3D11_INPUT_PER_VERTEX_DATA,0},
@@ -201,10 +222,13 @@ private:
                 D3D11_BUFFER_DESC desc{}; desc.ByteWidth = bytes; desc.Usage = D3D11_USAGE_DEFAULT;
                 desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER; Check(device->CreateBuffer(&desc, nullptr, target.GetAddressOf()));
             };
-            buffer(416, vertexConstants_); buffer(368, pixelConstants_); buffer(64, halfConstants_);
+            buffer(416, vertexConstants_); buffer(368, pixelConstants_); buffer(144, halfConstants_);
+            buffer(96,fogBloodConstants_);
             D3D11_SAMPLER_DESC sampler{}; sampler.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
             sampler.AddressU = sampler.AddressV = sampler.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
             sampler.MaxLOD = D3D11_FLOAT32_MAX; Check(device->CreateSamplerState(&sampler, sampler_.GetAddressOf()));
+            sampler.AddressU=sampler.AddressV=sampler.AddressW=D3D11_TEXTURE_ADDRESS_WRAP;
+            Check(device->CreateSamplerState(&sampler,repeatSampler_.GetAddressOf()));
             D3D11_RASTERIZER_DESC raster{}; raster.FillMode = D3D11_FILL_SOLID; raster.CullMode = D3D11_CULL_NONE;
             raster.DepthClipEnable = true; raster.MultisampleEnable = true;
             Check(device->CreateRasterizerState(&raster, raster_.GetAddressOf()));
@@ -216,6 +240,18 @@ private:
             rt.DestBlend = rt.DestBlendAlpha = D3D11_BLEND_INV_SRC_ALPHA;
             rt.BlendOpAlpha = D3D11_BLEND_OP_MAX;
             Check(device->CreateBlendState(&blend, composite_.GetAddressOf()));
+            rt.DestBlend = D3D11_BLEND_ONE;
+            Check(device->CreateBlendState(&blend, seaComposite_.GetAddressOf()));
+            D3D11_BLEND_DESC seaBlend{}; seaBlend.IndependentBlendEnable = true;
+            for (int i = 0; i < 3; ++i)
+            {
+                auto& target = seaBlend.RenderTarget[i]; target.RenderTargetWriteMask = 15; target.BlendEnable = true;
+                target.BlendOp = target.BlendOpAlpha = D3D11_BLEND_OP_ADD;
+                target.SrcBlend = target.SrcBlendAlpha = i == 2 ? D3D11_BLEND_ZERO : D3D11_BLEND_ONE;
+                target.DestBlend = i == 2 ? D3D11_BLEND_INV_SRC_COLOR : D3D11_BLEND_ONE;
+                target.DestBlendAlpha = i == 2 ? D3D11_BLEND_INV_SRC_ALPHA : D3D11_BLEND_ONE;
+            }
+            Check(device->CreateBlendState(&seaBlend, seaAccumulate_.GetAddressOf()));
             D3D11_DEPTH_STENCIL_DESC depth{}; Check(device->CreateDepthStencilState(&depth, noDepth_.GetAddressOf()));
             depth.DepthEnable = true; depth.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
             Check(device->CreateDepthStencilState(&depth, readDepth_.GetAddressOf()));
@@ -276,6 +312,8 @@ private:
     static bool Compatible(const Draw& a, const Draw& b)
     {
         return a.HalfResolution==b.HalfResolution && a.Textures==b.Textures && a.SoftDepth==b.SoftDepth
+            && a.FogBlood==b.FogBlood && (!a.FogBlood || (a.FogBloodParameters && b.FogBloodParameters
+                && !std::memcmp(a.FogBloodParameters,b.FogBloodParameters,(a.FogBlood==1?21:23)*sizeof(float))))
             && !std::memcmp(a.Layer,b.Layer,sizeof(AecnLayer))
             && a.Config->Premultiplied==b.Config->Premultiplied
             && !std::memcmp(&a.Config->CoveredColourMultiplier,&b.Config->CoveredColourMultiplier,8)
@@ -316,7 +354,7 @@ private:
             for (int i = 0; i < draw.Count; ++i)
             {
                 const auto& particle = draw.Particles[i]; float softBias = 0;
-                if (layer.NativeSoftDepth)
+                if (layer.NativeSoftDepth && !draw.FogBlood)
                 {
                     using namespace DirectX::PackedVector;
                     const auto factor = XMConvertHalfToFloat(XMConvertFloatToHalf(layer.SoftDistance));
@@ -347,14 +385,16 @@ private:
                     std::copy_n(vertex.UV, 2, vertex.UV2);
                     vertex.Custom1[0]=nextX; vertex.Custom1[1]=nextY; vertex.Custom1[2]=blend; vertex.Custom1[3]=particle.ParticleSize;
                     std::copy_n(particle.NormalRotation, 4, vertex.Custom2);
-                    vertex.Dynamic[0][0]=1; vertex.Dynamic[0][1]=layer.NativeSoftDepth ? softBias+.001f : layer.SoftDistance;
+                    vertex.Dynamic[0][0]=1; vertex.Dynamic[0][1]=draw.FogBlood?particle.SoftParticleScale
+                        :layer.NativeSoftDepth ? softBias+.001f : layer.SoftDistance;
                     vertex.Dynamic[0][2]=static_cast<float>(draw.Config->Premultiplied); vertex.Dynamic[0][3]=layer.NormalIndex >= 0 ? 1.0f : 0.0f;
                     vertex.Dynamic[1][0]=1; vertex.Dynamic[1][1]=layer.EmissionShapeWeight;
                     vertex.Dynamic[1][2]=particle.AlphaCrush[0]; vertex.Dynamic[1][3]=particle.AlphaCrush[1];
                     vertex.Dynamic[2][0]=particle.UV[2] < 0 ? -1.0f : 1.0f; vertex.Dynamic[2][1]=particle.UV[3] < 0 ? -1.0f : 1.0f;
+                    if(draw.FogBlood){vertex.Dynamic[2][2]=particle.MaterialTime;vertex.Dynamic[2][3]=particle.NormalRotation[0];}
                     vertex.Dynamic[3][0]=1.0f/(draw.HalfResolution?width_/2:width_);
                     vertex.Dynamic[3][1]=1.0f/(draw.HalfResolution?height_/2:height_);
-                    vertex.Dynamic[3][2]=softBias; vertex.Dynamic[3][3]=layer.NativeSoftDepth ? (viewZ < 0 ? nearPlane : -nearPlane) : 0;
+                    vertex.Dynamic[3][2]=softBias; vertex.Dynamic[3][3]=layer.NativeSoftDepth && !draw.FogBlood ? (viewZ < 0 ? nearPlane : -nearPlane) : 0;
                     vertices_.push_back(vertex);
                 }
             }
@@ -383,7 +423,7 @@ private:
         D3D11_MAPPED_SUBRESOURCE mapped{}; Check(context->Map(vertexBuffer_.Get(),0,D3D11_MAP_WRITE_DISCARD,0,&mapped));
         std::memcpy(mapped.pData,vertices_.data(),bytes); context->Unmap(vertexBuffer_.Get(),0);
     }
-    void Constants(ID3D11DeviceContext* context, const Draw& draw)
+    void Constants(ID3D11DeviceContext* context, const Draw& draw, float receiverDepthHalfQuantum = 0)
     {
         std::array<float,104> vs{}; std::array<float,92> ps{};
         std::memcpy(vs.data(),draw.View,64); std::memcpy(vs.data()+16,draw.Projection,64);
@@ -407,17 +447,34 @@ private:
         context->UpdateSubresource(vertexConstants_.Get(),0,nullptr,vs.data(),0,0);
         context->UpdateSubresource(pixelConstants_.Get(),0,nullptr,ps.data(),0,0);
         float nearPlane,farPlane; Planes(draw,nearPlane,farPlane);
-        const float half[16]={nearPlane,farPlane,.0006000000284984708f,.25f,
+        float half[36]={nearPlane,farPlane,.0006000000284984708f,.25f,
             static_cast<float>(draw.Config->Premultiplied),draw.Config->CoveredColourMultiplier,draw.Config->EmissionMultiplier,.0010004499927163124f,
             static_cast<float>(width_/2),static_cast<float>(height_/2),static_cast<float>(width_),static_cast<float>(height_),
             draw.HalfResolution?2.0f:1.0f,0,1.0f/width_,1.0f/height_};
+        if(draw.SeaOverlay)
+        {
+            half[16]=lighting.Parameters[2];half[17]=lighting.Parameters[3];
+            half[18]=receiverDepthHalfQuantum;
+            DirectX::XMFLOAT4X4 projection;std::memcpy(&projection,draw.Projection,64);
+            DirectX::XMFLOAT4X4 inverseViewProjection;
+            DirectX::XMStoreFloat4x4(&inverseViewProjection,DirectX::XMMatrixInverse(nullptr,
+                DirectX::XMMatrixMultiply(DirectX::XMLoadFloat4x4(&view),DirectX::XMLoadFloat4x4(&projection))));
+            std::memcpy(half+20,&inverseViewProjection,64);
+        }
         context->UpdateSubresource(halfConstants_.Get(),0,nullptr,half,0,0);
         auto v=vertexConstants_.Get(),p=pixelConstants_.Get(),h=halfConstants_.Get();
         context->VSSetConstantBuffers(0,1,&v); context->PSSetConstantBuffers(0,1,&p);
         context->VSSetConstantBuffers(1,1,&h); context->PSSetConstantBuffers(1,1,&h);
+        if(draw.FogBlood)
+        {
+            float material[24]{};std::copy_n(draw.FogBloodParameters,draw.FogBlood==1?21:23,material);
+            context->UpdateSubresource(fogBloodConstants_.Get(),0,nullptr,material,0,0);
+            auto m=fogBloodConstants_.Get();context->PSSetConstantBuffers(2,1,&m);
+        }
     }
     void Fullscreen(ID3D11DeviceContext* context, ID3D11PixelShader* shader)
     {
+        auto sampler=sampler_.Get();context->PSSetSamplers(0,1,&sampler);
         context->VSSetShader(fullscreen_.Get(),nullptr,0); context->PSSetShader(shader,nullptr,0);
         context->IASetInputLayout(nullptr); context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
         context->Draw(3,0); ++drawCalls_;
@@ -431,7 +488,8 @@ private:
         Fullscreen(context,downsample_.Get());
     }
 public:
-    static bool CanRender(ID3D11DeviceContext* context, const std::vector<Draw>& draws, ID3D11ShaderResourceView* fullDepth = nullptr)
+    static bool CanRender(ID3D11DeviceContext* context, const std::vector<Draw>& draws, ID3D11ShaderResourceView* fullDepth = nullptr,
+        bool seaOverlay = false)
     {
         if (draws.empty()) return false;
         D3D11_TEXTURE2D_DESC target{}; D3D11_VIEWPORT viewport{}; bool hasDepth=false;
@@ -441,6 +499,7 @@ public:
         context->VSGetShader(currentVertex.GetAddressOf(),nullptr,&instances);if(instances)return false;
         context->PSGetShader(currentPixel.GetAddressOf(),nullptr,&instances);if(instances)return false;
         const bool hasFull=std::any_of(draws.begin(),draws.end(),[](const Draw& draw){return !draw.HalfResolution;});
+        const bool hasFogBlood=std::any_of(draws.begin(),draws.end(),[](const Draw& draw){return draw.FogBlood!=0;});
         if(hasFull && target.SampleDesc.Count==4)
             for(auto format:{DXGI_FORMAT_R32_FLOAT,DXGI_FORMAT_R32G32_FLOAT,DXGI_FORMAT_R32G32B32A32_FLOAT,DXGI_FORMAT_R16G16B16A16_FLOAT})
             {
@@ -454,21 +513,29 @@ public:
         if(gs || hs || ds)return false;
         D3D11_TEXTURE2D_DESC depth{};
         if(fullDepth && (!Describe(fullDepth,depth) || depth.Width!=target.Width || depth.Height!=target.Height))return false;
-        if(hasDepth && !fullDepth)return false;
+        if(hasDepth && !fullDepth && !seaOverlay)return false;
         size_t count=0;
         for(const auto& draw:draws)
         {
             if(!draw.Layer || !draw.Config || !draw.Particles || draw.Count<=0 || !draw.View || !draw.Projection || !draw.Textures[0])return false;
             const auto& layer=*draw.Layer; const auto& config=*draw.Config;
-            if(layer.Kind!=0 || layer.Distortion!=0 || layer.ModelIndex>=0 || layer.OpaqueModel || layer.MeshMaterialIndex>=0
-                || layer.GradientIndex>=0 || layer.TextureIndex<0 || layer.Blend!=1 || (config.Premultiplied!=0 && config.Premultiplied!=1)
+            if(draw.FogBlood<0 || draw.FogBlood>2 || (draw.FogBlood && (!draw.FogBloodParameters || seaOverlay
+                || !draw.Textures[1] || !draw.Textures[2] || layer.MeshMaterialIndex<0)))return false;
+            if(draw.FogBlood)
+                for(int i=0;i<(draw.FogBlood==1?21:23);++i)if(!std::isfinite(draw.FogBloodParameters[i]))return false;
+            if(layer.Kind!=0 || layer.Distortion!=0 || layer.ModelIndex>=0 || layer.OpaqueModel || (layer.MeshMaterialIndex>=0 && !draw.FogBlood)
+                || (!seaOverlay && layer.GradientIndex>=0) || layer.TextureIndex<0 || layer.Blend!=1 || (config.Premultiplied!=0 && config.Premultiplied!=1)
                 || layer.MaterialMode!=config.Premultiplied || layer.LightingMode<0 || layer.LightingMode>2
                 || !std::isfinite(config.CoveredColourMultiplier) || config.CoveredColourMultiplier<0
                 || !std::isfinite(config.EmissionMultiplier) || config.EmissionMultiplier<0)return false;
             if(!std::isfinite(layer.SoftDistance) || layer.SoftDistance<0 || layer.SoftDistance>65504
                 || !std::isfinite(layer.DistortionSoftScaleStrength) || layer.DistortionSoftScaleStrength<0 || layer.DistortionSoftScaleStrength>1)return false;
             if(std::memcmp(draw.View,draws[0].View,64) || std::memcmp(draw.Projection,draws[0].Projection,64))return false;
-            if(draw.Projection[15]!=0 || std::abs(draw.Projection[11]+1)>1e-6f)return false;
+            if(seaOverlay && (!draw.Lighting || draw.Lighting->Parameters[2]!=1 || !std::isfinite(draw.Lighting->Parameters[3])
+                || !draws[0].Lighting || draw.Lighting->Parameters[3]!=draws[0].Lighting->Parameters[3]))return false;
+            const bool perspective=draw.Projection[15]==0 && std::abs(draw.Projection[11]+1)<=1e-6f;
+            const bool orthographic=draw.Projection[15]==1 && draw.Projection[11]==0;
+            if(!perspective && !((seaOverlay || hasFogBlood) && orthographic))return false;
             float nearPlane,farPlane; Planes(draw,nearPlane,farPlane);
             if(!std::isfinite(nearPlane) || !std::isfinite(farPlane) || nearPlane<=0 || farPlane<=nearPlane)return false;
             if(draw.SoftDepth && (!Describe(draw.SoftDepth,depth) || depth.Width!=target.Width/4 || depth.Height!=target.Height/4))return false;
@@ -486,13 +553,100 @@ public:
         }
         return count>0 && count<=std::numeric_limits<UINT>::max()/(4*sizeof(Vertex));
     }
+    void RenderSeaOverlay(ID3D11Device* device, ID3D11DeviceContext* context, const std::vector<Draw>& draws,
+        ID3D11ShaderResourceView* fullDepth = nullptr, ID3D11ShaderResourceView* receiverDepth = nullptr)
+    {
+        if(!CanRender(context,draws,fullDepth,true))throw std::runtime_error("Unsupported native sea-overlay scene packet");
+        D3D11_TEXTURE2D_DESC target{}; D3D11_VIEWPORT viewport{}; bool hasDepth=false; Target(context,target,viewport,hasDepth);
+        if(!receiverDepth)throw std::runtime_error("Missing native sea-overlay receiver depth");
+        D3D11_SHADER_RESOURCE_VIEW_DESC receiverView{};receiverDepth->GetDesc(&receiverView);
+        if(receiverView.ViewDimension!=(target.SampleDesc.Count==4?D3D11_SRV_DIMENSION_TEXTURE2DMS:D3D11_SRV_DIMENSION_TEXTURE2D))
+            throw std::runtime_error("Mismatched native sea-overlay receiver depth samples");
+        float receiverDepthHalfQuantum=0;
+        switch(receiverView.Format)
+        {
+        case DXGI_FORMAT_R24_UNORM_X8_TYPELESS: receiverDepthHalfQuantum=.5f/16777215.0f;break;
+        case DXGI_FORMAT_R16_UNORM: receiverDepthHalfQuantum=.5f/65535.0f;break;
+        case DXGI_FORMAT_R32_FLOAT: break;
+        default:throw std::runtime_error("Unsupported native sea-overlay receiver depth precision");
+        }
+        Prepare(device,target.Width,target.Height,target.SampleDesc.Count);
+        if(!seaVertex_)
+        {
+            const auto& v=CompiledHalfSceneShaders[14];
+            Check(device->CreateVertexShader(v.Data,v.Size,nullptr,seaVertex_.GetAddressOf()));
+            const auto& v4=CompiledHalfSceneShaders[24];
+            Check(device->CreateVertexShader(v4.Data,v4.Size,nullptr,seaVertex4_.GetAddressOf()));
+            auto pixel=[&](size_t i,Ptr<ID3D11PixelShader>& shader)
+            {
+                const auto& code=CompiledHalfSceneShaders[i];
+                Check(device->CreatePixelShader(code.Data,code.Size,nullptr,shader.GetAddressOf()));
+            };
+            pixel(10,seaShader_);pixel(11,seaCompose_);pixel(12,seaShader4_);pixel(13,seaCompose4_);
+        }
+        auto& sea=sea_[target.SampleDesc.Count==4?1:0];
+        if(sea.Width!=target.Width || sea.Height!=target.Height || sea.Samples!=target.SampleDesc.Count)
+        {
+            SeaSet next;
+            next.Colour=MakeSurface(device,target.Width,target.Height,DXGI_FORMAT_R16G16B16A16_FLOAT,false,target.SampleDesc.Count);
+            next.Normal=MakeSurface(device,target.Width,target.Height,DXGI_FORMAT_R8G8B8A8_UNORM,false,target.SampleDesc.Count);
+            next.Revealage=MakeSurface(device,target.Width,target.Height,DXGI_FORMAT_R16_FLOAT,false,target.SampleDesc.Count);
+            next.Width=target.Width;next.Height=target.Height;next.Samples=target.SampleDesc.Count;sea=std::move(next);
+        }
+        PrepareGeometry(device,context,draws);
+        struct ClearInputs
+        {
+            std::vector<Prepared>& Entries;
+            ~ClearInputs(){for(auto& entry:Entries){entry.Source=nullptr;entry.Runs.clear();entry.Count=0;}}
+        } clearInputs{prepared_};
+        Restore restore(device,context);drawCalls_=0;
+        ID3D11UnorderedAccessView* unordered[D3D11_PS_CS_UAV_REGISTER_COUNT]{};
+        context->OMSetRenderTargetsAndUnorderedAccessViews(0,nullptr,nullptr,0,ARRAYSIZE(unordered),unordered,nullptr);
+        context->RSSetState(raster_.Get());
+        std::array<ID3D11SamplerState*,8> samplers{};samplers.fill(sampler_.Get());context->PSSetSamplers(0,8,samplers.data());
+        const float zero[4]{},one[4]={1,1,1,1},normal[4]={.5f,.5f,1,1};
+        context->ClearRenderTargetView(sea.Colour.Target.Get(),zero);context->ClearRenderTargetView(sea.Normal.Target.Get(),normal);
+        context->ClearRenderTargetView(sea.Revealage.Target.Get(),one);
+        context->ClearDepthStencilView(quarterDepth_.Depth.Get(),D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1,0);
+        const bool needsSoft=std::any_of(draws.begin(),draws.end(),[](const Draw& draw){return draw.FogBlood || draw.Layer->NativeSoftDepth || draw.Layer->SoftDistance>0;});
+        if(fullDepth && needsSoft)
+        {
+            DepthPass(context,halfDepth_,fullDepth,width_/2,height_/2);
+            DepthPass(context,quarterDepth_,halfDepth_.View.Get(),width_/4,height_/4);
+        }
+        ID3D11ShaderResourceView* empty[8]{};context->PSSetShaderResources(0,8,empty);
+        ID3D11RenderTargetView* targets[]={sea.Colour.Target.Get(),sea.Normal.Target.Get(),sea.Revealage.Target.Get()};
+        // The native sea-overlay pass has no depth-stencil attachment.
+        context->OMSetRenderTargets(3,targets,nullptr);context->RSSetViewports(1,&viewport);
+        context->OMSetBlendState(seaAccumulate_.Get(),nullptr,0xffffffff);context->OMSetDepthStencilState(noDepth_.Get(),0);
+        context->VSSetShader(target.SampleDesc.Count==4?seaVertex4_.Get():seaVertex_.Get(),nullptr,0);
+        context->PSSetShader(target.SampleDesc.Count==4?seaShader4_.Get():seaShader_.Get(),nullptr,0);
+        context->IASetInputLayout(layout_.Get());context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context->IASetIndexBuffer(indexBuffer_.Get(),DXGI_FORMAT_R32_UINT,0);
+        for(size_t group=0;group<preparedCount_;++group)
+        {
+            const auto& prepared=prepared_[group];const auto& draw=*prepared.Source;Constants(context,draw,receiverDepthHalfQuantum);
+            std::array<ID3D11ShaderResourceView*,5> textures={draw.Textures[0],draw.Textures[1]?draw.Textures[1]:draw.Textures[0],
+                draw.Textures[2]?draw.Textures[2]:draw.Textures[0],nullptr,draw.SoftDepth?draw.SoftDepth:quarterDepth_.View.Get()};
+            context->PSSetShaderResources(0,5,textures.data());
+            UINT stride=sizeof(Vertex),offset=static_cast<UINT>(prepared.FirstVertex*sizeof(Vertex));auto buffer=vertexBuffer_.Get();
+            context->IASetVertexBuffers(0,1,&buffer,&stride,&offset);context->DrawIndexed(prepared.Count*6,0,0);++drawCalls_;
+        }
+        context->PSSetShaderResources(0,8,empty);
+        ID3D11RenderTargetView* destination=restore.Targets[0].Get();context->OMSetRenderTargets(1,&destination,nullptr);
+        context->OMSetBlendState(seaComposite_.Get(),nullptr,0xffffffff);
+        Constants(context,draws.front(),receiverDepthHalfQuantum);
+        ID3D11ShaderResourceView* inputs[]={sea.Colour.View.Get(),sea.Revealage.View.Get(),receiverDepth};context->PSSetShaderResources(0,3,inputs);
+        Fullscreen(context,target.SampleDesc.Count==4?seaCompose4_.Get():seaCompose_.Get());
+        // The official battle-water consumer does not sample the accumulated normal target.
+    }
     void Render(ID3D11Device* device, ID3D11DeviceContext* context, const std::vector<Draw>& draws, ID3D11ShaderResourceView* fullDepth = nullptr)
     {
         if(!CanRender(context,draws,fullDepth))throw std::runtime_error("Unsupported native full/half-resolution scene packet");
         D3D11_TEXTURE2D_DESC target{}; D3D11_VIEWPORT viewport{}; bool hasDepth=false; Target(context,target,viewport,hasDepth);
         const bool hasFull=std::any_of(draws.begin(),draws.end(),[](const Draw& draw){return !draw.HalfResolution;});
         const bool hasHalf=std::any_of(draws.begin(),draws.end(),[](const Draw& draw){return draw.HalfResolution;});
-        const bool needsSoft=std::any_of(draws.begin(),draws.end(),[](const Draw& draw){return draw.Layer->NativeSoftDepth || draw.Layer->SoftDistance>0;});
+        const bool needsSoft=std::any_of(draws.begin(),draws.end(),[](const Draw& draw){return draw.FogBlood || draw.Layer->NativeSoftDepth || draw.Layer->SoftDistance>0;});
         Prepare(device,target.Width,target.Height,hasFull?target.SampleDesc.Count:1);
         PrepareGeometry(device,context,draws);
         struct ClearInputs
@@ -543,8 +697,17 @@ public:
                 context->RSSetViewports(1,half?&halfViewport:&viewport);
                 context->OMSetBlendState(additive_.Get(),nullptr,0xffffffff);
                 context->OMSetDepthStencilState(draw.Layer->ZTest?readDepth_.Get():noDepth_.Get(),0);
-                context->VSSetShader(vertex_.Get(),nullptr,0);
-                context->PSSetShader(phase==0?(multisample?moments4_.Get():moments_.Get()):(multisample?colour4_.Get():colourShader_.Get()),nullptr,0);
+                context->VSSetShader(multisample?vertex4_.Get():vertex_.Get(),nullptr,0);
+                auto shader=phase==0?(multisample?moments4_.Get():moments_.Get()):(multisample?colour4_.Get():colourShader_.Get());
+                if(draw.FogBlood)
+                {
+                    const auto family=draw.FogBlood-1;
+                    shader=phase==0?(multisample?fogBloodMoments4_[family].Get():fogBloodMoments_[family].Get())
+                        :(multisample?fogBloodColour4_[family].Get():fogBloodColour_[family].Get());
+                }
+                context->PSSetShader(shader,nullptr,0);
+                ID3D11SamplerState* materialSamplers[3];std::fill_n(materialSamplers,3,draw.FogBlood?repeatSampler_.Get():sampler_.Get());
+                context->PSSetSamplers(0,3,materialSamplers);
                 context->IASetInputLayout(layout_.Get()); context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
                 context->IASetIndexBuffer(indexBuffer_.Get(),DXGI_FORMAT_R32_UINT,0);
                 Constants(context,draw);

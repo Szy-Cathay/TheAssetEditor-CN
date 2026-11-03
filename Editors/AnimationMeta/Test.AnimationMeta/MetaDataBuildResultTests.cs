@@ -1,4 +1,4 @@
-using Editors.AnimationMeta.SuperView.Visualisation;
+﻿using Editors.AnimationMeta.SuperView.Visualisation;
 using Editors.AnimationMeta.SuperView.Visualisation.Rules;
 using Editors.Shared.Core.Common;
 using GameWorld.Core.Animation;
@@ -441,12 +441,12 @@ namespace Test.AnimationMeta
                 Assert.That(result!.Instances, Has.Count.EqualTo(1));
                 Assert.That(
                     result.Diagnostics.Select(diagnostic => diagnostic.ReasonKey),
-                    Is.EqualTo(new[] { "SuperView.Diagnostics.MissingEffect" }));
+                    Is.EqualTo(new[] { "SuperView.Diagnostics.MissingEffect", "SuperView.Diagnostics.MissingBone" }));
                 Assert.That(
                     result.Diagnostics,
                     Has.All.Property(nameof(MetaDataBuildDiagnostic.Source))
                         .SameAs(effect));
-                Assert.That(result.Diagnostics.Single().Position, Is.Null);
+                Assert.That(result.Diagnostics.Single(diagnostic => diagnostic.ReasonKey == "SuperView.Diagnostics.MissingEffect").Position, Is.Null);
             });
         }
 

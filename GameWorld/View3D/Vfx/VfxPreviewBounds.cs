@@ -16,6 +16,7 @@ internal static class VfxPreviewBounds
         var models = conversion.Models.Select(model =>
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (model.AnimationData != null) return Array.Empty<BoundingBox>();
             if (model.AnimationVertices == null)
                 return new[] { BoundingBox.CreateFromPoints(model.Vertices.Select(vertex => vertex.Position)) };
             return Enumerable.Range(0, model.AnimationFrameCount).Select(frame =>
@@ -56,9 +57,10 @@ internal static class VfxPreviewBounds
                 {
                     if (particle.Colour.W <= .000001f && !(part.OpaqueModel != 0 && part.MeshMaterialIndex < 0)) continue;
                     var model = conversion.Models[part.ModelIndex];
-                    var frame = (int)Math.Floor(Math.Max(0, particle.AppearancePhase) * model.AnimationCycles * models[part.ModelIndex].Length)
-                        % models[part.ModelIndex].Length;
-                    var points = models[part.ModelIndex][frame].GetCorners().Select(point => Vector3.Transform(point, particle.Transform));
+                    var frame = (int)Math.Floor(Math.Max(0, particle.AppearancePhase) * model.AnimationCycles * model.AnimationFrameCount)
+                        % model.AnimationFrameCount;
+                    var frameBounds = model.AnimationData?.Bounds(model.Vertices, frame) ?? models[part.ModelIndex][frame];
+                    var points = frameBounds.GetCorners().Select(point => Vector3.Transform(point, particle.Transform));
                     Include(BoundingBox.CreateFromPoints(points), part.Distortion == 0);
                 }
             }

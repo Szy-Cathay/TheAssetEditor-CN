@@ -34,11 +34,11 @@ internal static class VfxOneShotMeshMaterial
                 parameters.Add((float)number);
             }
         }
-        // The public renderer has six user texture slots. The zero-distortion path uses exactly six.
-        if (parameters[0] != 0) throw new VfxMappingException("colour_distortion_switch", "Vfx.Preview.MaterialUnsupported");
         if (parameters[6] < 0 || parameters[17] < 0 || parameters[49] < 0 || parameters[51] < 0)
             throw new VfxMappingException("material", "Vfx.Preview.RangeUnsupported");
-        var paths = new[] { "t_xml_tex_1", "t_xml_tex_2", "t_xml_tex_3", "t_xml_colour_overlay", "t_xml_oneshot_mask", "t_xml_global_mask" }.Select(slot =>
+        var slots = new[] { "t_xml_tex_1", "t_xml_tex_2", "t_xml_tex_3", "t_xml_colour_overlay", "t_xml_oneshot_mask", "t_xml_global_mask" };
+        if (parameters[0] != 0) slots = [.. slots, "t_xml_distortion_texture"];
+        var paths = slots.Select(slot =>
         {
             var nodes = root.Element("textures")?.Elements("texture").Where(n => string.Equals((string?)n.Element("slot"), slot, StringComparison.OrdinalIgnoreCase)).ToArray() ?? [];
             if (nodes.Length != 1 || string.IsNullOrWhiteSpace((string?)nodes[0].Element("source")))

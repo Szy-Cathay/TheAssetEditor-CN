@@ -251,12 +251,13 @@ public partial class EffectVfxPreviewTests
         public bool Disposed { get; private set; }
         public bool ForwardReplayAllowed { get; private set; } = true;
         public float Time { get; private set; }
+        public Matrix Attachment { get; private set; }
         public Func<float, Matrix>? History { get; private set; }
         public void Reload(VfxPreviewSnapshot snapshot) => ReloadCount++;
         public void ConfigureInteractiveSeekFrame(bool isHistoryConstant, float? groundHeight, bool initializeDuration = false, bool allowForwardReplay = true)
             => ForwardReplayAllowed = allowForwardReplay;
         public void Advance(float seconds, Matrix attachment) => Seek(Time + seconds, attachment);
-        public void Seek(float seconds, Matrix attachment) => Time = seconds;
+        public void Seek(float seconds, Matrix attachment) { Time = seconds; Attachment = attachment; }
         public void Seek(float seconds, Matrix attachment, Func<float, Matrix> history) { Seek(seconds, attachment); History = history; }
         public void Draw(CommonShaderParameters parameters) { }
         public void Dispose() => Disposed = true;

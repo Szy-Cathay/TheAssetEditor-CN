@@ -28,11 +28,11 @@ public class VfxAnalyticCurveTests
         }
     }
 
-    [TestCase("exp1", "bezier_q")]
+    [TestCase("exp1", "future_mode")]
     [TestCase("bezier_u", "sine")]
     [TestCase("log3", "future_mode")]
-    [TestCase("s_inv", "s_inv")]
-    public void UncalibratedEndpointCombinations_StayUnsupported(string outgoing, string incoming)
+    [TestCase("future_mode", "s_inv")]
+    public void UnknownEndpointModes_StayUnsupported(string outgoing, string incoming)
     {
         var exception = Assert.Throws<VfxMappingException>(() => new VfxPreviewCurve(
             $"x,0,0;0,0,linear,{outgoing},0,0,0,0,1;1,1,{incoming},linear,0,0,0,0,1:x,0;0,0", "scale", 1));

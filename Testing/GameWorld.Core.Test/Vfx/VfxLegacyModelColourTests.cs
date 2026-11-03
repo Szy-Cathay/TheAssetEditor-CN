@@ -19,35 +19,54 @@ public class VfxLegacyModelColourTests
     [TestCase(@"rigidmodels\buildings\textures\diagnostic_rubble_diffuse.dds", @"rigidmodels\buildings\textures\diagnostic_rubble_base_colour.dds")]
     [TestCase("rigidmodels/diagnostic_base_colour.dds", "rigidmodels/diagnostic_base_colour.dds")]
     [TestCase("rigidmodels/diagnostic_DIFFUSE.dds", "rigidmodels/diagnostic_DIFFUSE.dds")]
-    [TestCase("rigidmodels/diagnostic_diffuse.DDS", "rigidmodels/diagnostic_diffuse.DDS")]
-    [TestCase("rigidmodels/diagnostic_diffuse_other.dds", "rigidmodels/diagnostic_diffuse_other.dds")]
+    [TestCase("rigidmodels/diagnostic_diffuse.DDS", "rigidmodels/diagnostic_base_colour.DDS")]
+    [TestCase("rigidmodels/diagnostic_diffuse_other.dds", "rigidmodels/diagnostic_base_colour_other.dds")]
+    [TestCase("rigidmodels/diagnostic_diffuse.tga", "rigidmodels/diagnostic_base_colour.tga")]
     [TestCase("rigidmodels/diffuse/diagnostic.dds", "rigidmodels/diffuse/diagnostic.dds")]
-    [TestCase("rigidmodels/old_diffuse/diagnostic_diffuse.dds", "rigidmodels/old_diffuse/diagnostic_diffuse.dds")]
-    [TestCase("rigidmodels/diagnostic_diffuse_diffuse.dds", "rigidmodels/diagnostic_diffuse_diffuse.dds")]
+    [TestCase("rigidmodels/old_diffuse/diagnostic_diffuse.dds", "rigidmodels/old_base_colour/diagnostic_diffuse.dds")]
+    [TestCase("rigidmodels/diagnostic_diffuse_diffuse.dds", "rigidmodels/diagnostic_base_colour_diffuse.dds")]
     [TestCase("", "")]
-    public void VerifiedEmbeddedSlot_OnlyRewritesAnUnambiguousOrdinalSuffix(string path, string expected)
+    public void VerifiedEmbeddedSlot_RewritesTheFirstOrdinalNativeToken(string path, string expected)
     {
         Assert.That(VfxLegacyModelColour.ResolveEmbeddedDiffuse(RmvVersionEnum.RMV2_V7, VertexFormat.Static,
             ModelMaterialEnum.ship_ambientmap, path), Is.EqualTo(expected));
     }
 
-    [TestCase(RmvVersionEnum.RMV2_V5, VertexFormat.Static, ModelMaterialEnum.ship_ambientmap)]
-    [TestCase(RmvVersionEnum.RMV2_V6, VertexFormat.Static, ModelMaterialEnum.ship_ambientmap)]
-    [TestCase(RmvVersionEnum.RMV2_V8, VertexFormat.Static, ModelMaterialEnum.ship_ambientmap)]
+    [TestCase((RmvVersionEnum)0, VertexFormat.Static, ModelMaterialEnum.ship_ambientmap)]
+    [TestCase((RmvVersionEnum)99, VertexFormat.Static, ModelMaterialEnum.default_type)]
     [TestCase(RmvVersionEnum.RMV2_V7, VertexFormat.Weighted, ModelMaterialEnum.ship_ambientmap)]
-    [TestCase(RmvVersionEnum.RMV2_V7, VertexFormat.Static, ModelMaterialEnum.default_type)]
+    [TestCase(RmvVersionEnum.RMV2_V7, VertexFormat.Static, ModelMaterialEnum.unlit)]
     [TestCase(RmvVersionEnum.RMV2_V7, VertexFormat.Static, ModelMaterialEnum.dirtmap)]
     public void UnverifiedModelScopes_RetainTheirAuthoredColourPath(RmvVersionEnum version, VertexFormat format, ModelMaterialEnum material)
     {
         Assert.That(VfxLegacyModelColour.ResolveEmbeddedDiffuse(version, format, material, Diffuse), Is.EqualTo(Diffuse));
     }
 
-    [TestCase(false)]
-    [TestCase(true)]
-    public void DirectLegacyModel_UsesTheNativeColourEvenWhenTheOldDiffuseExists(bool oldExists)
+    [TestCase(RmvVersionEnum.RMV2_V5, ModelMaterialEnum.ship_ambientmap)]
+    [TestCase(RmvVersionEnum.RMV2_V6, ModelMaterialEnum.ship_ambientmap)]
+    [TestCase(RmvVersionEnum.RMV2_V7, ModelMaterialEnum.ship_ambientmap)]
+    [TestCase(RmvVersionEnum.RMV2_V8, ModelMaterialEnum.ship_ambientmap)]
+    [TestCase(RmvVersionEnum.RMV2_V5, ModelMaterialEnum.default_type)]
+    [TestCase(RmvVersionEnum.RMV2_V6, ModelMaterialEnum.default_type)]
+    [TestCase(RmvVersionEnum.RMV2_V7, ModelMaterialEnum.default_type)]
+    [TestCase(RmvVersionEnum.RMV2_V8, ModelMaterialEnum.default_type)]
+    public void NativeTextureConsumer_UpgradesBothStaticMaterialTypesAcrossRecognizedHeaders(RmvVersionEnum version, ModelMaterialEnum material)
+    {
+        Assert.That(VfxLegacyModelColour.ResolveEmbeddedDiffuse(version, VertexFormat.Static, material, Diffuse), Is.EqualTo(BaseColour));
+    }
+
+    [TestCase(false, ModelMaterialEnum.ship_ambientmap, RmvVersionEnum.RMV2_V7)]
+    [TestCase(true, ModelMaterialEnum.ship_ambientmap, RmvVersionEnum.RMV2_V7)]
+    [TestCase(false, ModelMaterialEnum.default_type, RmvVersionEnum.RMV2_V7)]
+    [TestCase(true, ModelMaterialEnum.default_type, RmvVersionEnum.RMV2_V7)]
+    [TestCase(false, ModelMaterialEnum.ship_ambientmap, RmvVersionEnum.RMV2_V8)]
+    [TestCase(true, ModelMaterialEnum.ship_ambientmap, RmvVersionEnum.RMV2_V8)]
+    [TestCase(false, ModelMaterialEnum.default_type, RmvVersionEnum.RMV2_V8)]
+    [TestCase(true, ModelMaterialEnum.default_type, RmvVersionEnum.RMV2_V8)]
+    public void DirectLegacyModel_UsesTheNativeColourEvenWhenTheOldDiffuseExists(bool oldExists, ModelMaterialEnum material, RmvVersionEnum version)
     {
         // DIAG: a minimal static mesh with the verified legacy header and distinct resource bytes.
-        var source = VfxModelVariantTests.Source(1); var model = Model(); var original = model.ToArray();
+        var source = VfxModelVariantTests.Source(1); var model = Model(version, material); var original = model.ToArray();
         var requests = new List<string>(); byte[] colour = [27, 19, 8]; byte[] old = [0, 4, 2];
         var conversion = TotalWarVfxConverter.Convert(new(source, "vfx/legacy-diagnostic.xml", path =>
         {
@@ -74,10 +93,11 @@ public class VfxLegacyModelColourTests
         });
     }
 
-    [Test]
-    public void MissingNativeColour_IsDiagnosedWithoutInventingAColourOrFallingBackToTheOldDiffuse()
+    [TestCase(ModelMaterialEnum.ship_ambientmap)]
+    [TestCase(ModelMaterialEnum.default_type)]
+    public void MissingNativeColour_IsDiagnosedWithoutInventingAColourOrFallingBackToTheOldDiffuse(ModelMaterialEnum material)
     {
-        var model = Model(); var requests = new List<string>();
+        var model = Model(material: material); var requests = new List<string>();
         var conversion = TotalWarVfxConverter.Convert(new(VfxModelVariantTests.Source(1), "vfx/legacy-diagnostic.xml", path =>
         {
             path = path.Replace('\\', '/'); requests.Add(path);
@@ -92,13 +112,15 @@ public class VfxLegacyModelColourTests
         });
     }
 
-    [TestCase("t_xml_diffuse")]
-    [TestCase("t_xml_base_colour")]
-    public void ExplicitWsModelMaterial_RetainsItsAuthoredOverride(string slot)
+    [TestCase("t_xml_diffuse", ModelMaterialEnum.ship_ambientmap)]
+    [TestCase("t_xml_base_colour", ModelMaterialEnum.ship_ambientmap)]
+    [TestCase("t_xml_diffuse", ModelMaterialEnum.default_type)]
+    [TestCase("t_xml_base_colour", ModelMaterialEnum.default_type)]
+    public void ExplicitWsModelMaterial_RetainsItsAuthoredOverride(string slot, ModelMaterialEnum materialId)
     {
         var source = VfxDocument.Read(VfxModelVariantTests.Source(1));
         source.Root.Descendants("ModelFile").Single().SetAttributeValue("value", "vfx/diagnostic.wsmodel");
-        var model = Model(); var requests = new List<string>(); byte[] explicitColour = [78, 6, 2];
+        var model = Model(material: materialId); var requests = new List<string>(); byte[] explicitColour = [78, 6, 2];
         var material = new XElement("material", new XElement("name", "diagnostic_override"), new XElement("shader", "shaders/rigid_character.xml.shader"),
             new XElement("textures", new XElement("texture", new XElement("slot", slot), new XElement("source", "vfx/explicit_diffuse.dds"))));
         var conversion = TotalWarVfxConverter.Convert(new(source.Write(), "vfx/legacy-diagnostic.xml", path =>
@@ -123,8 +145,7 @@ public class VfxLegacyModelColourTests
         });
     }
 
-    [TestCase(RmvVersionEnum.RMV2_V8, ModelMaterialEnum.ship_ambientmap)]
-    [TestCase(RmvVersionEnum.RMV2_V7, ModelMaterialEnum.default_type)]
+    [TestCase(RmvVersionEnum.RMV2_V7, ModelMaterialEnum.dirtmap)]
     public void DirectUnverifiedModel_RetainsTheExistingDiffusePriority(RmvVersionEnum version, ModelMaterialEnum material)
     {
         var model = Model(version, material); var requests = new List<string>(); byte[] original = [0, 4, 2];

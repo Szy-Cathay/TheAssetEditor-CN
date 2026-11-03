@@ -23,8 +23,9 @@ internal sealed class VfxPreviewCurve
     private readonly string _field;
     private readonly bool _omittedScaleAxes;
     private readonly VfxSpriteNativeScaleCurve? _nativeScale;
+    private readonly Dictionary<string, VfxModelNativeCurve> _nativeTables = new(StringComparer.Ordinal);
 
-    public VfxPreviewCurve(string? text, string field, float fallback, bool planarScale = false)
+    public VfxPreviewCurve(string? text, string field, float fallback, bool planarScale = false, bool nativeModelTable = false)
     {
         _field = field;
         _fallback = fallback;
@@ -36,13 +37,21 @@ internal sealed class VfxPreviewCurve
             _nativeScale = VfxSpriteNativeScaleCurve.Create(text);
         foreach (var channel in channels)
         {
+            if (channel.Points.Count == 0 && field == "EmitterPosition") continue;
             if (channel.Points.Count == 0 && planarScale && (field is "ParticleScale" or "ParticleInitialScale")
                 && (channel.Name is "z" or "z_min" or "z_max")) continue;
-            if (channel.Points.Count == 0 || channel.Points.GroupBy(x => x.Time).Any(group => group.Select(point => point.Value).Distinct().Count() != 1))
+            if (channel.Points.Count == 0)
                 throw new VfxMappingException(field, "Vfx.Preview.AmbiguousField");
-            for (var index = 1; _nativeScale == null && index < channel.Points.Count; ++index)
+            var effective = channel.AuthoredPoints.GroupBy(point => (float)point.Time).Select(group => group.First())
+                .OrderBy(point => (float)point.Time).ToArray();
+            if (nativeModelTable || NeedsNativeSampler(effective))
             {
-                var left = channel.Points[index - 1]; var right = channel.Points[index];
+                _ = VfxModelNativeCurve.CreateChannelSampler(channel, field);
+                continue;
+            }
+            for (var index = 1; _nativeScale == null && index < effective.Length; ++index)
+            {
+                var left = effective[index - 1]; var right = effective[index];
                 var analytic = IsAnalyticMode(left.OutMode) && IsAnalyticMode(right.InMode);
                 if (!analytic && !IsMixedBezier(left.OutMode, right.InMode) && (!IsMode(left.OutMode) || !IsMode(right.InMode)))
                     throw new VfxMappingException(field, "Vfx.Preview.InterpolationUnsupported");
@@ -57,16 +66,16 @@ internal sealed class VfxPreviewCurve
         _channels = channels.Select(channel =>
         {
             if (channel.Points.Count == 0)
-                return new SampleChannel(channel.Name, [new(0, 1, "linear", "linear", (0, 0), (0, 0), true)]);
-            var points = channel.Points.GroupBy(point => point.Time).Select(group =>
+                return new SampleChannel(channel.Name, [new(0, field == "EmitterPosition" ? 0 : 1, "linear", "linear", (0, 0), (0, 0), true)]);
+            var effective = channel.AuthoredPoints.GroupBy(point => (float)point.Time).Select(group => group.First())
+                .OrderBy(point => (float)point.Time).ToArray();
+            var points = effective.Select(first =>
             {
-                // A zero-duration equal-value join keeps both adjacent segments' authored handles.
-                var first = group.First(); var last = group.Last();
-                var incomingValid = first.TryGetHandles(out var incoming, out _);
-                var outgoingValid = last.TryGetHandles(out _, out var outgoing);
-                return new SamplePoint(first.Time, first.Value, first.InMode, last.OutMode, incoming, outgoing, incomingValid && outgoingValid);
+                var valid = first.TryGetHandles(out var incoming, out var outgoing);
+                return new SamplePoint(first.Time, first.Value, first.InMode, first.OutMode, incoming, outgoing, valid);
             }).ToArray();
-            return new SampleChannel(channel.Name, points);
+            return new SampleChannel(channel.Name, points, NeedsNativeSampler(effective)
+                ? VfxModelNativeCurve.CreateChannelSampler(channel, field) : null);
         }).ToArray();
         _omittedScaleAxes = (field is "ParticleScale" or "ParticleInitialScale")
             && _channels.Length > 0 && _channels.All(channel => channel.Name is "x" or "x_min" or "x_max");
@@ -80,6 +89,9 @@ internal sealed class VfxPreviewCurve
                 _bindings.Add(axis, (min, ExactChannel(min, max) ? min : max));
             }
         }
+        if (nativeModelTable)
+            foreach (var axis in _bindings.Keys)
+                _nativeTables.Add(axis, VfxModelNativeCurve.Create(text, field, axis));
         bool Single(string axis) => _bindings.TryGetValue(axis, out var binding)
             && binding.Min.SingleValue is { } min && binding.Max.SingleValue is { } max
             && float.IsFinite(min) && float.IsFinite(max);
@@ -139,6 +151,7 @@ internal sealed class VfxPreviewCurve
 
     public VfxRange Range(string axis, double time)
     {
+        if (_nativeTables.TryGetValue(axis, out var table)) return new(table.Sample(time, 0), table.Sample(time, 1));
         if (_nativeScale != null) return _nativeScale.Range(axis, time);
         if (_channels.Length == 0) return new(_fallback, _fallback);
         if (!_bindings.TryGetValue(axis, out var binding))
@@ -152,11 +165,13 @@ internal sealed class VfxPreviewCurve
         return new(min, max);
     }
 
-    public float Sample(string axis, double time, float random) => _nativeScale?.Sample(axis, time, random) ?? Range(axis, time).Sample(random);
+    public float Sample(string axis, double time, float random) => _nativeTables.TryGetValue(axis, out var table)
+        ? table.Sample(time, random) : _nativeScale?.Sample(axis, time, random) ?? Range(axis, time).Sample(random);
     public Vector3 Vector(double time, Vector3 random) => new(Sample("x", time, random.X), Sample("y", time, random.Y), Sample("z", time, random.Z));
 
     private float Evaluate(SampleChannel channel, double time)
     {
+        if (channel.NativeSampler != null) return channel.NativeSampler((float)time);
         var points = channel.Points;
         if (time <= points[0].Time) return (float)points[0].Value;
         for (var index = 1; index < points.Length; ++index)
@@ -207,12 +222,15 @@ internal sealed class VfxPreviewCurve
         return Bezier(left.Value, y1, y2, right.Value, (low + high) * 0.5);
     }
 
-    private sealed record SampleChannel(string Name, SamplePoint[] Points)
+    private sealed record SampleChannel(string Name, SamplePoint[] Points, Func<float, float>? NativeSampler = null)
     {
         public float? SingleValue { get; } = Points.Length == 1 ? (float)Points[0].Value : null;
     }
     private readonly record struct SamplePoint(double Time, double Value, string InMode, string OutMode,
         (double Time, double Value) Incoming, (double Time, double Value) Outgoing, bool HasHandles);
+
+    private static bool NeedsNativeSampler(IReadOnlyList<VfxCurvePoint> points) => points.Zip(points.Skip(1)).Any(pair =>
+        pair.First.OutMode is "bezier_q" or "step_next" or "step" or "s_inv" || pair.Second.InMode is "bezier_q" or "step_next" or "step" or "s_inv");
 
     private static bool ExactChannel(SampleChannel lower, SampleChannel upper)
     {
@@ -336,6 +354,7 @@ internal sealed class VfxPreviewEmitter
     public float? ConstantForceDamping { get; init; }
     public bool ParticleForceCurve { get; init; }
     public bool ModelConstantForce { get; init; }
+    public VfxModelNativeForce? ModelForceCurve { get; init; }
     public bool DestroyOnExplicitStop { get; init; }
     public VfxRange Start { get; init; }
     public VfxRange Duration { get; init; } = new(1, 1);
@@ -371,6 +390,7 @@ internal sealed class VfxPreviewEmitter
     public bool RequiresFlatTerrain { get; init; }
     public bool SpawnOnTerrain { get; init; }
     public bool ModelTerrainBirth { get; init; }
+    public bool ModelTerrainNormal { get; init; }
     public int TerrainSpawnDirection { get; init; } = 2;
     public Vector4? ParticleCullDistances { get; init; }
     public VfxRange SpawnAngle { get; init; }
@@ -389,6 +409,7 @@ internal sealed class VfxPreviewEmitter
     public bool MinimumPixelHalfResolution { get; init; }
     public bool HalfResolution { get; init; }
     public bool FullResolution { get; init; }
+    public bool SeaOverlay { get; init; }
     public bool IsMotionTrail => !IsEventTemplate && (Kind is 0 or 1) && (SpawnSpacing > 0 || TrailMode);
     public bool PremultipliedAlpha { get; init; }
     public float AdditiveMultiplier { get; init; }

@@ -9,7 +9,8 @@ internal sealed partial class TotalWarVfxSimulation
     internal float? CurrentGroundHeight => _groundHeight;
 
     internal bool NeedsGroundReplay(float? height) => !Nullable.Equals(_groundHeight, height)
-        && conversion.Emitters.Any(emitter => emitter.ModelTerrainBirth || emitter.RequiresFlatTerrain && emitter.Events.Count > 0);
+        && conversion.Emitters.Any(emitter => emitter.ModelTerrainBirth || emitter.ModelTerrainNormal
+            || emitter.RequiresFlatTerrain && emitter.Events.Count > 0);
 
     internal void PrepareInitialGround(float? height, Matrix attachment, Func<float, Matrix>? history,
         bool useCurrentAttachmentForFrame, bool continueMotionTrails, Func<float, float?>? nextAttachmentSample)

@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -12,6 +12,8 @@ internal static class VfxCustomSpriteMaterial
         using var reader = XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
         var root = XElement.Load(reader);
         var shader = root.Element("shader")?.Value.Replace('\\', '/').ToLowerInvariant() ?? "";
+        if (VfxFogBloodMaterial.Supports(shader))
+            return (VfxFogBloodMaterial.Read(root), 0, "Vfx.Preview.CustomMboitMaterialCandidate");
         if (shader == "shaders/fx_animated_uvs_custom.xml.shader")
         {
             var material = VfxAnimatedUvMaterial.Read(root);

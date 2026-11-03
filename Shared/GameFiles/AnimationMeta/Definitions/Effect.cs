@@ -38,8 +38,16 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
 
         // Part of the inteface - not the metedata file
         public bool Tracking { get; set; } = false;
-        public float EffectStartTime { get => 0; set; }
-        public float EffectEndTime { get => 0; set; }
+        public float EffectStartTime
+        {
+            get => BitConverter.Int32BitsToSingle(UnknownIntBase_v0);
+            set => UnknownIntBase_v0 = BitConverter.SingleToInt32Bits(value);
+        }
+        public float EffectEndTime
+        {
+            get => BitConverter.Int32BitsToSingle(UnknownIntBase_v1);
+            set => UnknownIntBase_v1 = BitConverter.SingleToInt32Bits(value);
+        }
 
     }
 
@@ -63,8 +71,8 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
 
         // Part of the inteface - not the metedata file
         public bool Tracking { get; set; } = false;
-        public float EffectStartTime { get => 0; set; }
-        public float EffectEndTime { get => 0; set; }
+        public float EffectStartTime { get => StartTime; set => StartTime = value; }
+        public float EffectEndTime { get => EndTime; set => EndTime = value; }
     }
 
     [MetaData("EFFECT", 3)]
@@ -84,6 +92,34 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
     public class Effect_v5 : Effect_v3
     {
         //TODO: exactly same ???
+    }
+
+    [MetaData("EFFECT", 6)]
+    public class Effect_v6 : DecodedMetaEntryBase_v2, IEffectMeta
+    {
+        [MetaDataTag(4)]
+        public string VfxName { get; set; } = "";
+
+        [MetaDataTag(5)]
+        public bool Tracking { get; set; }
+
+        [MetaDataTag(6)]
+        public bool TerrainMutable { get; set; }
+
+        [MetaDataTag(7)]
+        public Vector3 Position { get; set; } = Vector3.Zero;
+
+        [MetaDataTag(8, "", MetaDataTagAttribute.DisplayType.EulerVector)]
+        public Vector4 Orientation { get; set; } = new(0, 0, 0, 1);
+
+        [MetaDataTag(9)]
+        public int NodeIndex { get; set; }
+
+        [MetaDataTag(10)]
+        public float Scale { get; set; } = 1;
+
+        public float EffectStartTime { get => StartTime; set => StartTime = value; }
+        public float EffectEndTime { get => EndTime; set => EndTime = value; }
     }
 
     [MetaData("EFFECT", 7)]
@@ -115,8 +151,45 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
 
 
         // Part of the inteface - not the metedata file
-        public float EffectStartTime { get => StartTime; set; }
-        public float EffectEndTime { get => EndTime; set; }
+        public float EffectStartTime { get => StartTime; set => StartTime = value; }
+        public float EffectEndTime { get => EndTime; set => EndTime = value; }
+    }
+
+    [MetaData("EFFECT", 8)]
+    public class Effect_v8 : Effect_v7 { }
+
+    [MetaData("EFFECT", 9)]
+    public class Effect_v9 : Effect_v7 { }
+
+    [MetaData("EFFECT", 10)]
+    public class Effect_v10 : DecodedMetaEntryBase, IEffectMeta
+    {
+        [MetaDataTag(5)]
+        public string VfxName { get; set; } = "";
+
+        [MetaDataTag(6)]
+        public bool Tracking { get; set; }
+
+        [MetaDataTag(7)]
+        public bool TerrainMutable { get; set; }
+
+        [MetaDataTag(8)]
+        public bool DistanceCulled { get; set; }
+
+        [MetaDataTag(9)]
+        public Vector3 Position { get; set; } = Vector3.Zero;
+
+        [MetaDataTag(10, "", MetaDataTagAttribute.DisplayType.EulerVector)]
+        public Vector4 Orientation { get; set; } = new(0, 0, 0, 1);
+
+        [MetaDataTag(11)]
+        public int NodeIndex { get; set; }
+
+        [MetaDataTag(12)]
+        public float Scale { get; set; } = 1;
+
+        public float EffectStartTime { get => StartTime; set => StartTime = value; }
+        public float EffectEndTime { get => EndTime; set => EndTime = value; }
     }
 
     [MetaData("EFFECT", 11)]
@@ -151,8 +224,8 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
 
 
         // Part of the inteface - not the metedata file
-        public float EffectStartTime { get => StartTime; set; }
-        public float EffectEndTime { get => EndTime; set; }
+        public float EffectStartTime { get => StartTime; set => StartTime = value; }
+        public float EffectEndTime { get => EndTime; set => EndTime = value; }
     }
 
     [MetaData("EFFECT", 12)]
@@ -191,8 +264,8 @@ namespace Shared.GameFormats.AnimationMeta.Definitions
 
 
         // Part of the inteface - not the metedata file
-        public float EffectStartTime { get => StartTime; set; }
-        public float EffectEndTime { get => EndTime; set; }
+        public float EffectStartTime { get => StartTime; set => StartTime = value; }
+        public float EffectEndTime { get => EndTime; set => EndTime = value; }
     }
 
 

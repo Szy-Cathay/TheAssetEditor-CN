@@ -18,14 +18,16 @@
             <RowDefinition Height="auto"/>
             <RowDefinition Height="auto"/>
             <RowDefinition Height="auto"/>
+            <RowDefinition Height="auto"/>
         </Grid.RowDefinitions>
 
-        <local:RiderAttachmentSubView Grid.Row="0" />
-        <views:AnimationSettingsView Grid.Row="1" DataContext="{Binding AnimationSettings, Mode=OneTime}"/>
-        <local:MountLinkSubView Grid.Row="2" />
-        <views:SaveAndPreviewView Grid.Row="3"/>
-        <local:VisualisationHelperSubView  Grid.Row="4" />
-        <Button Content="{loc:Loc MountAnim.RefreshTool}" Click="{s:MethodBinding RefreshViewAction}" Grid.Row="5" Margin="10,0,10,0"/>
-        <Button Content="{loc:Loc MountAnim.CopyRiderAllFrames}" Click="{s:MethodBinding CopyAnimation}" Grid.Row="6" Margin="10,0,10,0"/>
+        <views:PlaybackSourcesView Grid.Row="0" Grid.IsSharedSizeScope="True" />
+        <local:RiderAttachmentSubView Grid.Row="1" />
+        <views:AnimationSettingsView Grid.Row="2" DataContext="{Binding AnimationSettings, Mode=OneTime}"/>
+        <local:MountLinkSubView Grid.Row="3" />
+        <views:SaveAndPreviewView Grid.Row="4"/>
+        <local:VisualisationHelperSubView  Grid.Row="5" />
+        <Button Content="{loc:Loc MountAnim.RefreshTool}" Click="{s:MethodBinding RefreshViewAction}" Grid.Row="6" Margin="10,0,10,0"/>
+        <Button Content="{loc:Loc MountAnim.CopyRiderAllFrames}" Click="{s:MethodBinding CopyAnimation}" Grid.Row="7" Margin="10,0,10,0"/>
     </Grid>
 </UserControl>

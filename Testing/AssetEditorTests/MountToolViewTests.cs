@@ -31,7 +31,7 @@ namespace AssetEditorTests;
 
 [TestClass]
 [DoNotParallelize]
-public class MountToolViewTests
+public partial class MountToolViewTests
 {
     [ClassInitialize]
     public static void Initialize(TestContext _) => new LocalizationManager().LoadLanguage();

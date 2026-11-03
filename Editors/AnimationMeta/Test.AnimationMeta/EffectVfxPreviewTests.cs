@@ -443,10 +443,16 @@ public partial class EffectVfxPreviewTests
         public float Time;
         public Matrix Attachment;
         public Func<float, Matrix>? History;
+        public bool UseCurrentAttachmentForFrame;
         public void Reload(VfxPreviewSnapshot snapshot) { Snapshot = snapshot; Reloads++; }
         public void Advance(float seconds, Matrix attachment) => Seek(Time + seconds, attachment);
         public void Seek(float seconds, Matrix attachment) { Time = seconds; Attachment = attachment; }
         public void Seek(float seconds, Matrix attachment, Func<float, Matrix> history) { Seek(seconds, attachment); History = history; }
+        public void Seek(float seconds, Matrix attachment, Func<float, Matrix> history, bool useCurrentAttachmentForFrame)
+        {
+            Seek(seconds, attachment, history);
+            UseCurrentAttachmentForFrame = useCurrentAttachmentForFrame;
+        }
         public void Draw(CommonShaderParameters parameters) { Draws++; }
         public void Dispose() => Disposed = true;
     }

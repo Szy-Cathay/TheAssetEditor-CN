@@ -1,4 +1,4 @@
-using GameWorld.Core.Components.Rendering;
+﻿using GameWorld.Core.Components.Rendering;
 using GameWorld.Core.Rendering;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Utility;
@@ -22,6 +22,8 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
     private bool _pendingContentReload;
     private bool _disposed;
     private VfxInteractiveFrameBudget? _preparationBudget;
+    private Matrix? _lastAttachment;
+    private Func<float, Matrix>? _lastAttachmentHistory;
     public bool EnableInteractiveReload { get; set; }
     public bool IsPlaybackAdvancing { get; set; }
     public float TimeSeconds { get; set; }
@@ -29,6 +31,8 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
     public float? AttachmentSampleTimeSeconds { get; set; }
     public bool CurrentPlaybackEnabled { get; set; } = true;
     public float? FlatGroundHeight { get; set; }
+    public Func<Matrix>? CurrentAttachment { get; set; }
+    public Func<float, Matrix>? WorldAttachmentAtTime { get; set; }
     public Func<float, Matrix>? LocalAttachmentAtTime { get; set; }
     public Func<float, float>? AttachmentHistoryTime { get; set; }
     public IReadOnlyList<VfxPreviewDiagnostic> Diagnostics { get; private set; } = [];
@@ -58,6 +62,8 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
         DisposeTails();
         DisposePreview(_preview); _preview = next;
         _currentPrepared = false;
+        _lastAttachment = null;
+        _lastAttachmentHistory = null;
         _reload = _reload || next == null || pendingContent;
         if (!_reload && EnableInteractiveReload) _preview?.BeginInteractiveRestart();
     }
@@ -70,11 +76,15 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
             var next = _preview.CreatePlaybackInstance();
             _preview.EmissionEndTimeSeconds = EmissionEndTimeSeconds is { } end
                 ? Math.Min(end, emissionEndTimeSeconds) : emissionEndTimeSeconds;
-            _tails.Add(new(_preview, TimeSeconds, _currentPrepared));
+            _tails.Add(new(_preview, TimeSeconds, _currentPrepared, emissionEndTimeSeconds,
+                _lastAttachmentHistory?.Invoke(emissionEndTimeSeconds) ?? _lastAttachment, _lastAttachmentHistory,
+                CurrentAttachment != null));
             _preview = next;
         }
         _reload = _reload || _preview == null || pendingContent;
         _currentPrepared = false;
+        _lastAttachment = null;
+        _lastAttachmentHistory = null;
         if (!_reload && EnableInteractiveReload) _preview?.BeginInteractiveRestart();
     }
     public void RefreshPlayback()
@@ -127,24 +137,31 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
             }
             var time = Math.Max(0, TimeSeconds);
             var canonicalParent = SceneManager != null && Parent != null ? SceneManager.GetWorldPosition(Parent) : parentWorld;
-            var attachment = ModelMatrix * canonicalParent;
+            var attachment = CurrentAttachment?.Invoke() ?? ModelMatrix * canonicalParent;
             Func<float, Matrix>? history = null;
-            if (LocalAttachmentAtTime is { } sample)
+            var historyTime = AttachmentHistoryTime;
+            if (WorldAttachmentAtTime is { } worldSample)
+                history = past => worldSample(historyTime?.Invoke(past) ?? past);
+            else if (LocalAttachmentAtTime is { } sample)
             {
                 var inverseCurrentLocal = Matrix.Invert(sample(AttachmentSampleTimeSeconds ?? time));
-                history = past => sample(AttachmentHistoryTime?.Invoke(past) ?? past) * inverseCurrentLocal * attachment;
+                history = past => sample(historyTime?.Invoke(past) ?? past) * inverseCurrentLocal * attachment;
             }
+            _lastAttachment = attachment;
+            _lastAttachmentHistory = history;
             foreach (var tail in _tails)
             {
+                var tailHistory = tail.History ?? history;
+                var tailAttachment = tail.Attachment ?? tailHistory?.Invoke(tail.AttachmentEndTimeSeconds) ?? attachment;
                 if (!tail.Preview.HasPendingInteractiveReload || ContinueReload(tail.Preview,
-                    new(tail.TimeSeconds, attachment, history, EmissionEnd: tail.Preview.EmissionEndTimeSeconds,
-                        GroundHeight: FlatGroundHeight), budget))
+                    new(tail.TimeSeconds, tailAttachment, tailHistory, EmissionEnd: tail.Preview.EmissionEndTimeSeconds,
+                        GroundHeight: FlatGroundHeight, UseCurrentAttachmentForFrame: tail.UseCurrentAttachment), budget))
                 {
-                    Seek(tail.Preview, tail.TimeSeconds, attachment, history);
+                    Seek(tail.Preview, tail.TimeSeconds, tailAttachment, tailHistory, tail.UseCurrentAttachment);
                     tail.Prepared = true;
                 }
                 else if (tail.Prepared && !tail.Preview.IsPreparing)
-                    Seek(tail.Preview, tail.TimeSeconds, attachment, history);
+                    Seek(tail.Preview, tail.TimeSeconds, tailAttachment, tailHistory, tail.UseCurrentAttachment);
             }
             for (var index = _tails.Count - 1; index >= 0; --index)
                 if (_tails[index].Prepared && !_tails[index].Preview.HasPendingInteractiveReload && _tails[index].Preview.IsDrained)
@@ -155,10 +172,11 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
             if (CurrentPlaybackEnabled && _preview != null)
             {
                 if (!_preview.HasPendingInteractiveReload || ContinueReload(_preview, new(time, attachment, history,
-                    EmissionEnd: EmissionEndTimeSeconds, GroundHeight: FlatGroundHeight), budget))
+                    EmissionEnd: EmissionEndTimeSeconds, GroundHeight: FlatGroundHeight,
+                    UseCurrentAttachmentForFrame: CurrentAttachment != null), budget))
                 {
                     _preview.EmissionEndTimeSeconds = EmissionEndTimeSeconds;
-                    Seek(_preview, time, attachment, history);
+                    Seek(_preview, time, attachment, history, CurrentAttachment != null);
                     _currentPrepared = true;
                     _pendingContentReload = false;
                     SetDiagnostics(_preview.Diagnostics);
@@ -166,7 +184,7 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
                 else if (_currentPrepared && !_preview.IsPreparing)
                 {
                     _preview.EmissionEndTimeSeconds = EmissionEndTimeSeconds;
-                    Seek(_preview, time, attachment, history);
+                    Seek(_preview, time, attachment, history, CurrentAttachment != null);
                 }
             }
             return _tails.Any(tail => tail.Prepared && !tail.Preview.IsPreparing && tail.Preview.EmitterCount > 0)
@@ -243,9 +261,14 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
         DisposeTails();
         DiagnosticsChanged = null;
         LocalAttachmentAtTime = null;
+        CurrentAttachment = null;
+        WorldAttachmentAtTime = null;
         AttachmentHistoryTime = null;
+        _lastAttachment = null;
+        _lastAttachmentHistory = null;
     }
-    private void Seek(IVfxPreview preview, float time, Matrix attachment, Func<float, Matrix>? history)
+    private void Seek(IVfxPreview preview, float time, Matrix attachment, Func<float, Matrix>? history,
+        bool useCurrentAttachment = false)
     {
         if (EnableInteractiveReload) preview.ConfigureInteractiveSeekFrame(history == null, FlatGroundHeight,
             allowForwardReplay: !IsPlaybackAdvancing);
@@ -253,7 +276,7 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
         if (preparation != null && !preparation.TryBegin(preview)) return;
         try
         {
-            if (history != null) preview.Seek(Math.Max(0, time), attachment, history);
+            if (history != null) preview.Seek(Math.Max(0, time), attachment, history, useCurrentAttachment);
             else preview.Seek(Math.Max(0, time), attachment);
         }
         finally { preparation?.End(preview, preview.IsSeekingFrame); }
@@ -276,10 +299,15 @@ public sealed class VfxPreviewSceneNode : GroupNode, IDrawableItem, IRenderItem,
         foreach (var tail in _tails) DisposePreview(tail.Preview);
         _tails.Clear();
     }
-    private sealed class PlaybackTail(IVfxPreview preview, float timeSeconds, bool prepared)
+    private sealed class PlaybackTail(IVfxPreview preview, float timeSeconds, bool prepared,
+        float attachmentEndTimeSeconds, Matrix? attachment, Func<float, Matrix>? history, bool useCurrentAttachment)
     {
         public IVfxPreview Preview { get; } = preview;
         public float TimeSeconds { get; set; } = timeSeconds;
         public bool Prepared { get; set; } = prepared;
+        public float AttachmentEndTimeSeconds { get; } = attachmentEndTimeSeconds;
+        public Matrix? Attachment { get; } = attachment;
+        public Func<float, Matrix>? History { get; } = history;
+        public bool UseCurrentAttachment { get; } = useCurrentAttachment;
     }
 }

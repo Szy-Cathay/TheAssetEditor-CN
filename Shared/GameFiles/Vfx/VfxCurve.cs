@@ -54,6 +54,7 @@ public sealed class VfxCurve
 public sealed class VfxCurveChannel(string header, string name, IReadOnlyList<VfxCurvePoint> points)
 {
     public string Name { get; } = name;
+    public IReadOnlyList<VfxCurvePoint> AuthoredPoints { get; } = points;
     // Display order must not change the serialized key order or discard coincident keys.
     public IReadOnlyList<VfxCurvePoint> Points { get; } = points.OrderBy(x => x.Time).ToArray();
     public override string ToString() => points.Count == 0 ? header : header + ";" + string.Join(';', points.Select(x => x.ToString()));

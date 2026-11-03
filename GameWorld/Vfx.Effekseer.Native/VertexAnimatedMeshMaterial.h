@@ -49,18 +49,17 @@ inline std::string VertexAnimatedMeshCode()
         $F2$ globalUV = (uv1 + sourceTime * Va2(19)) * Va2(21);
         $F4$ globalMask = $TEX_P4$globalUV$TEX_S4$;
         $F1$ vertexAlpha = lerp(1, vcolor.a, Va(49));
-        $F1$ depthScale = vertexAnimCamera.w > 0.5 ? 1 : abs(dot(normalize(cameraPosition.xyz - worldPos), vertexAnimCamera.xyz));
-        $F1$ vertexAnimSoftDistance = max(Va(29) * depthScale, 0.00000001);
+        $F1$ vertexAnimSoftDistance = max(Va(29), 0.00000001);
         $F1$ soft = vertexAnimRender.x > 0.5 ? CalcDepthFade(screenUV, meshZ, vertexAnimSoftDistance) : 1;
         mask *= lerp(1, soft, Va(17)) * facing * globalMask.r * Va(46) * vertexAlpha * vertexAlpha;
         mask *= lerp(1, floor(customData2.a * 1000) * 0.001, Va(63));
+        $F1$ nativeAlpha = min(mask, 1);
         mask = max(mask, 0);
         $F2$ colourUV = (uv1 + sourceTime * Va2(12)) * Va2(15);
         $F4$ overlay = $TEX_P3$colourUV$TEX_S3$;
         $F3$ colour = overlay.rgb * (1 + overlay.a * (Va(14) - 1)) * Va3(23) * Va(26) * customData2.rgb;
-        $F1$ opacity = saturate(mask);
-        // Preserve the native ONE / INV_SRC_ALPHA contribution with the public SRC_ALPHA renderer.
-        $F3$ emissive = colour * mask / max(opacity, 0.00000001);
+        $F1$ opacity = nativeAlpha;
+        $F3$ emissive = colour * mask * lerp($F3$(1,1,1), vcolor.rgb, Va(49));
         $F1$ opacityMask = 1;
         $F3$ worldPositionOffset = $F3$(0,0,0);
     )";
@@ -81,8 +80,8 @@ inline std::vector<uint8_t> VertexAnimatedMeshMaterial()
         string(name.c_str()); string(name.c_str()); string("");
         integer(index); integer(0); integer(0); integer(1); integer(0);
     }
-    integer(2);
-    for (auto name : {"vertexAnimRender", "vertexAnimCamera"})
+    integer(7);
+    for (auto name : {"vertexAnimRender", "vertexAnimCamera", "vertexAnimInverse0", "vertexAnimInverse1", "vertexAnimInverse2", "vertexAnimInverse3", "vertexAnimViewport"})
     {
         string(name); string(name); integer(0); integer(0); integer(4); integer(0); integer(0); integer(0); integer(0);
     }

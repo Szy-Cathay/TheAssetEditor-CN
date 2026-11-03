@@ -10,7 +10,6 @@ internal sealed partial class TotalWarVfxSimulation
         var basis = particle.Root;
         var current = CurrentRoot(state, _simulatedTime);
         if (definition.Kind != 1 || definition.SimulationSpace == 1 || state.Parent != null
-            || !definition.Force.TryConstantVector(out var force)
             || !TryModelForceRoot(basis, out var scale, out var rotation)
             || !TryModelForceRoot(current, out var currentScale, out _)
             || Math.Abs(scale - currentScale) > .00001f
@@ -19,9 +18,23 @@ internal sealed partial class TotalWarVfxSimulation
             ForceBasisUnsupported = true;
             return false;
         }
+        Vector3 sourceAcceleration;
+        if (definition.ModelForceCurve is { } curve)
+        {
+            // Native 6C2BD0 normalizes source age with the particle's source lifetime.
+            var sourceAge = (float)age * state.TimeScale;
+            var sourceLife = particle.Life * state.TimeScale;
+            sourceAcceleration = curve.Sample(sourceAge / (sourceLife + .000001), particle.RandomAlpha);
+        }
+        else if (definition.Force.TryConstantVector(out var force)) sourceAcceleration = force * .01f;
+        else
+        {
+            ForceBasisUnsupported = true;
+            return false;
+        }
         // Rigid forces are world-axis acceleration, scaled with geometry, independently of birth rotation.
         // The matching positive uniform scale cancels when storing that acceleration in local space.
-        var acceleration = Vector3.Transform(force * .01f, Quaternion.Conjugate(rotation));
+        var acceleration = Vector3.Transform(sourceAcceleration, Quaternion.Conjugate(rotation));
         acceleration *= state.TimeScale;
         acceleration *= state.TimeScale;
         if (!float.IsFinite(acceleration.X) || !float.IsFinite(acceleration.Y) || !float.IsFinite(acceleration.Z))

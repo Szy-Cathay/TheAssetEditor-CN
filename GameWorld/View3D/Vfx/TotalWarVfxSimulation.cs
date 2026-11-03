@@ -1,4 +1,4 @@
-﻿using GameWorld.Core.Rendering;
+using GameWorld.Core.Rendering;
 using Microsoft.Xna.Framework;
 
 namespace GameWorld.Core.Vfx;
@@ -204,11 +204,12 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
         CaptureSeekCheckpoint();
     }
 
-    private void Tick(double delta)
+    private void Tick(double delta, EmitterState? eventSubtree = null)
     {
         for (var index = _particles.Count - 1; index >= 0; --index)
         {
             var particle = _particles[index];
+            if (!WithinEventSubtree(particle.Emitter, eventSubtree)) continue;
             var definition = particle.Emitter.Definition;
             // Stop suppresses death callbacks; retain capacity until the clipped pre-stop emission is consumed.
             if (ExplicitModelStopped(particle.Emitter, _simulatedTime)) continue;
@@ -243,7 +244,7 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
                 particle.Position = particle.MotionOrigin + particle.MotionInitialVelocity * (float)(_simulatedTime - particle.Birth);
                 continue;
             }
-            if (definition.ModelConstantForce && TryStepModelConstantForce(particle, age, delta))
+            if ((definition.ModelConstantForce || definition.ModelForceCurve != null) && TryStepModelConstantForce(particle, age, delta))
             {
                 CommitModelMotion(particle, _simulatedTime);
                 continue;
@@ -261,12 +262,20 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
                 var acceleration = definition.ParticleForceCurve
                     ? particle.FixedForce ?? definition.Force.Vector(age / particle.Life, new Vector3(particle.RandomAlpha)) * .01f
                     : new Vector3(0, definition.CalibratedVerticalAcceleration, 0);
+                if (particle.SpriteForceInverseRotation is { } forceRotation)
+                    acceleration = Vector3.Transform(acceleration, forceRotation);
+                if (definition.Kind == 0)
+                {
+                    // Source-time acceleration changes velocity already measured per preview second.
+                    acceleration *= particle.Emitter.TimeScale;
+                    acceleration *= particle.Emitter.TimeScale;
+                }
                 particle.Velocity += acceleration * (float)delta;
             }
             var damping = definition.Deceleration.Sample("x", age / particle.Life, particle.RandomAlpha);
             if (definition.Kind != 0) damping = Math.Max(0, damping);
-            // Rigid damping consumes source time; velocity already includes the reference speed.
-            var dampingDelta = definition.Kind == 1 ? (float)delta * particle.Emitter.TimeScale : (float)delta;
+            // Source damping consumes source time; velocity already includes the reference speed.
+            var dampingDelta = definition.Kind is 0 or 1 ? (float)delta * particle.Emitter.TimeScale : (float)delta;
             particle.Velocity *= MathF.Exp(-damping * dampingDelta);
             particle.Position += particle.Velocity * (float)delta;
             if (definition.ConstantForceDamping != null)
@@ -280,10 +289,17 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
         for (var index = 0; index < _emitters.Count; ++index)
         {
             var emitter = _emitters[index];
+            if (!WithinEventSubtree(emitter, eventSubtree) || _simulatedTime <= emitter.PreparedThroughTime) continue;
+            if (!emitter.Activated)
+            {
+                if (_simulatedTime + .000001 < emitter.ActivationTime) continue;
+                ActivateEvent(emitter);
+                if (_simulatedTime <= emitter.PreparedThroughTime) continue;
+            }
             UpdateMotionRoot(emitter, _simulatedTime);
             if (emitter.Parent is { Alive: false } && emitter.Event is { TrackLifetime: true, OnDeath: false }) continue;
             var emissionTime = _simulatedTime;
-            var emissionDelta = delta;
+            var emissionDelta = Math.Min(delta, Math.Max(0, _simulatedTime - emitter.PreparedThroughTime));
             if (emitter.Parent == null && _emissionEndTimeSeconds is { } emissionEnd)
             {
                 if (emitter.Start >= emissionEnd || _simulatedTime > emissionEnd && _simulatedTime - delta >= emissionEnd) continue;
@@ -340,9 +356,10 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
                 }
             }
         }
-        ClearExplicitlyStoppedModels(_simulatedTime);
-        _emitters.RemoveAll(state => state.Parent != null && state.ActiveCount == 0
-            && (!state.Definition.Infinite && _simulatedTime > state.Start + state.Duration
+        if (eventSubtree == null) ClearExplicitlyStoppedModels(_simulatedTime);
+        _emitters.RemoveAll(state => !ReferenceEquals(state, eventSubtree) && WithinEventSubtree(state, eventSubtree)
+            && state.Parent != null && state.ActiveCount == 0
+            && (state.Activated && !state.Definition.Infinite && _simulatedTime > state.Start + state.Duration
                 || state.Event is { TrackLifetime: true, OnDeath: false } && !state.Parent.Alive));
     }
 
@@ -352,6 +369,7 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
         if (emitter.Parent is { Alive: false } && emitter.Event is { TrackLifetime: true, OnDeath: false }) return false;
         if (emitter.Definition.MaximumParticles <= 0 || emitter.Definition.Life.Maximum + emitter.LifeBias <= 0
             || emitter.Definition.SpawnSpacing <= 0 && (emitter.Definition.Emission.Maximum <= 0 || emitter.RateScale <= 0)) return false;
+        if (!emitter.Activated) return true;
         var continuousTrail = _continueMotionTrails && emitter.Parent == null && emitter.Definition.IsMotionTrail;
         var end = emitter.Definition.Infinite || continuousTrail ? double.PositiveInfinity : emitter.Start + emitter.Duration;
         if (emitter.Parent == null && _emissionEndTimeSeconds is { } emissionEnd)
@@ -508,11 +526,11 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
                 if (!_definitionIndexes.TryGetValue(child, out var definitionIndex)) continue;
                 if (_emitters.Count >= 4096) { CapacityReached = true; return; }
                 var state = new EmitterState(child, particle.Emitter.Random.Next(), definitionIndex, particle, particleEvent,
-                    eventTime + particleEvent.Delay, referenceRandoms, CreateSeekRandom);
-                state.SpawnAnchor = EventAnchor(state, eventTime, out _);
+                    eventTime + particleEvent.Delay / particle.Emitter.TimeScale, referenceRandoms, CreateSeekRandom);
                 if (!particle.Alive) FreezeEvent(state);
                 (particle.EventInstances ??= []).Add(state);
                 _emitters.Add(state);
+                if (state.ActivationTime <= _simulatedTime + .000001) ActivateEvent(state);
             }
         }
     }
@@ -617,6 +635,7 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
             Emitter = state, Birth = birthTime, Life = life, Position = position, Velocity = velocity,
             MotionOrigin = position, MotionInitialVelocity = velocity,
             ModelTerrainBirthValid = modelTerrainBirthValid,
+            ModelTerrainNormalValid = PrepareModelTerrainNormal(state, birthRoot),
             NativeFrameTrail = nativeFrameTrail,
             Root = birthRoot,
             InitialScale = definition.InitialScale.Vector(initialPhase, RandomVector(random)),
@@ -736,6 +755,13 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
                 ? Math.Clamp(((float)_requestedTime - (float)particle.Birth) / (particle.Life + .000001f), 0, 1) : 0;
             var emitterState = particle.Emitter;
             var root = ParticleRoot(particle, _requestedTime, currentFrame: true);
+            if (definition.ModelTerrainNormal && (!particle.ModelTerrainNormalValid
+                || _groundHeight is not { } receiver || !float.IsFinite(receiver)
+                || !TryModelForceRoot(root, out _, out _)))
+            {
+                TerrainBasisUnsupported = true;
+                continue;
+            }
             var position = particle.Position;
             var velocity = particle.Velocity;
             if (particle.NativeFrameTrail) position = particle.MotionOrigin + particle.MotionInitialVelocity * (float)(_requestedTime - particle.Birth);
@@ -751,7 +777,8 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
             var terrainBasis = definition.RequiresFlatTerrain && kind != 2 && definition.SpawnOnTerrain
                 && root.M11 > 0 && float.IsFinite(root.M11) ? Matrix.CreateScale(1 / root.M11) * root : root;
             if (definition.RequiresFlatTerrain && (camera.VfxGroundHeight is not { } ground || !float.IsFinite(ground)
-                || (terrainDecalBirth ? !TerrainDecalRootSupported(root) || !PositiveUniformScale(inheritedScale)
+                || (definition.SeaOverlay ? !VfxSeaOverlay.IsFlatReceiverBasis(root, inheritedScale)
+                    : terrainDecalBirth ? !TerrainDecalRootSupported(root) || !PositiveUniformScale(inheritedScale)
                     : !MatrixClose(terrainBasis, Matrix.CreateTranslation(root.Translation)))
                 || !terrainDecalBirth && kind == 2 && definition.SpawnOnTerrain
                     && Math.Abs(worldPosition.Y - ground) > .00001f))
@@ -890,7 +917,7 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
                     ? new(shadingBasis.Right.X, shadingBasis.Right.Y, shadingBasis.Up.X, shadingBasis.Up.Y)
                     : new(shadingBasis.Backward, 1);
             var lightingRotation = Vector4.Zero;
-            if (kind == 0 && hasShadingBasis && render.LightingMode != 0)
+            if (kind == 0 && hasShadingBasis && (render.LightingMode != 0 || definition.SeaOverlay))
             {
                 var normalBasis = definition.Alignment == 3 ? Matrix.CreateRotationY(MathHelper.Pi) * shadingBasis : shadingBasis;
                 var normalRotation = Quaternion.CreateFromRotationMatrix(normalBasis);
@@ -904,8 +931,16 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
             var customSprite = kind == 0 && render.MeshMaterialIndex >= 0;
             // Texture opacity is applied after sampling, including straight-alpha sprites.
             var rawSpriteAlpha = kind == 0 || kind == 2 && render.MaterialMode < 3;
-            var rawMaterialAlpha = kind == 1 && definition.RenderParts(particle.ModelVariant)
-                .Any(part => part.OpaqueModel != 0 && part.MeshMaterialIndex >= 0);
+            var mappedModel = false;
+            var rawMaterialAlpha = false;
+            if (kind == 1)
+                foreach (var part in definition.RenderParts(particle.ModelVariant))
+                {
+                    if (part.MeshMaterialIndex < 0) continue;
+                    mappedModel = true;
+                    rawMaterialAlpha |= part.OpaqueModel != 0
+                        || VfxNativeColourMeshMaterial.UsesRawParticleAlpha(conversion.MeshMaterials[part.MeshMaterialIndex].Parameters);
+                }
             var alpha = rawSpriteAlpha || rawMaterialAlpha ? Math.Max(0, authoredAlpha) : Math.Clamp(authoredAlpha, 0, 1);
             alpha *= distanceAlpha;
             if (cullOpacity && !(camera.VfxLowOpacityCulling < alpha)) continue;
@@ -920,21 +955,28 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
             var flipU = particle.RandomAlpha * 251; var flipV = particle.RandomAlpha * 149;
             if (flipU - MathF.Floor(flipU) > 1 - definition.UvFlipProbability.X) { uv.X += uv.Z; uv.Z = -uv.Z; }
             if (flipV - MathF.Floor(flipV) > 1 - definition.UvFlipProbability.Y) { uv.Y += uv.W; uv.W = -uv.W; }
+            // Meshes do not consume the sprite normal quaternion; reuse its XY lanes without changing the ABI or RNG.
+            var modelInstanceUv = mappedModel;
+            var modelUv = modelInstanceUv ? VfxModelInstanceUv.FromSeed(particle.RandomAlpha) : Vector2.Zero;
             var native = new EffekseerParticle
             {
                 Layer = emitterState.DefinitionIndex, Transform = localTransform * basis * Matrix.CreateTranslation(worldPosition),
                 Colour = new(colour, alpha), UV = uv,
-                Time = (float)age,
+                Time = (float)(mappedModel ? age * emitterState.TimeScale : age),
                 MaterialTime = (float)_requestedTime,
                 AppearancePhase = (float)phase,
                 AlphaCrush = definition.AlphaCrush == null ? Vector2.Zero
                     : new(definition.AlphaCrush.Sample("progress", phase, particle.RandomAlpha), definition.SharpAlphaCrush ? 2 : 1),
                 SoftParticleScale = Math.Min(scale.X, scale.Y),
-                ParticleSize = kind == 0 && render.LightingMode != 0 ? scale.X
+                ParticleSize = render.MeshMaterialIndex >= 0 && VfxFogBloodMaterial.IsFog(conversion.MeshMaterials[render.MeshMaterialIndex].Parameters.Length)
+                    ? scale.X : kind == 0 && render.LightingMode != 0 ? scale.X
                     : customSprite ? Math.Min(Math.Abs(scale.X), Math.Abs(scale.Y))
                     : render.Distortion != 0 ? Math.Min(scale.X, scale.Y) : 0,
                 Flipbook = flipbook,
-                NormalRotation = render.Distortion != 0 ? distortionNormalBasis : lightingRotation,
+                NormalRotation = render.MeshMaterialIndex >= 0 && VfxFogBloodMaterial.IsFamily(conversion.MeshMaterials[render.MeshMaterialIndex].Parameters.Length)
+                    ? new(particle.RandomAlpha, 0, 0, 1)
+                    : modelInstanceUv ? new(modelUv, 0, 1)
+                    : render.Distortion != 0 ? distortionNormalBasis : lightingRotation,
             };
             result.Add(new(native, particle.ModelVariant) { RequiresGroundDepth = particle.ModelTerrainBirthValid });
         }
@@ -1289,8 +1331,8 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
             if (!ancestorValid) { valid = false; return Matrix.Identity; }
         }
         var root = ParticleRoot(parent, Math.Min(time, parent.Birth + parent.Life), currentFrame);
-        // Visible rigid models retain the calibrated birth anchor; no-model helpers follow their motion.
-        var position = definition.Kind == 1 && !definition.IsEventHelper ? parent.MotionOrigin : parent.Position;
+        // Native position tracking reads the parent's current particle position for models and helpers alike.
+        var position = parent.Position;
         if (definition.ConstantForceDamping != null && ForceBasisSupported(parent, definition))
             (position, _) = ConstantMotion(parent, definition, Math.Min(parent.Life, time - parent.Birth));
         if (definition.ModelEmitterMotion != null)
@@ -1446,7 +1488,23 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
         allowed.Translation = basis.Translation;
         var supported = Math.Abs(emitter.TimeScale - 1) <= 0.00001f && MatrixClose(basis, allowed)
             && (definition.ConstantForceDamping == null || emitter.LifeBias == 0);
-        if (definition.SimulationSpace == 2) particle.WorldForceBasisSupported = supported;
+        particle.SpriteForceInverseRotation = null;
+        var correctedSprite = false;
+        if (!supported && definition.Kind == 0 && definition.ConstantForceDamping == null
+            && definition.SimulationSpace is 0 or 2 && emitter.Parent == null
+            && float.IsFinite(emitter.TimeScale) && emitter.TimeScale > 0
+            && TryModelForceRoot(basis, out var birthScale, out var birthRotation))
+        {
+            correctedSprite = true;
+            var current = CurrentRoot(emitter, _simulatedTime);
+            supported = TryModelForceRoot(current, out var currentScale, out _)
+                && Math.Abs(currentScale - birthScale) <= .00001f;
+            // Native ordinary ForceA is world-axis acceleration, with the same geometric scale.
+            // The local particle representation must cancel its birth rotation, not rotate gravity.
+            if (supported) particle.SpriteForceInverseRotation = Quaternion.Conjugate(birthRotation);
+        }
+        // The birth root is immutable, but its current scale must still be checked each tick.
+        if (definition.SimulationSpace == 2 && !correctedSprite) particle.WorldForceBasisSupported = supported;
         if (!supported) ForceBasisUnsupported = true;
         return supported;
     }
@@ -1509,7 +1567,10 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
         public bool ModelAngularUnsupported;
         public bool SpriteAngularUnsupported;
         public bool Started;
+        public bool Activated;
+        public readonly double ActivationTime;
         public double Accumulator;
+        public double PreparedThroughTime = double.NegativeInfinity;
         public Matrix? DistanceRoot;
         public double DistanceRemainder;
         public Matrix? NativeTrailRoot;
@@ -1522,6 +1583,7 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
             Dictionary<object, ReferenceRandoms>? referenceRandoms = null, Func<int, Random>? randomFactory = null)
         {
             Definition = definition; DefinitionIndex = definitionIndex; Parent = parent; Event = particleEvent;
+            ActivationTime = eventTime; Activated = parent == null;
             Random = randomFactory?.Invoke(seed) ?? new Random(seed);
             Start = definition.Start.Sample(Random.NextSingle()); Duration = definition.Duration.Sample(Random.NextSingle());
             RandomRate = Random.NextSingle();
@@ -1556,6 +1618,7 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
         public bool Alive = true;
         public bool NativeFrameTrail;
         public bool ModelTerrainBirthValid;
+        public bool ModelTerrainNormalValid;
         public int Cell, Row, ModelVariant;
         public double Birth;
         public double MotionStart;
@@ -1563,6 +1626,7 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
         public Vector3 Position, Velocity, InitialScale, Orientation, Spin, RandomScale, RandomColour;
         public Vector3? FixedForce;
         public bool? WorldForceBasisSupported;
+        public Quaternion? SpriteForceInverseRotation;
         public Vector3 MotionOrigin, MotionInitialVelocity;
         public Matrix Root;
         public Matrix BirthRotation;

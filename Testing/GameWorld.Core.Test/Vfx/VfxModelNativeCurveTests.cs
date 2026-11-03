@@ -89,11 +89,8 @@ public class VfxModelNativeCurveTests
         Assert.That(curve.Maximum, Is.GreaterThan(2.99f));
     }
 
-    [TestCase("bezier_q")]
     [TestCase("bezier_u")]
     [TestCase("spline")]
-    [TestCase("step_next")]
-    [TestCase("step")]
     public void UnverifiedModes_AreStillExplicitlyRejected(string mode)
     {
         var source = $"x_min,0,0;0,0,linear,{mode},0,0,.2,1,1;1,1,{mode},linear,-.2,-1,0,0,1:x,0;0,0";
@@ -101,7 +98,6 @@ public class VfxModelNativeCurveTests
         Assert.That(error!.Reason, Is.EqualTo("Vfx.Preview.InterpolationUnsupported"));
     }
 
-    [TestCase("x,0;0,1")]
     [TestCase("x,1;0,2")]
     [TestCase("x,1;0,1|x,0;0,0")]
     public void InvalidOrAmbiguousBindings_AreNotSilentlyGuessed(string links)

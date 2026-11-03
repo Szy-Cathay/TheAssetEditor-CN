@@ -17,6 +17,7 @@ public sealed class EffectMetaInstance : IMetaDataInstance, IMetaDataPlaybackIns
     private readonly AnimationPlayer? _ownerPlayer;
     private readonly float? _rangeEmissionEnd;
     private readonly Func<bool>? _refreshTransform;
+    private readonly Action<float, bool>? _prepareAttachment;
     private AnimationPlaybackTime? _previousPlayback;
     private double _cycleOriginSeconds;
     private double _playbackOriginSeconds;
@@ -45,7 +46,8 @@ public sealed class EffectMetaInstance : IMetaDataInstance, IMetaDataPlaybackIns
     public int? HighlightedBoneIndex => _marker.HighlightedBoneIndex;
 
     public EffectMetaInstance(DrawableMetaInstance marker, VfxPreviewSceneNode particles, MetaDataTimeRange? range,
-        bool persistentOwner = false, AnimationPlayer? ownerPlayer = null, Func<bool>? refreshTransform = null)
+        bool persistentOwner = false, AnimationPlayer? ownerPlayer = null, Func<bool>? refreshTransform = null,
+        Action<float, bool>? prepareAttachment = null)
     {
         _marker = marker; _particles = particles; _start = range?.StartTime ?? 0;
         _instantTrigger = range is { } time && !time.IsWholeAnimationRange && float.IsFinite(time.StartTime)
@@ -53,6 +55,7 @@ public sealed class EffectMetaInstance : IMetaDataInstance, IMetaDataPlaybackIns
         _persistentOwner = persistentOwner;
         _ownerPlayer = ownerPlayer;
         _refreshTransform = refreshTransform;
+        _prepareAttachment = prepareAttachment;
         if (range is { IsWholeAnimationRange: false } interval && !_instantTrigger
             && float.IsFinite(interval.EndTime) && interval.EndTime > _start)
             _rangeEmissionEnd = interval.EndTime - _start;
@@ -117,6 +120,9 @@ public sealed class EffectMetaInstance : IMetaDataInstance, IMetaDataPlaybackIns
             : null;
         ApplyMarkerVisibility();
         _marker.Update(currentTime);
+        _prepareAttachment?.Invoke(currentTime, previous == null || reset
+            || previous is { } priorCycle && priorCycle.CycleIndex != playback.CycleIndex && !continuousOwner
+            || playback.IsStopped && previous is not { IsStopped: true });
     }
     private void ApplyMarkerVisibility()
     {

@@ -1,5 +1,6 @@
-﻿#nullable enable
+#nullable enable
 using System.Security.Cryptography;
+using System.Reflection;
 using System.Text.Json;
 using System.Xml.Linq;
 using GameWorld.Core.Rendering;
@@ -180,7 +181,7 @@ public class EffekseerVfxPreviewTests
     [TestCase("wh2_dlc12_lib_lizard_acid_explosion.xml", "distortion-production", 2, 5)]
     [TestCase("wh_dlc08_lib_pinning_icicles.xml", "pinning-icicles", 0, 3)]
     [TestCase("cine_embers.xml", "cinematic-embers", 0, 2)]
-    [TestCase("wh2_dlc10_entangle_aoe.xml", "analytic-model-branch", 1, 1, "branch_3D")]
+    [TestCase("wh2_dlc10_entangle_aoe.xml", "analytic-model-branch", 1, 1, "branch_3D", 1f, true)]
     [TestCase("wh3_dlc24_lib_ability_petrifying_gaze.xml", "analytic-sprite-whoosh", 0, 1, "BASE_speed_whooshes3")]
     [TestCase("wh2_dlc10_entangle_aoe.xml", "entangle-complete", 3, 8, null, 3f)]
     [TestCase("wh2_dlc10_entangle_aoe.xml", "entangle-vines", 3, 1, "vines_decal", 1.5f)]
@@ -189,13 +190,22 @@ public class EffekseerVfxPreviewTests
     [TestCase("wh2_dlc10_entangle_aoe.xml", "entangle-core", 3, 1, "decal_core", .4f)]
     [TestCase("wh2_dlc10_entangle_aoe.xml", "entangle-ring", 3, 1, "decal_ring", 2.5f)]
     public void RealGameSamples_RenderSupportedLayersAndReportRemainder(string name, string outputName, int family, int minimumMappedLayers,
-        string? isolatedLayer = null, float previewSeconds = 1)
+        string? isolatedLayer = null, float previewSeconds = 1, bool authoredAlphaPlateau = false)
     {
         var data = Environment.GetEnvironmentVariable("ASSETEDITOR_VFX_GAME_DATA");
         if (string.IsNullOrWhiteSpace(data)) Assert.Ignore("ASSETEDITOR_VFX_GAME_DATA is not set.");
         var loader = new PackFileContainerLoader(null!);
         var definitions = loader.Load(Path.Combine(data!, "vfx_desc.pack"))!;
-        var resources = new[] { "vfx.pack", "vfx_models.pack", "vfx_models_dds.pack", "data.pack" }
+        var resourcePacks = new[] { "vfx.pack", "vfx_models.pack", "vfx_models_dds.pack", "data.pack", "commontextures.pack", "models2e_dds.pack" };
+        var manifest = File.ReadLines(Path.Combine(data!, "manifest.txt")).Select(line => line.Split('\t'))
+            .Where(parts => parts.Length >= 2 && parts[0].EndsWith(".pack", StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(parts => parts[0], parts => long.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture), StringComparer.OrdinalIgnoreCase);
+        foreach (var pack in resourcePacks.Append("vfx_desc.pack"))
+        {
+            Assert.That(manifest.ContainsKey(pack), Is.True, $"The fixture must only load manifest-owned original packs: {pack}");
+            Assert.That(new FileInfo(Path.Combine(data!, pack)).Length, Is.EqualTo(manifest[pack]), $"Original pack length: {pack}");
+        }
+        var resources = resourcePacks
             .Select(pack => loader.Load(Path.Combine(data!, pack))!).Append(definitions).ToArray();
         var path = "vfx\\" + name;
         var source = definitions.FileList[path].DataSource.ReadData();
@@ -224,6 +234,10 @@ public class EffekseerVfxPreviewTests
             Assert.That(conversion.Diagnostics.Any(x => x.Field == "shaders/vfx_waterfall.xml.shader"
                 && x.ReasonKey == "Vfx.Preview.MaterialUnsupported"), Is.True,
                 "A custom three-mask scrolling material must not be reported as a missing ordinary diffuse texture or replaced by one.");
+        var sourceSeconds = isolatedLayer != null || family == 3 ? previewSeconds : family == 0 ? 0.5f : 0.2f;
+        var plateau = authoredAlphaPlateau ? SourceAlphaPlateau(source, isolatedLayer!) : null;
+        var stages = plateau == null ? new[] { sourceSeconds } : new[] { sourceSeconds, plateau.StageSeconds };
+        string? originalParticleIdentities = null;
         var graphics = new GraphicsDeviceServiceMock();
         try
         {
@@ -231,40 +245,263 @@ public class EffekseerVfxPreviewTests
             using var preview = new EffekseerVfxPreview(device);
             preview.Reload(snapshot);
             Assert.That(preview.EmitterCount, Is.EqualTo(conversion.Emitters.Count(e => !e.IsEventTemplate)), JsonSerializer.Serialize(preview.Diagnostics));
-            var seconds = isolatedLayer != null || family == 3 ? previewSeconds : family == 0 ? 0.5f : 0.2f;
-            preview.Seek(seconds, Matrix.Identity);
             var simulation = new TotalWarVfxSimulation(conversion);
-            simulation.Seek(seconds, Matrix.Identity);
-            var frame = simulation.Frame(new CommonShaderParameters(Matrix.Identity, Matrix.Identity, new(0, 0, 100), Vector3.Zero, 0, 0, 0, 1, Vector3.One, []));
-            Assert.That(frame, Is.Not.Empty);
-            var meshRadius = conversion.Models.SelectMany(x => x.Vertices).Select(x => x.Position.Length()).DefaultIfEmpty(1).Max();
-            var minimum = new Vector3(float.MaxValue); var maximum = new Vector3(float.MinValue);
-            foreach (var particle in frame)
+            foreach (var seconds in stages)
             {
-                var radius = Math.Max(particle.Transform.Right.Length(), particle.Transform.Up.Length()) * Math.Max(1, meshRadius);
-                minimum = Vector3.Min(minimum, particle.Transform.Translation - new Vector3(radius));
-                maximum = Vector3.Max(maximum, particle.Transform.Translation + new Vector3(radius));
-            }
-            var extent = maximum - minimum;
-            var width = Math.Max(1, Math.Max(extent.X, Math.Max(extent.Y, extent.Z)) * 1.1f);
-            var centre = (maximum + minimum) / 2;
-            var baseline = Render(device, null, width, centre, outputName + "-baseline");
-            var pixels = Render(device, preview, width, centre, outputName, groundHeight: family == 3 ? 0 : null);
-            var changed = pixels.Zip(baseline).Count(pair => pair.First != pair.Second);
-            Assert.That(changed, Is.GreaterThan(outputName == "entangle-core" ? 0 : 20),
-                "The original assets must produce pixels; the very faint native core must not be artificially brightened.");
-            Assert.That(VfxDocument.Read(source).Write(), Is.EqualTo(source));
-            var output = Environment.GetEnvironmentVariable("ASSETEDITOR_VFX_RENDER_OUTPUT");
-            if (!string.IsNullOrWhiteSpace(output))
-                File.WriteAllText(Path.Combine(output, outputName + "-evidence.json"), JsonSerializer.Serialize(new
+                var stageOutputName = seconds == sourceSeconds ? outputName : outputName + "-alpha-plateau";
+                preview.Seek(seconds, Matrix.Identity);
+                simulation.Seek(seconds, Matrix.Identity);
+                var frame = simulation.ProjectedFrame(SceneParameters(1, Vector3.Zero), applyCameraCulling: false);
+                Assert.That(frame, Is.Not.Empty);
+                var modelCorners = new Dictionary<(int Model, int Frame), Vector3[]>();
+                var points = new List<Vector3>();
+                foreach (var projected in frame)
                 {
-                    Source = path, SourceSha256 = Convert.ToHexStringLower(SHA256.HashData(source)), IsolatedLayer = isolatedLayer,
-                    MappedLayers = preview.EmitterCount, TotalLayers = preview.TotalEmitterCount, DisabledLayers = conversion.DisabledEmitterCount, ChangedPixels = changed,
-                    TimeSeconds = seconds, Width = width, NativeGameComparison = false, Diagnostics = preview.Diagnostics,
-                }, new JsonSerializerOptions { WriteIndented = true }));
-            TestContext.Out.WriteLine($"{name}: {preview.EmitterCount}/{preview.TotalEmitterCount} layers, {changed} changed pixels.");
+                    var particle = projected.Render;
+                    foreach (var part in conversion.Emitters[particle.Layer].RenderParts(projected.ModelVariant))
+                    {
+                        Vector3[] corners;
+                        if (part.ModelIndex >= 0)
+                        {
+                            var model = conversion.Models[part.ModelIndex];
+                            var modelFrame = (int)MathF.Floor(Math.Max(0, particle.AppearancePhase) * model.AnimationCycles * model.AnimationFrameCount)
+                                % model.AnimationFrameCount;
+                            if (!modelCorners.TryGetValue((part.ModelIndex, modelFrame), out corners!))
+                            {
+                                var local = model.AnimationData?.Bounds(model.Vertices, modelFrame)
+                                    ?? BoundingBox.CreateFromPoints((model.AnimationVertices ?? model.Vertices)
+                                        .Skip(model.AnimationVertices == null ? 0 : modelFrame * model.Vertices.Length)
+                                        .Take(model.Vertices.Length).Select(vertex => vertex.Position));
+                                corners = local.GetCorners(); modelCorners.Add((part.ModelIndex, modelFrame), corners);
+                            }
+                        }
+                        else
+                        {
+                            var pivot = part.Pivot;
+                            corners = [new(-pivot.X,-pivot.Y,0),new(1-pivot.X,-pivot.Y,0),
+                                new(-pivot.X,1-pivot.Y,0),new(1-pivot.X,1-pivot.Y,0)];
+                        }
+                        points.AddRange(corners.Select(point => Vector3.Transform(point, particle.Transform)));
+                    }
+                }
+                Assert.That(points, Is.Not.Empty);
+                var worldBounds = BoundingBox.CreateFromPoints(points);
+                var centre = (worldBounds.Min + worldBounds.Max) * .5f;
+                var orientation = SceneParameters(1, Vector3.Zero).View;
+                var projectedBounds = BoundingBox.CreateFromPoints(points.Select(point => Vector3.Transform(point - centre, orientation)));
+                var screenCentre = (projectedBounds.Min + projectedBounds.Max) * .5f;
+                centre += Vector3.TransformNormal(new Vector3(screenCentre.X, screenCentre.Y, 0), Matrix.Invert(orientation));
+                var width = Math.Max(.05f, Math.Max(projectedBounds.Max.X - projectedBounds.Min.X,
+                    projectedBounds.Max.Y - projectedBounds.Min.Y) * 1.1f);
+                var baseline = Render(device, null, width, centre, stageOutputName + "-baseline");
+                var pixels = Render(device, preview, width, centre, stageOutputName, groundHeight: family == 3 ? 0 : null);
+                var changed = pixels.Zip(baseline).Count(pair => pair.First != pair.Second);
+                var rgba = pixels.SelectMany(pixel => new[] { pixel.R, pixel.G, pixel.B, pixel.A }).ToArray();
+                var pixelSha256 = Convert.ToHexStringLower(SHA256.HashData(rgba));
+                var previewSimulation = (TotalWarVfxSimulation)typeof(EffekseerVfxPreview)
+                    .GetField("_simulation", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(preview)!;
+                var particleIdentities = plateau == null ? null : OriginalParticleIdentities(previewSimulation);
+                if (plateau != null)
+                {
+                    Assert.That(particleIdentities, Is.EqualTo(OriginalParticleIdentities(simulation)), "The GPU submission and independent inspection must retain the same original births, random values and lifetimes.");
+                    originalParticleIdentities ??= particleIdentities;
+                    using var originalIdentities = JsonDocument.Parse(originalParticleIdentities);
+                    using var currentIdentities = JsonDocument.Parse(particleIdentities!);
+                    var original = originalIdentities.RootElement.EnumerateArray().Select(item => item.GetRawText()).ToArray();
+                    var current = currentIdentities.RootElement.EnumerateArray().Select(item => item.GetRawText()).ToArray();
+                    Assert.That(current.Distinct().Count(), Is.EqualTo(current.Length), "No original identity may be duplicated or respawned.");
+                    Assert.That(original.Except(current), Is.Empty, "Every original birth, random value, lifetime and initial transform must remain exactly intact.");
+                    foreach (var added in current.Except(original))
+                    {
+                        using var identity = JsonDocument.Parse(added);
+                        var birth = identity.RootElement.GetProperty("Birth").GetDouble();
+                        Assert.That(birth, Is.GreaterThan(plateau.AuthoredEmissionEnd), "Only the original finite emission interval's last partial tick may add a particle after the first stage.");
+                        Assert.That(birth, Is.LessThanOrEqualTo(plateau.LastBirth), "A finite source must not emit beyond its original float interval plus one fixed tick.");
+                    }
+                }
+                var coverage = plateau == null ? null : Native176NoiseFieldStatistics(conversion, frame);
+                if (plateau != null)
+                {
+                    var submittedOpaque = (List<EffekseerParticle>)typeof(EffekseerVfxPreview)
+                        .GetField("_opaqueParticles", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(preview)!;
+                    Assert.That(submittedOpaque.Count, Is.EqualTo(frame.Length), "Every original branch packet must actually reach the opaque GPU route in both stages.");
+                }
+                var output = Environment.GetEnvironmentVariable("ASSETEDITOR_VFX_RENDER_OUTPUT");
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    var actualCamera = SceneParameters(width, centre) with { VfxGroundHeight = family == 3 ? 0 : null };
+                    var projected = simulation.ProjectedFrame(actualCamera);
+                    var rendered = (List<EffekseerParticle>)typeof(EffekseerVfxPreview)
+                        .GetField("_renderedParticles", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(preview)!;
+                    var opaque = (List<EffekseerParticle>)typeof(EffekseerVfxPreview)
+                        .GetField("_opaqueParticles", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(preview)!;
+                    var prepared = changed <= 20 && conversion.MeshMaterials.Any(material => material.Parameters.Length is 60 or 68)
+                        ? VfxPreparedResources.Prepare(conversion) : null;
+                    if (plateau != null) File.WriteAllBytes(Path.Combine(output, stageOutputName + ".rgba"), rgba);
+                    File.WriteAllText(Path.Combine(output, stageOutputName + "-evidence.json"), JsonSerializer.Serialize(new
+                    {
+                        Source = path, SourceSha256 = Convert.ToHexStringLower(SHA256.HashData(source)), IsolatedLayer = isolatedLayer,
+                        SelectedSnapshotSha256 = Convert.ToHexStringLower(SHA256.HashData(snapshot.GameBytes)),
+                        RgbaSha256 = pixelSha256, RgbaWidth = 256, RgbaHeight = 256,
+                        StagePurpose = plateau == null ? "Original visibility stage" : seconds == sourceSeconds
+                            ? "Original sparse growth control; not a meaningful visibility pass" : "First authored full-alpha plateau visibility stage",
+                        AuthoredPlateau = plateau, OriginalParticleIdentities = particleIdentities, NativeNoiseFieldStatistics = coverage,
+                        MappedLayers = preview.EmitterCount, TotalLayers = preview.TotalEmitterCount, DisabledLayers = conversion.DisabledEmitterCount, ChangedPixels = changed,
+                        CameraPosition = actualCamera.CameraPosition.ToString(), CameraTarget = centre.ToString(),
+                        ActualWorldBounds = worldBounds.ToString(), ViewSpaceGeometryBounds = projectedBounds.ToString(),
+                        InspectionParticles = frame.Length, FormalProjectedParticles = projected.Length,
+                        Frames = projected.Select(item => new { conversion.Emitters[item.Render.Layer].Name, item.ModelVariant,
+                            item.Render.Layer, Position = item.Render.Transform.Translation.ToString(),
+                            Transform = MatrixValues(item.Render.Transform),
+                            CameraDistance = Vector3.Distance(actualCamera.CameraPosition, item.Render.Transform.Translation),
+                            CullDistances = conversion.Emitters[item.Render.Layer].ParticleCullDistances?.ToString(),
+                            Colour = item.Render.Colour.ToString(), item.Render.Time, item.Render.MaterialTime,
+                            item.Render.AppearancePhase, UV = item.Render.UV.ToString(), InstanceUvPayload = item.Render.NormalRotation.ToString() }).ToArray(),
+                        ActualColourSubmittedCount = rendered.Count, ActualOpaqueSubmittedCount = opaque.Count,
+                        ActualSubmittedPackets = opaque.Concat(rendered).Select(item => new { item.Layer, Position = item.Transform.Translation.ToString(),
+                            Transform = MatrixValues(item.Transform),
+                            Colour = item.Colour.ToString(), item.Time, item.MaterialTime, item.AppearancePhase,
+                            UV = item.UV.ToString(), InstanceUvPayload = item.NormalRotation.ToString() }).ToArray(),
+                        MaterialInputs = conversion.MeshMaterials.Select((material,index) => new
+                        {
+                            Index = index, material.Parameters, material.TextureIndexes,
+                            TexturePaths = material.TextureIndexes.Select(slot => conversion.TexturePaths[slot]).ToArray(),
+                            MaskRectangles = prepared?.Masks[index]?.Atlas?.Rectangles,
+                            SamplingInputs = prepared == null ? null : material.TextureIndexes.Select(slot => new
+                            {
+                                Index = slot, Path = conversion.TexturePaths[slot], Usage = conversion.TextureUsages[slot].ToString(),
+                                Sha256 = Convert.ToHexStringLower(SHA256.HashData(conversion.Textures[slot])),
+                                Width = prepared.Textures[slot].Image?.Width, Height = prepared.Textures[slot].Image?.Height,
+                                Srgb = prepared.Textures[slot].Image?.Srgb, MipLevels = prepared.Textures[slot].Image?.MipLevels,
+                                UnfilteredTopMipCentreRgba = prepared.Textures[slot].Image is { } image
+                                    ? image.Pixels.AsSpan(((image.Height/2)*image.Width+image.Width/2)*4,4).ToArray().Select(value => (int)value).ToArray() : null,
+                                DecodeFailure = prepared.Textures[slot].Failure?.Message,
+                            }).ToArray(),
+                        }).ToArray(),
+                        DiagnosticModelGeometry = prepared == null ? null : conversion.Models.Select((model,index) => new
+                        {
+                            Index = index, model.AnimationFrameCount, HasCompactAnimation = model.AnimationData != null,
+                            HasBakedAnimation = model.AnimationVertices != null,
+                            PositionUv = model.Vertices.Select(vertex => new[] { vertex.Position.X, vertex.Position.Y, vertex.Position.Z, vertex.UV.X, vertex.UV.Y }).ToArray(),
+                            model.Indices,
+                        }).ToArray(),
+                        DiagnosticScope = "Exact source stage and original parameters retained. Material atlas rectangles are reconstructed by the production CPU preparation, not a GPU constant-buffer capture. Geometry inspection is pre-cull; formal and submitted packets expose actual culling/alpha.",
+                        TimeSeconds = seconds, Width = width, NativeGameComparison = false, Diagnostics = preview.Diagnostics,
+                    }, new JsonSerializerOptions { WriteIndented = true }));
+                }
+                if (plateau != null && seconds == sourceSeconds)
+                {
+                    Assert.That(frame.All(item => item.Render.AppearancePhase < plateau.PhaseStart && item.Render.Colour.W < 1), Is.True,
+                        "Retain the original growth stage and its genuine low alpha; do not inflate it into the plateau.");
+                    Assert.That(coverage!.FullyCoveredParticles, Is.Zero, "The native original red-noise field must remain sparse in this early stage.");
+                }
+                else
+                {
+                    Assert.That(changed, Is.GreaterThan(outputName == "entangle-core" ? 0 : 20),
+                        "The original assets must produce pixels; the very faint native core must not be artificially brightened.");
+                    if (plateau != null)
+                    {
+                        Assert.That(frame.All(item => item.Render.Colour.W == 1), Is.True, "The unmodified source curve has full alpha inside its first authored plateau.");
+                        Assert.That(coverage!.FullyCoveredParticles, Is.EqualTo(frame.Length));
+                    }
+                }
+                Assert.That(VfxDocument.Read(source).Write(), Is.EqualTo(source));
+                TestContext.Out.WriteLine($"{name} at {seconds}s: {preview.EmitterCount}/{preview.TotalEmitterCount} layers, {changed} changed pixels; RGBA {pixelSha256}.");
+
+            }
         }
         finally { graphics.Release(); }
+    }
+
+    private sealed record AuthoredAlphaPlateau(double PhaseStart, double PhaseEnd, double Start, double AuthoredEmissionEnd,
+        float FloatStart, float FloatDuration, double FloatEmissionEnd, double TickSeconds, double LastBirth,
+        double MinimumLife, double MaximumLife, double TableInteriorMargin, double SafeStartSeconds, double SafeEndSeconds,
+        float StageSeconds, string OriginalCurve);
+
+    private static AuthoredAlphaPlateau SourceAlphaPlateau(byte[] source, string layer)
+    {
+        var root = VfxDocument.Read(source).Root.Element("vfx")!;
+        var emitter = root.Elements("emitters").Elements("emitter").Single(node => (string?)node.Attribute("id") == layer);
+        var properties = emitter.Elements().Where(node => (string?)node.Attribute("quality") == "0")
+            .ToDictionary(node => (string)node.Attribute("name")!);
+        double Bound(string name, string bound) => double.Parse((string)properties[name].Attribute(bound)!, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.That(Bound("StartTime", "min"), Is.EqualTo(Bound("StartTime", "max")), "The source stage proof requires a fixed start.");
+        Assert.That(Bound("LifeTime", "min"), Is.EqualTo(Bound("LifeTime", "max")), "The source stage proof requires a fixed emission interval.");
+        Assert.That(VfxCurve.TryParse(properties["ParticleLifeTime"].Value, out var life), Is.True);
+        Assert.That(VfxCurve.TryParse(properties["ParticleInitialAlpha"].Value, out var initialAlpha), Is.True);
+        Assert.That(life!.Channels.All(channel => channel.Points.Count == 1), Is.True);
+        Assert.That(initialAlpha!.Channels.All(channel => channel.Points.All(point => point.Value == 1)), Is.True);
+        var alphaText = root.Elements("behaviour_chains").Elements("behaviour_chain")
+            .Single(node => (string?)node.Attribute("id") == layer).Elements("quality")
+            .Single(node => (string?)node.Attribute("value") == "0").Descendants("property")
+            .Single(node => (string?)node.Attribute("name") == "curve_alpha").Value;
+        Assert.That(VfxCurve.TryParse(alphaText, out var alpha), Is.True);
+        var plateaus = alpha!.Channels.Select(channel => channel.Points.Zip(channel.Points.Skip(1))
+            .First(pair => pair.First.Value == 1 && pair.Second.Value == 1)).ToArray();
+        var phaseStart = plateaus.Max(pair => pair.First.Time);
+        var phaseEnd = plateaus.Min(pair => pair.Second.Time);
+        var start = Bound("StartTime", "min"); var duration = Bound("LifeTime", "max");
+        var authoredEnd = start + duration;
+        var floatStart = (float)start; var floatDuration = (float)duration;
+        var floatEnd = (double)floatStart + floatDuration;
+        const double tick = 1.0 / 120;
+        var lastBirth = floatEnd + tick;
+        var minimumLife = life.Channels.Min(channel => channel.Points[0].Value);
+        var maximumLife = life.Channels.Max(channel => channel.Points[0].Value);
+        const double margin = 1.0 / 127;
+        var safeStart = lastBirth + maximumLife * (phaseStart + margin);
+        var safeEnd = start + minimumLife * (phaseEnd - margin);
+        var stage = (float)Math.Ceiling(safeStart);
+        Assert.That(stage, Is.LessThan(safeEnd), "Choose the first whole second analytically inside the common original plateau; never search rendered frames for a passing time.");
+        return new(phaseStart, phaseEnd, start, authoredEnd, floatStart, floatDuration, floatEnd, tick, lastBirth,
+            minimumLife, maximumLife, margin, safeStart, safeEnd, stage, alphaText);
+    }
+
+    private static string OriginalParticleIdentities(TotalWarVfxSimulation simulation)
+    {
+        var particles = ((System.Collections.IEnumerable)typeof(TotalWarVfxSimulation)
+            .GetField("_particles", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(simulation)!).Cast<object>();
+        return JsonSerializer.Serialize(particles.Select(particle =>
+        {
+            object Field(string name) => particle.GetType().GetField(name)!.GetValue(particle)!;
+            return new { Birth = (double)Field("Birth"), Life = (float)Field("Life"),
+                RandomAlpha = (float)Field("RandomAlpha"), ModelVariant = (int)Field("ModelVariant"),
+                InitialAlpha = (float)Field("InitialAlpha"), InitialScale = Field("InitialScale").ToString(),
+                RandomScale = Field("RandomScale").ToString(), RandomColour = Field("RandomColour").ToString(),
+                Root = MatrixValues((Matrix)Field("Root")) };
+        }).OrderBy(particle => particle.Birth).ThenBy(particle => particle.RandomAlpha));
+    }
+
+    private sealed record NoiseFieldRow(float Alpha, int NativeAlphaFloor, float Threshold, int NonnegativeTexels);
+    private sealed record NoiseFieldStatistics(string Scope, string NoiseSha256, int Texels, int MinimumRed, int MaximumRed,
+        int FullyCoveredParticles, NoiseFieldRow[] Particles);
+
+    private static NoiseFieldStatistics Native176NoiseFieldStatistics(VfxConversion conversion, VfxPreviewParticle[] frame)
+    {
+        var material = conversion.MeshMaterials.Single();
+        Assert.That(material.Parameters.Length, Is.EqualTo(60));
+        Assert.That(material.Parameters[58], Is.EqualTo(1)); Assert.That(material.Parameters[59], Is.EqualTo(1));
+        Assert.That(material.Parameters[43], Is.Zero, "The original manual dither term is disabled.");
+        (byte[] Pixels, int Width, int Height, bool Srgb, int MipLevels) Image(int slot)
+            => VfxPreparedResources.DecodeTexture(conversion.Textures[material.TextureIndexes[slot]], VfxTextureUsage.MaterialValue);
+        foreach (var slot in new[] { 1, 7 })
+            Assert.That(Image(slot).Pixels.All(value => value == 255), Is.True, "The original dissolve and global masks are white.");
+        var dither = Image(3);
+        Assert.That(Enumerable.Range(0, dither.Width * dither.Height).All(index => dither.Pixels[index * 4] > 0), Is.True);
+        var noise = Image(2);
+        var red = Enumerable.Range(0, noise.Width * noise.Height).Select(index => noise.Pixels[index * 4] / 255f).Order().ToArray();
+        var rows = frame.Select(particle =>
+        {
+            var alpha = particle.Render.Colour.W; var quantized = (int)MathF.Floor(alpha * 1000);
+            var threshold = 1 - quantized * .001f;
+            var low = 0; var high = red.Length;
+            while (low < high) { var middle = (low + high) / 2; if (red[middle] < threshold) low = middle + 1; else high = middle; }
+            return new NoiseFieldRow(alpha, quantized, threshold, red.Length - low);
+        }).ToArray();
+        return new("Original top-mip texel-centre UV-domain field statistics only; not a filtered raster or screen-pixel prediction. With original white masks, manual0 and positive dither.R, the native clip is noise.R >= 1-floor(alpha*1000)*.001.",
+            Convert.ToHexStringLower(SHA256.HashData(conversion.Textures[material.TextureIndexes[2]])), red.Length,
+            noise.Pixels.Where((_, index) => index % 4 == 0).Min(), noise.Pixels.Where((_, index) => index % 4 == 0).Max(),
+            rows.Count(row => row.NonnegativeTexels == red.Length), rows);
     }
 
     [TestCase(0)]

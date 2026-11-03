@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Xml;
 using System.Xml.Linq;
 using Shared.GameFormats.Vfx;
@@ -8,15 +8,21 @@ namespace GameWorld.Core.Vfx;
 // The parameter order matches wh_vfx_mesh's shipped 196-byte AUTO_PARAMETERS layout.
 internal sealed record VfxScrollingMeshMaterial(string[] TexturePaths, float[] Parameters)
 {
-    public static bool Supports(string shader) => shader.Replace('\\', '/').ToLowerInvariant()
+    public static bool Supports(string shader) => VfxMeshDistortionMaterial.Supports(shader) || VfxFungiMeshMaterial.Supports(shader) || VfxFogBloodMaterial.Supports(shader) || VfxRigidGlowMaterial.Supports(shader) || VfxNativeColourMeshMaterial.Supports(shader) || VfxNativeSimpleMeshMaterial.Supports(shader)
+        || shader.Replace('\\', '/').ToLowerInvariant()
         is "shaders/wh_vfx_mesh.xml.shader" or "shaders/wh2_vfx_mesh_colour.xml.shader" or "shaders/wh3_vfx_one_shot_mesh.xml.shader"
             or "shaders/wh3_vfx_basic_mesh.xml.shader" or "shaders/vfx_gemstone_crystal.xml.shader" or "shaders/fx_premultiply_animated_uvs.xml.shader" or "shaders/vfx_mesh_solid.xml.shader"
             or "shaders/vfx_soulpanning.xml.shader" or "shaders/vfx_soulpanning_w2.xml.shader" or "shaders/vfx_soulpanning_w4.xml.shader"
             or "shaders/vfx_growing_vines.xml.shader" or "shaders/wh3_vfx_rigid_emissive_dissolve_one_shot.xml.shader"
+            or "shaders/vfx_rigid_emissive_dissolve.xml.shader"
+            or "shaders/wh3_vfx_rigid_emissive_dissolve.xml.shader"
             or "shaders/vfx_rigid_basic_dither.xml.shader"
-            or "shaders/wh2_vfx_cst_tidecall.xml.shader" or "shaders/wh_vfx_mesh_vertex_anim_battle.xml.shader";
-    public bool UsesVertexColour => Parameters.Length is VfxTidecallMaterial.ParameterCount or VfxVertexAnimatedMeshMaterial.ParameterCount
-        || Parameters.Length is not (8 or 12 or 28 or 32 or 40 or 60) && Parameters[Parameters.Length == 56 ? 48 : Parameters.Length == 55 ? 53 : Parameters.Length == 54 ? 52 : 47] != 0;
+            or "shaders/wh2_vfx_cst_tidecall.xml.shader" or "shaders/wh_vfx_mesh_vertex_anim_battle.xml.shader"
+            or "shaders/wh_vfx_mesh_vertex_anim.xml.shader";
+    public bool UsesVertexColour => Parameters.Length is VfxMeshDistortionMaterial.ParameterCount or VfxFungiMeshMaterial.ParameterCount ? true : VfxFogBloodMaterial.IsFamily(Parameters.Length) ? VfxFogBloodMaterial.UsesVertexColour(Parameters) : Parameters.Length == VfxRigidGlowMaterial.ParameterCount ? true : Parameters.Length == VfxNativeColourMeshMaterial.ParameterCount ? VfxNativeColourMeshMaterial.UsesVertexColour(Parameters)
+        : Parameters.Length == VfxNativeSimpleMeshMaterial.ParameterCount ? TexturePaths.Length != 0
+        : Parameters.Length is VfxTidecallMaterial.ParameterCount or VfxVertexAnimatedMeshMaterial.ParameterCount
+        || Parameters.Length is not (8 or 12 or 28 or 32 or 40 or 60 or VfxLegacyRigidDissolveMaterial.ParameterCount) && Parameters[Parameters.Length == 56 ? 48 : Parameters.Length == 55 ? 53 : Parameters.Length == 54 ? 52 : 47] != 0;
     internal static readonly (string Name, int Components)[] Fields =
     [
         ("Texture_A_channels", 4), ("Texture_B_Channels", 4), ("Texture_C_Channels", 4),
@@ -35,10 +41,19 @@ internal sealed record VfxScrollingMeshMaterial(string[] TexturePaths, float[] P
         using var reader = XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null });
         var root = XElement.Load(reader);
         var shader = ((string?)root.Element("shader"))?.Replace('\\', '/').ToLowerInvariant() ?? "";
+        if (VfxMeshDistortionMaterial.Supports(shader)) return VfxMeshDistortionMaterial.Read(root);
+        if (VfxFungiMeshMaterial.Supports(shader)) return VfxFungiMeshMaterial.Read(root);
+        if (VfxFogBloodMaterial.Supports(shader)) return VfxFogBloodMaterial.Read(root);
+        if (VfxRigidGlowMaterial.Supports(shader)) return VfxRigidGlowMaterial.Read(root);
+        if (VfxNativeColourMeshMaterial.Supports(shader)) return VfxNativeColourMeshMaterial.Read(root);
+        if (VfxNativeSimpleMeshMaterial.Supports(shader)) return VfxNativeSimpleMeshMaterial.Read(root);
         if (shader == "shaders/vfx_rigid_basic_dither.xml.shader") return VfxRigidBasicDitherMaterial.Read(root);
         if (shader == "shaders/wh2_vfx_cst_tidecall.xml.shader") return VfxTidecallMaterial.Read(root);
-        if (shader == "shaders/wh_vfx_mesh_vertex_anim_battle.xml.shader") return VfxVertexAnimatedMeshMaterial.Read(root);
+        if (shader is "shaders/wh_vfx_mesh_vertex_anim_battle.xml.shader" or "shaders/wh_vfx_mesh_vertex_anim.xml.shader")
+            return VfxVertexAnimatedMeshMaterial.Read(root);
+        if (shader == "shaders/wh3_vfx_rigid_emissive_dissolve.xml.shader") return VfxNativeRigidDissolveMaterial.Read(root);
         if (shader == "shaders/wh3_vfx_rigid_emissive_dissolve_one_shot.xml.shader") return VfxRigidDissolveMaterial.Read(root);
+        if (shader == "shaders/vfx_rigid_emissive_dissolve.xml.shader") return VfxLegacyRigidDissolveMaterial.Read(root);
         if (shader == "shaders/vfx_growing_vines.xml.shader") return VfxGrowingVinesMaterial.Read(root);
         if (shader == "shaders/vfx_mesh_solid.xml.shader") return VfxSolidMeshMaterial.Read(root, resolve);
         if (shader is "shaders/vfx_soulpanning.xml.shader" or "shaders/vfx_soulpanning_w2.xml.shader" or "shaders/vfx_soulpanning_w4.xml.shader")

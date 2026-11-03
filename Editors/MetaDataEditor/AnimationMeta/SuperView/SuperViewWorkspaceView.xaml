@@ -81,6 +81,34 @@
                         <CheckBox Content="{loc:Loc SuperView.ShowTargetPos}" IsChecked="{Binding ShowTargetPositions, Mode=TwoWay}" Style="{StaticResource AeInput.CheckBox}" Margin="0,0,0,8" />
                         <CheckBox Content="{loc:Loc SuperView.ShowFirePos}" IsChecked="{Binding ShowFirePositions, Mode=TwoWay}" Style="{StaticResource AeInput.CheckBox}" Margin="0,0,0,8" />
                         <CheckBox Content="{loc:Loc SuperView.ShowSplashAttack}" IsChecked="{Binding ShowSplashAttacks, Mode=TwoWay}" Style="{StaticResource AeInput.CheckBox}" />
+                        <TextBlock Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc SuperView.Effects.Title}" Margin="0,16,0,8" />
+                        <TextBlock Style="{StaticResource AeText.Caption}" Text="{loc:Loc SuperView.Effects.ContextHint}" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <StackPanel x:Name="EffectPreviewControls">
+                            <TextBlock Text="{loc:Loc SuperView.Effects.Terrain}" Style="{StaticResource AeForm.TextLabel}" HorizontalAlignment="Left" Margin="0,0,0,4" />
+                            <ComboBox x:Name="EffectPreviewTerrain" ItemsSource="{Binding EffectTerrainChoices}" DisplayMemberPath="Label" SelectedValuePath="Value"
+                                      SelectedValue="{Binding PreviewTerrainType, Mode=TwoWay}" Style="{StaticResource AeInput.ComboBox}" Margin="0,0,0,8" />
+                            <TextBlock Text="{loc:Loc SuperView.Effects.Aura}" Style="{StaticResource AeForm.TextLabel}" HorizontalAlignment="Left" Margin="0,0,0,4" />
+                            <Grid ToolTip="{loc:Loc SuperView.Effects.OverrideHint}" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding PreviewAuraResource, Mode=OneWay}" ToolTip="{Binding PreviewAuraResource}" IsReadOnly="True" Style="{StaticResource AeInput.TextBox}" AutomationProperties.Name="{loc:Loc SuperView.Effects.Aura}" />
+                                <Button Grid.Column="1" Content="{loc:Loc General.Browse}" Command="{Binding BrowseAuraResourceCommand}" Style="{StaticResource AeButton.Secondary}" Margin="8,0,0,0" />
+                                <Button Grid.Column="2" Content="{loc:Loc General.Clear}" Command="{Binding ClearAuraResourceCommand}" Style="{StaticResource AeButton.Quiet}" Margin="8,0,0,0" />
+                            </Grid>
+                            <TextBlock Text="{loc:Loc SuperView.Effects.Weapon}" Style="{StaticResource AeForm.TextLabel}" HorizontalAlignment="Left" Margin="0,0,0,4" />
+                            <Grid ToolTip="{loc:Loc SuperView.Effects.OverrideHint}" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBox Text="{Binding PreviewWeaponResource, Mode=OneWay}" ToolTip="{Binding PreviewWeaponResource}" IsReadOnly="True" Style="{StaticResource AeInput.TextBox}" AutomationProperties.Name="{loc:Loc SuperView.Effects.Weapon}" />
+                                <Button Grid.Column="1" Content="{loc:Loc General.Browse}" Command="{Binding BrowseWeaponResourceCommand}" Style="{StaticResource AeButton.Secondary}" Margin="8,0,0,0" />
+                                <Button Grid.Column="2" Content="{loc:Loc General.Clear}" Command="{Binding ClearWeaponResourceCommand}" Style="{StaticResource AeButton.Quiet}" Margin="8,0,0,0" />
+                            </Grid>
+                            <CheckBox x:Name="EffectPreviewDistanceCulling" Content="{loc:Loc SuperView.Effects.DistanceCulling}" IsChecked="{Binding PreviewDistanceCulling, Mode=TwoWay}"
+                                      ToolTip="{loc:Loc SuperView.Effects.DistanceCullingHint}" Style="{StaticResource AeInput.CheckBox}" Margin="0,0,0,8" />
+                            <CheckBox x:Name="EffectPreviewIdFilter" Content="{loc:Loc SuperView.Effects.IdFilter}" IsChecked="{Binding PreviewEffectIdFilter, Mode=TwoWay}"
+                                      Style="{StaticResource AeInput.CheckBox}" Margin="0,0,0,4" />
+                            <TextBox x:Name="EffectPreviewId" Text="{Binding PreviewEffectId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged, ValidatesOnExceptions=True}"
+                                     IsEnabled="{Binding PreviewEffectIdFilter}" ToolTip="{loc:Loc SuperView.Effects.IdFilterHint}" Style="{StaticResource AeInput.TextBox}"
+                                     AutomationProperties.Name="{loc:Loc SuperView.Effects.IdFilter}" />
+                        </StackPanel>
                         <TextBlock Style="{StaticResource AeText.SectionTitle}" Text="{loc:Loc SuperView.PreviewWind}" Margin="0,16,0,8"
                                    Visibility="{Binding CanPreviewFlagWind, Converter={StaticResource B2VConverter}}" />
                         <Grid x:Name="FlagWindControls" ToolTip="{loc:Loc SuperView.PreviewWindHint}"

@@ -28,7 +28,7 @@ inline std::array<SceneUtilityShaderSource, 3> SceneUtilityShaderSources()
                     float3 accumulated = vectors.SampleLevel(linearClamp, bufferUV, 0).rgb;
                     // Native mode 1 squares 1-T even when floating transmittance leaves [0,1].
                     float visibility = 1 - transmittance.SampleLevel(linearClamp, bufferUV, 0).r;
-                    if (visibility == 0 || accumulated.z <= 0) discard;
+                    if (visibility == 0) discard;
                     float2 offset = 0.02 * accumulated.xy / (accumulated.z < 0.001 ? 1 : accumulated.z)
                         * visibility * visibility;
                     if (all(offset == 0)) discard;

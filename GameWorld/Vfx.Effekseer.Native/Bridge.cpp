@@ -7,6 +7,7 @@
 #include <Effekseer/Renderer/Effekseer.ModelRenderer.h>
 #include <Effekseer/Material/Effekseer.CompiledMaterial.h>
 #include <EffekseerRendererDX11.h>
+#include <EffekseerRendererDX11.RendererImplemented.h>
 #include <wrl/client.h>
 #include <d3dcompiler.h>
 #include <DirectXPackedVector.h>
@@ -37,6 +38,8 @@ thread_local std::string lastError;
 #include "FloatSceneTarget.h"
 #include "WeightedDistortionTarget.h"
 #include "HalfResolutionScene.h"
+#include "CompactAnimatedModel.h"
+#include "NativeMeshBlendScope.h"
 
 // Only the pinned resource container uses an internal API; particles use the renderer's public parameters.
 class ResourceEffect final : public EffectImplemented
@@ -56,7 +59,8 @@ public:
         const MaterialRef& basicMeshMaterial, const MaterialRef& gemstoneMaterial, const MaterialRef& animatedUVMaterial, const MaterialRef& basicSpriteMaterial,
         const MaterialRef& premultiplyAnimatedMaterial, const MaterialRef& solidMaterial, const MaterialRef& prelitSpriteMaterial, const MaterialRef& soulPanningMaterial,
         const MaterialRef& growingVinesMaterial, const MaterialRef& rigidDissolveMaterial, const MaterialRef& distortionMaterial,
-        const MaterialRef& tidecallMaterial, const MaterialRef& vertexAnimatedMaterial, const MaterialRef& rigidBasicDitherMaterial)
+        const MaterialRef& tidecallMaterial, const MaterialRef& vertexAnimatedMaterial, const MaterialRef& rigidBasicDitherMaterial,
+        const std::array<MaterialRef, 4>& colourMeshMaterials, const std::array<MaterialRef, 2>& simpleMeshMaterials, const std::array<MaterialRef, 2>& rigidGlowMaterials, MaterialRef fungiMaterial, MaterialRef meshDistortionMaterial)
         : EffectImplemented(manager, nullptr, 0)
     {
         m_version = Version17;
@@ -82,6 +86,11 @@ public:
         materials_.push_back(tidecallMaterial);
         materials_.push_back(vertexAnimatedMaterial);
         materials_.push_back(rigidBasicDitherMaterial);
+        for (const auto& value : colourMeshMaterials) materials_.push_back(value);
+        for (const auto& value : simpleMeshMaterials) materials_.push_back(value);
+        for (const auto& value : rigidGlowMaterials) materials_.push_back(value);
+        materials_.push_back(fungiMaterial);
+        materials_.push_back(meshDistortionMaterial);
     }
 };
 
@@ -90,7 +99,7 @@ struct SceneDraw
 {
     std::shared_ptr<Preview> preview;
     std::array<float, 16> view{}, projection{};
-    std::vector<AecnParticle> opaque, colour, distortion, fallback;
+    std::vector<AecnParticle> opaque, colour, distortion, sea, fallback;
     AecnLighting lighting{};
     ComPtr<ID3D11ShaderResourceView> softDepth;
 };
@@ -107,23 +116,31 @@ struct Preview
     RefPtr<ModelRenderer> meshes;
     std::vector<TextureRef> textures;
     std::vector<ModelRef> models;
+    std::vector<RefPtr<CompactAnimatedModel>> compactModels;
     std::vector<float> modelAnimationCycles;
     int64_t animatedVertices = 0, animatedIndices = 0;
     std::vector<AecnLayer> layers;
     std::vector<AecnHalfLayerConfig> halfLayers;
     std::vector<AecnHalfLayerConfig> fullLayers;
+    std::vector<AecnHalfLayerConfig> seaLayers;
+    std::vector<const AecnHalfLayerConfig*> seaLayerLookup;
     struct NativeAlphaLayer { const AecnHalfLayerConfig* config = nullptr; bool halfResolution = false; };
     std::vector<NativeAlphaLayer> nativeAlphaLayers;
     EffectRef effect;
     AecnRenderTiming::Stats timing;
     MaterialLoaderRef materialLoader;
     MaterialRef material, decalMaterial, scrollingMaterial, oneShotMaterial, basicMeshMaterial, gemstoneMaterial, animatedUVMaterial, basicSpriteMaterial, premultiplyAnimatedMaterial, solidMaterial, prelitSpriteMaterial, soulPanningMaterial, growingVinesMaterial, rigidDissolveMaterial, distortionMaterial, tidecallMaterial, vertexAnimatedMaterial, rigidBasicDitherMaterial;
+    std::array<MaterialRef, 4> colourMeshMaterials{};
+    std::array<MaterialRef, 2> simpleMeshMaterials{};
+    std::array<MaterialRef, 2> rigidGlowMaterials{};
+    MaterialRef fungiMaterial, meshDistortionMaterial;
+    std::array<ComPtr<ID3D11BlendState>, 2> nativeMeshBlends{};
     AecnSpriteUpload::Renderer* uploadRenderer = nullptr;
     std::unique_ptr<AecnSpriteUpload::Shader> uploadShader;
     MaterialRef uploadMaterial;
     EffectRef uploadEffect;
     SpriteRendererRef uploadSprites;
-    struct MeshMaterial { std::vector<int32_t> textures; std::array<float, 104> parameters{}; ComPtr<ID3D11Buffer> extendedParameters; bool oneShot = false, basicMesh = false, gemstone = false, animatedUV = false, basicSprite = false, premultiplyAnimated = false, solid = false, prelitSprite = false, soulPanning = false, scrollingMesh = false, growingVines = false, rigidDissolve = false, tidecall = false, vertexAnimated = false, rigidBasicDither = false; };
+    struct MeshMaterial { std::vector<int32_t> textures; std::array<float, 104> parameters{}; ComPtr<ID3D11Buffer> extendedParameters; bool oneShot = false, basicMesh = false, gemstone = false, animatedUV = false, basicSprite = false, premultiplyAnimated = false, solid = false, prelitSprite = false, soulPanning = false, scrollingMesh = false, growingVines = false, rigidDissolve = false, tidecall = false, vertexAnimated = false, rigidBasicDither = false, colourMesh = false, simpleMesh = false, simpleAdditive = false, rigidGlow = false, customFog = false, customBlood = false, fungi = false, meshDistortion = false; };
     std::vector<MeshMaterial> meshMaterials;
     FloatSceneTarget floatingScene;
     std::unique_ptr<FloatSceneTarget::Frame> sceneFrame;
@@ -194,6 +211,11 @@ struct Preview
         if (tidecallMaterial != nullptr) materialLoader->Unload(tidecallMaterial);
         if (vertexAnimatedMaterial != nullptr) materialLoader->Unload(vertexAnimatedMaterial);
         if (rigidBasicDitherMaterial != nullptr) materialLoader->Unload(rigidBasicDitherMaterial);
+        for (auto& value : colourMeshMaterials) if (value != nullptr) materialLoader->Unload(value);
+        for (auto& value : simpleMeshMaterials) if (value != nullptr) materialLoader->Unload(value);
+        for (auto& value : rigidGlowMaterials) if (value != nullptr) materialLoader->Unload(value);
+        if (fungiMaterial != nullptr) materialLoader->Unload(fungiMaterial);
+        if (meshDistortionMaterial != nullptr) materialLoader->Unload(meshDistortionMaterial);
     }
 
     void CaptureDepth(const float* projection)
@@ -321,8 +343,8 @@ public:
     {
         context->VSGetConstantBuffers(2, 1, vertexConstants_.GetAddressOf());
         context->PSGetConstantBuffers(2, 1, pixelConstants_.GetAddressOf());
-        context->VSGetShaderResources(0, 1, vertexTexture_.GetAddressOf());
-        context->VSGetSamplers(0, 1, vertexSampler_.GetAddressOf());
+        context->VSGetShaderResources(8, 1, vertexTexture_.GetAddressOf());
+        context->VSGetSamplers(8, 1, vertexSampler_.GetAddressOf());
         context->PSGetShaderResources(8, 5, pixelTextures_);
         context->PSGetSamplers(8, 1, pixelSampler_.GetAddressOf());
     }
@@ -331,7 +353,7 @@ public:
         auto vertex = vertexConstants_.Get(), pixel = pixelConstants_.Get();
         auto texture = vertexTexture_.Get(); auto sampler = vertexSampler_.Get();
         context_->VSSetConstantBuffers(2, 1, &vertex); context_->PSSetConstantBuffers(2, 1, &pixel);
-        context_->VSSetShaderResources(0, 1, &texture); context_->VSSetSamplers(0, 1, &sampler);
+        context_->VSSetShaderResources(8, 1, &texture); context_->VSSetSamplers(8, 1, &sampler);
         sampler = pixelSampler_.Get();
         context_->PSSetShaderResources(8, 5, pixelTextures_); context_->PSSetSamplers(8, 1, &sampler);
         for (auto resource : pixelTextures_) if (resource) resource->Release();
@@ -476,9 +498,11 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
     const AecnParticle* particles, int count, const AecnLighting* lighting,
     ID3D11ShaderResourceView* softDepth, int sharedDistortionPass);
 static const AecnHalfLayerConfig* HalfLayer(const Preview& preview, int layer);
+static const AecnHalfLayerConfig* SeaLayer(const Preview& preview, int layer);
+static void DrawSeaScene(Preview& owner, const std::vector<SceneDraw>& draws);
 static const std::vector<AecnParticle>& ExpandHalfFallback(const Preview& preview,
     const std::vector<AecnParticle>& particles, std::vector<AecnParticle>& result);
-static bool TryDrawHalfScene(Preview& owner, const std::vector<SceneDraw>& draws);
+static bool TryDrawHalfScene(Preview& owner, const std::vector<SceneDraw>& draws, bool customMboit);
 
 API int AecnVfxAbi(int layerBytes, int particleBytes, int vertexBytes, int lightingBytes)
 {
@@ -561,7 +585,7 @@ API int AecnVfxEndScene(Preview* preview)
                 for (auto& command : Draws)
                 {
                     command.preview.reset(); command.softDepth.Reset();
-                    command.opaque.clear(); command.colour.clear(); command.distortion.clear(); command.fallback.clear();
+                    command.opaque.clear(); command.colour.clear(); command.distortion.clear(); command.sea.clear(); command.fallback.clear();
                 }
                 // Retain only buffer capacity; never retain another preview or an old scene/depth snapshot.
                 if (!Draws.empty()) Owner.recycledSceneDraws = std::move(Draws);
@@ -575,11 +599,32 @@ API int AecnVfxEndScene(Preview* preview)
         };
         // All opaque receivers precede colour; all colour precedes one scene-wide refraction resolve.
         for (const auto& command : draws) draw(command, command.opaque, -1);
-        if (!TryDrawHalfScene(*preview, draws))
+        DrawSeaScene(*preview, draws);
+        const bool customMboit=std::any_of(draws.begin(),draws.end(),[](const SceneDraw& command)
+        {
+            return std::any_of(command.colour.begin(),command.colour.end(),[&](const AecnParticle& particle)
+            {
+                const auto index=command.preview->layers[particle.Layer].MeshMaterialIndex;
+                return index>=0 && (command.preview->meshMaterials[index].customFog || command.preview->meshMaterials[index].customBlood);
+            });
+        });
+        if (!TryDrawHalfScene(*preview, draws, customMboit))
+        {
+            if(customMboit)throw std::runtime_error("Unsupported native custom MBOIT scene packet");
             for (auto& command : draws)
             {
                 if (command.preview->halfLayers.empty() && command.preview->fullLayers.empty()) draw(command, command.colour, -1);
                 else draw(command, ExpandHalfFallback(*command.preview, command.colour, command.fallback), -1);
+            }
+        }
+        else if(customMboit)
+            for(auto& command:draws)
+            {
+                // The native frame registers the MBOIT composition before ordinary DEFERRED_ALPHA.
+                command.fallback.clear();
+                for(const auto& particle:command.colour)
+                    if(!HalfLayer(*command.preview,particle.Layer))command.fallback.push_back(particle);
+                draw(command,command.fallback,-1);
             }
         if (std::any_of(draws.begin(), draws.end(), [](const SceneDraw& command) { return !command.distortion.empty(); }))
         {
@@ -710,6 +755,7 @@ API int AecnVfxModel(Preview* preview, const AecnVertex* vertices, int vertexCou
             faces[i / 3].Indexes[i % 3] = indices[i];
         }
         preview->models.push_back(MakeRefPtr<Model>(converted, faces));
+        preview->compactModels.push_back(nullptr);
         preview->modelAnimationCycles.push_back(0);
     });
 }
@@ -722,6 +768,7 @@ API int AecnVfxModelAlias(Preview* preview, int sourceIndex)
         auto model = preview->models[sourceIndex];
         const auto cycles = preview->modelAnimationCycles[sourceIndex];
         preview->models.push_back(model);
+        preview->compactModels.push_back(preview->compactModels[sourceIndex]);
         preview->modelAnimationCycles.push_back(cycles);
     });
 }
@@ -733,7 +780,9 @@ API int AecnVfxPrepareModel(Preview* preview, int modelIndex)
             throw std::runtime_error("Invalid model preparation index");
         auto model = preview->models[modelIndex];
         if (model == nullptr) throw std::runtime_error("Missing model geometry");
-        model->StoreBufferToGPU(preview->renderer->GetGraphicsDevice().Get());
+        if (preview->compactModels[modelIndex] != nullptr)
+            preview->compactModels[modelIndex]->PrepareFrame(preview->renderer->GetGraphicsDevice().Get(), 0);
+        else model->StoreBufferToGPU(preview->renderer->GetGraphicsDevice().Get());
         if (!model->GetIsBufferStoredOnGPU()) throw std::runtime_error("Cannot prepare model geometry");
     });
 }
@@ -787,11 +836,59 @@ API int AecnVfxModelFrames(Preview* preview, const AecnVertex* vertices, int ver
             write(&faceCount, sizeof(faceCount)); write(indices, sizeof(int32_t) * indexCount);
         }
         preview->models.push_back(MakeRefPtr<Model>(bytes.data(), static_cast<int32_t>(bytes.size())));
+        preview->compactModels.push_back(nullptr);
         preview->modelAnimationCycles.push_back(cycles);
         preview->animatedVertices = accumulatedVertices;
         preview->animatedIndices = accumulatedIndices;
     });
 }
+API int AecnVfxModelSkinned(Preview* preview, const AecnVertex* vertices, int vertexCount, const int32_t* indices, int indexCount,
+    const AecnSkinWeight* weights, int weightBytes, const float* poses, int poseCount, int boneCount, int frameCount, float cycles,
+    float offsetX, float offsetY, float offsetZ)
+{
+    return Guard([&]
+    {
+        constexpr int64_t maximumBytes = 96000000, maximumIndices = 6000000;
+        if (!preview || !vertices || !indices || !weights || !poses || weightBytes != sizeof(AecnSkinWeight)
+            || vertexCount < 3 || vertexCount > 1000000 || indexCount < 3 || indexCount % 3 != 0
+            || boneCount < 1 || boneCount > 256 || frameCount < 1 || frameCount > 65536
+            || static_cast<int64_t>(boneCount) * frameCount != poseCount || !std::isfinite(cycles) || cycles < 0 || cycles > 10
+            || !std::isfinite(offsetX) || !std::isfinite(offsetY) || !std::isfinite(offsetZ))
+            throw std::runtime_error("Invalid compact model geometry");
+        const auto bytes = static_cast<int64_t>(vertexCount) * 72 * 5 + static_cast<int64_t>(vertexCount) * 32
+            + static_cast<int64_t>(poseCount) * 64 + static_cast<int64_t>(frameCount) * 128;
+        const auto vertexUnits = (bytes + 71) / 72;
+        const auto indexUnits = static_cast<int64_t>(indexCount) * 5;
+        if (vertexUnits > maximumBytes / 72 - preview->animatedVertices || indexUnits > maximumIndices - preview->animatedIndices
+            || (preview->animatedVertices + vertexUnits) * 72 + (preview->animatedIndices + indexUnits) * 4 > maximumBytes)
+            throw std::runtime_error("Compact model exceeds the animation budget");
+        for (int index = 0; index < indexCount; ++index)
+            if (indices[index] < 0 || indices[index] >= vertexCount) throw std::runtime_error("Invalid compact model index");
+        for (int index = 0; index < vertexCount; ++index)
+        {
+            const auto raw = reinterpret_cast<const float*>(&vertices[index]);
+            if (!std::all_of(raw, raw + 18, [](float value) { return std::isfinite(value); }))
+                throw std::runtime_error("Invalid compact model vertex");
+            float total = 0;
+            for (int weight = 0; weight < 4; ++weight)
+            {
+                const auto value = weights[index].Weights[weight]; total += value;
+                if (!std::isfinite(value) || value < 0 || value > 1
+                    || (value > 0 && (weights[index].Bones[weight] < 0 || weights[index].Bones[weight] >= boneCount)))
+                    throw std::runtime_error("Invalid compact model weights");
+            }
+            if (std::abs(total - 1.0f) > 0.02f) throw std::runtime_error("Invalid compact model weight sum");
+        }
+        if (!std::all_of(poses, poses + static_cast<size_t>(poseCount) * 16, [](float value) { return std::isfinite(value); }))
+            throw std::runtime_error("Invalid compact model palette");
+        auto model = MakeRefPtr<CompactAnimatedModel>(vertices, vertexCount, indices, indexCount, weights, poses, poseCount, boneCount, frameCount,
+            Effekseer::Vector3D{offsetX, offsetY, offsetZ});
+        preview->models.push_back(model); preview->compactModels.push_back(model);
+        preview->modelAnimationCycles.push_back(cycles);
+        preview->animatedVertices += vertexUnits; preview->animatedIndices += indexUnits;
+    });
+}
+
 API int AecnVfxMeshMaterial(Preview* preview, const int32_t* textures, int textureCount, const float* parameters, int parameterCount)
 {
     return Guard([&]
@@ -803,11 +900,20 @@ API int AecnVfxMeshMaterial(Preview* preview, const int32_t* textures, int textu
         const auto prelitSprite = textureCount == 5 && parameterCount == 24;
         const auto soulPanning = textureCount == 4 && parameterCount == 28;
         const auto growingVines = textureCount == 5 && parameterCount == 12;
-        const auto rigidDissolve = textureCount == 6 && parameterCount == 60;
+        const auto legacyRigidDissolve = textureCount == 6 && parameterCount == 68;
+        const auto rigidDissolve = textureCount == 6 && (parameterCount == 60 || legacyRigidDissolve);
         const auto tidecall = textureCount == 12 && parameterCount == 104;
         const auto vertexAnimated = textureCount == 6 && parameterCount == 64;
         const auto rigidBasicDither = textureCount == 4 && parameterCount == 8;
-        if ((!rigidBasicDither && !vertexAnimated && !tidecall && !rigidDissolve && !growingVines && !soulPanning && !prelitSprite && !solid && !premultiplyAnimated && !animatedUV && !basicSprite && (textureCount != 6 || (parameterCount != 40 && parameterCount != 49 && parameterCount != 54 && parameterCount != 55))) || preview->meshMaterials.size() >= 256)
+        const auto colourMesh = (textureCount >= 4 && textureCount <= 6) && parameterCount == 72;
+        const auto meshColourDistortion = textureCount == 7 && (parameterCount == 54 || parameterCount == 55);
+        const auto fungi = textureCount == 9 && parameterCount == 80;
+        const auto customFog = textureCount == 3 && parameterCount == 21;
+        const auto customBlood = textureCount == 3 && parameterCount == 23;
+        const auto rigidGlow = textureCount == 3 && parameterCount == 16;
+        const auto meshDistortion = textureCount == 2 && parameterCount == 15;
+        const auto simpleMesh = (textureCount == 0 || textureCount == 2) && parameterCount == 4;
+        if ((!meshDistortion && !meshColourDistortion && !fungi && !customFog && !customBlood && !rigidGlow && !colourMesh && !simpleMesh && !rigidBasicDither && !vertexAnimated && !tidecall && !rigidDissolve && !growingVines && !soulPanning && !prelitSprite && !solid && !premultiplyAnimated && !animatedUV && !basicSprite && (textureCount != 6 || (parameterCount != 40 && parameterCount != 49 && parameterCount != 54 && parameterCount != 55))) || preview->meshMaterials.size() >= 256)
             throw std::runtime_error("Invalid scrolling mesh material layout");
         Preview::MeshMaterial material;
         material.textures.resize(textureCount);
@@ -822,19 +928,33 @@ API int AecnVfxMeshMaterial(Preview* preview, const int32_t* textures, int textu
         material.tidecall = tidecall;
         material.vertexAnimated = vertexAnimated;
         material.rigidBasicDither = rigidBasicDither;
+        material.colourMesh = colourMesh;
+        material.simpleMesh = simpleMesh; material.rigidGlow = rigidGlow; material.meshDistortion = meshDistortion;
+        material.customFog = customFog; material.customBlood = customBlood; material.fungi = fungi;
+        material.simpleAdditive = simpleMesh && textureCount == 2;
+        if ((material.oneShot && parameters[0]!=0 || material.basicMesh && parameters[34]!=0) && textureCount!=7)
+            throw std::runtime_error("Missing authored mesh colour distortion texture");
+        if (colourMesh && (parameters[68] < 0 || parameters[68] > 3 || std::floor(parameters[68]) != parameters[68]
+            || textureCount != (parameters[68] == 0 ? 4 : parameters[68] == 3 ? 6 : 5))) throw std::runtime_error("Invalid native colour mesh variant");
         if (rigidBasicDither && (parameters[6] != 0 || parameters[7] != 0)) throw std::runtime_error("Invalid rigid dither padding");
+        if (meshDistortion && (parameters[1] <= 0 || std::any_of(parameters+11,parameters+15,[](float value){return value!=0;})))
+            throw std::runtime_error("Invalid mesh distortion parameters");
         if (vertexAnimated && (parameters[18] < 0 || parameters[18] > 1)) throw std::runtime_error("Invalid vertex-animated fog control");
-        if (rigidDissolve && parameters[59] == 1)
+        if (legacyRigidDissolve && parameters[66] != 1) throw std::runtime_error("Invalid legacy dissolve variant");
+        const auto dissolveMode = legacyRigidDissolve ? 67 : 59;
+        const auto dissolveRectangles = legacyRigidDissolve ? 52 : 46;
+        const auto dissolveAliases = legacyRigidDissolve ? 56 : 48;
+        if (rigidDissolve && parameters[dissolveMode] == 1)
         {
-            for (int index = 46; index < 58; index += 4)
+            for (int index = dissolveRectangles; index < dissolveRectangles + 12; index += 4)
                 if (parameters[index] < 0 || parameters[index + 1] < 0 || parameters[index + 2] <= 0 || parameters[index + 3] <= 0
                     || parameters[index] + parameters[index + 2] > 1.000001f || parameters[index + 1] + parameters[index + 3] > 1.000001f)
                     throw std::runtime_error("Invalid dissolve mask rectangle");
         }
         else if (rigidDissolve)
         {
-            if (parameters[59] != 0) throw std::runtime_error("Invalid dissolve binding mode");
-            for (int index = 48; index < 58; ++index)
+            if (parameters[dissolveMode] != 0) throw std::runtime_error("Invalid dissolve binding mode");
+            for (int index = dissolveAliases; index < dissolveAliases + 10; ++index)
                 if (!std::isfinite(parameters[index]) || parameters[index] < 0 || parameters[index] >= textureCount || std::floor(parameters[index]) != parameters[index])
                     throw std::runtime_error("Invalid dissolve texture alias");
         }
@@ -859,15 +979,24 @@ API int AecnVfxMeshMaterial(Preview* preview, const int32_t* textures, int textu
             if (!std::isfinite(parameters[index])) throw std::runtime_error("Invalid scrolling mesh parameter");
             material.parameters[index] = parameters[index];
         }
-        if (tidecall || vertexAnimated)
+        if (customFog && (parameters[15]<0 || parameters[16]<0 || parameters[17]<0 || std::abs(parameters[18])>=1
+            || parameters[19]<0 || parameters[20]<0 || parameters[19]+parameters[20]<=0))
+            throw std::runtime_error("Invalid fog material range");
+        if (customBlood)
+        {
+            if (parameters[0]==0 || parameters[1]<0 || parameters[2]<0 || (parameters[3]!=0 && parameters[3]!=1))
+                throw std::runtime_error("Invalid blood material range");
+            for (int index=4;index<23;++index) if(parameters[index]!=0) throw std::runtime_error("Invalid blood material padding");
+        }
+        if (tidecall || vertexAnimated || rigidDissolve || colourMesh || fungi)
         {
             for (int index = 92; tidecall && index < 104; ++index)
                 if (parameters[index] < 0 || parameters[index] > 10 || std::floor(parameters[index]) != parameters[index])
                     throw std::runtime_error("Invalid tidecall texture alias");
             D3D11_BUFFER_DESC description{};
-            description.ByteWidth = parameterCount * sizeof(float); description.Usage = D3D11_USAGE_IMMUTABLE;
+            description.ByteWidth = (rigidDissolve ? 68 : parameterCount) * sizeof(float); description.Usage = D3D11_USAGE_IMMUTABLE;
             description.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-            D3D11_SUBRESOURCE_DATA initial{}; initial.pSysMem = parameters;
+            D3D11_SUBRESOURCE_DATA initial{}; initial.pSysMem = material.parameters.data();
             if (FAILED(preview->renderer->GetDevice()->CreateBuffer(&description, &initial, material.extendedParameters.GetAddressOf())))
                 throw std::runtime_error("Cannot upload extended mesh parameters");
         }
@@ -882,7 +1011,9 @@ API int AecnVfxConfigure(Preview* preview, const AecnLayer* layers, int count)
         for (int i = 0; i < count; ++i)
         {
             const auto& layer = layers[i];
-            if (layer.TextureIndex < (layer.Distortion != 0 ? -1 : 0) || layer.TextureIndex >= static_cast<int>(preview->textures.size()))
+            const bool untexturedMaterial = layer.MeshMaterialIndex >= 0 && layer.MeshMaterialIndex < static_cast<int>(preview->meshMaterials.size())
+                && preview->meshMaterials[layer.MeshMaterialIndex].simpleMesh && !preview->meshMaterials[layer.MeshMaterialIndex].simpleAdditive;
+            if (layer.TextureIndex < (layer.Distortion != 0 || untexturedMaterial ? -1 : 0) || layer.TextureIndex >= static_cast<int>(preview->textures.size()))
                 throw std::runtime_error("Layer texture is missing");
             if (layer.DistortionMaskIndex < -1 || layer.DistortionMaskIndex >= static_cast<int>(preview->textures.size())
                 || (layer.DistortionMaskIndex >= 0 && layer.Distortion == 0)
@@ -906,15 +1037,17 @@ API int AecnVfxConfigure(Preview* preview, const AecnLayer* layers, int count)
                 throw std::runtime_error("Unsupported UV orientation");
             if (layer.CameraFacing < 0 || layer.CameraFacing > 1 || (layer.CameraFacing && layer.Kind != 0))
                 throw std::runtime_error("Invalid camera-facing geometry");
-            if (layer.OpaqueModel < 0 || layer.OpaqueModel > 1 || (layer.OpaqueModel && (layer.Kind != 1 || (layer.MeshMaterialIndex >= 0 && (layer.MeshMaterialIndex >= static_cast<int>(preview->meshMaterials.size()) || (!preview->meshMaterials[layer.MeshMaterialIndex].gemstone && !preview->meshMaterials[layer.MeshMaterialIndex].tidecall && !preview->meshMaterials[layer.MeshMaterialIndex].solid && !preview->meshMaterials[layer.MeshMaterialIndex].growingVines && !preview->meshMaterials[layer.MeshMaterialIndex].rigidDissolve && !preview->meshMaterials[layer.MeshMaterialIndex].rigidBasicDither))))))
+            if (layer.OpaqueModel < 0 || layer.OpaqueModel > 1 || (layer.OpaqueModel && (layer.Kind != 1 || (layer.MeshMaterialIndex >= 0 && (layer.MeshMaterialIndex >= static_cast<int>(preview->meshMaterials.size()) || (!preview->meshMaterials[layer.MeshMaterialIndex].gemstone && !preview->meshMaterials[layer.MeshMaterialIndex].tidecall && !preview->meshMaterials[layer.MeshMaterialIndex].solid && !preview->meshMaterials[layer.MeshMaterialIndex].growingVines && !preview->meshMaterials[layer.MeshMaterialIndex].rigidDissolve && !preview->meshMaterials[layer.MeshMaterialIndex].rigidBasicDither && !preview->meshMaterials[layer.MeshMaterialIndex].fungi && !untexturedMaterial))))))
                 throw std::runtime_error("Invalid opaque model material");
             if (layer.LightingMode < 0 || layer.LightingMode > 2 || layer.NormalIndex < -1 || layer.NormalIndex >= static_cast<int>(preview->textures.size()))
                 throw std::runtime_error("Invalid particle lighting material");
             if (!std::isfinite(layer.EmissionShapeWeight) || layer.EmissionShapeWeight < 0 || layer.EmissionShapeWeight > 1)
                 throw std::runtime_error("Invalid texture emission shape weight");
             if (layer.MeshMaterialIndex < -1 || layer.MeshMaterialIndex >= static_cast<int>(preview->meshMaterials.size())
-                || (layer.MeshMaterialIndex >= 0 && (layer.Kind != (preview->meshMaterials[layer.MeshMaterialIndex].animatedUV || preview->meshMaterials[layer.MeshMaterialIndex].basicSprite || preview->meshMaterials[layer.MeshMaterialIndex].prelitSprite ? 0 : 1) || layer.Distortion != 0 || layer.MaterialMode != 0)))
+                || (layer.MeshMaterialIndex >= 0 && (layer.Kind != (preview->meshMaterials[layer.MeshMaterialIndex].animatedUV || preview->meshMaterials[layer.MeshMaterialIndex].basicSprite || preview->meshMaterials[layer.MeshMaterialIndex].prelitSprite || preview->meshMaterials[layer.MeshMaterialIndex].customFog || preview->meshMaterials[layer.MeshMaterialIndex].customBlood ? 0 : 1) || (layer.Distortion != 0 && !((preview->meshMaterials[layer.MeshMaterialIndex].rigidGlow || preview->meshMaterials[layer.MeshMaterialIndex].meshDistortion) && layer.Distortion == 1)) || layer.MaterialMode != 0)))
                 throw std::runtime_error("Invalid scrolling mesh binding");
+            if (layer.MeshMaterialIndex >= 0 && preview->meshMaterials[layer.MeshMaterialIndex].meshDistortion && layer.Distortion != 1)
+                throw std::runtime_error("Mesh distortion requires the distortion pass");
             if (layer.GradientIndex < -1 || layer.GradientIndex >= static_cast<int>(preview->textures.size())
                 || (layer.GradientIndex >= 0 && (layer.MeshMaterialIndex >= 0
                     || !std::isfinite(layer.GradientScale) || layer.GradientScale < 1 || layer.GradientScale > 1000000)))
@@ -951,6 +1084,8 @@ API int AecnVfxConfigure(Preview* preview, const AecnLayer* layers, int count)
         preview->layers.assign(layers, layers + count);
         preview->halfLayers.clear();
         preview->fullLayers.clear();
+        preview->seaLayers.clear();
+        preview->seaLayerLookup.clear();
         preview->nativeAlphaLayers.clear();
         preview->halfDrawCalls = -1;
         if (preview->basicMeshMaterial == nullptr && std::any_of(preview->meshMaterials.begin(), preview->meshMaterials.end(), [](const auto& material) { return material.basicMesh; }))
@@ -1051,7 +1186,48 @@ API int AecnVfxConfigure(Preview* preview, const AecnLayer* layers, int count)
             preview->rigidBasicDitherMaterial = preview->materialLoader->Load(bytes.Data, bytes.Size, MaterialFileType::Compiled);
             if (preview->rigidBasicDitherMaterial == nullptr) throw std::runtime_error("Cannot load the rigid dither material");
         }
-        preview->effect = MakeRefPtr<ResourceEffect>(preview->manager, preview->textures, preview->models, preview->material, preview->decalMaterial, preview->scrollingMaterial, preview->oneShotMaterial, preview->basicMeshMaterial, preview->gemstoneMaterial, preview->animatedUVMaterial, preview->basicSpriteMaterial, preview->premultiplyAnimatedMaterial, preview->solidMaterial, preview->prelitSpriteMaterial, preview->soulPanningMaterial, preview->growingVinesMaterial, preview->rigidDissolveMaterial, preview->distortionMaterial, preview->tidecallMaterial, preview->vertexAnimatedMaterial, preview->rigidBasicDitherMaterial);
+        for (int mode = 0; mode < 4; ++mode)
+            if (preview->colourMeshMaterials[mode] == nullptr && std::any_of(preview->meshMaterials.begin(), preview->meshMaterials.end(),
+                [mode](const auto& value) { return value.colourMesh && value.parameters[68] == mode; }))
+            {
+                if (preview->materialLoader == nullptr) preview->materialLoader = preview->renderer->CreateMaterialLoader();
+                const auto& bytes = CompiledVfxMaterials[18 + mode];
+                preview->colourMeshMaterials[mode] = preview->materialLoader->Load(bytes.Data, bytes.Size, MaterialFileType::Compiled);
+                if (preview->colourMeshMaterials[mode] == nullptr) throw std::runtime_error("Cannot load the native colour mesh material");
+            }
+        for (int mode = 0; mode < 2; ++mode)
+            if (preview->simpleMeshMaterials[mode] == nullptr && std::any_of(preview->meshMaterials.begin(), preview->meshMaterials.end(),
+                [mode](const auto& value) { return value.simpleMesh && value.simpleAdditive == (mode == 1); }))
+            {
+                if (preview->materialLoader == nullptr) preview->materialLoader = preview->renderer->CreateMaterialLoader();
+                const auto& bytes = CompiledVfxMaterials[22 + mode];
+                preview->simpleMeshMaterials[mode] = preview->materialLoader->Load(bytes.Data, bytes.Size, MaterialFileType::Compiled);
+                if (preview->simpleMeshMaterials[mode] == nullptr) throw std::runtime_error("Cannot load the native simple mesh material");
+            }
+        if (std::any_of(preview->meshMaterials.begin(), preview->meshMaterials.end(), [](const auto& value) { return value.rigidGlow; }))
+            for (int mode=0; mode<2; ++mode)
+                if (preview->rigidGlowMaterials[mode] == nullptr)
+                {
+                    if (preview->materialLoader == nullptr) preview->materialLoader = preview->renderer->CreateMaterialLoader();
+                    const auto& bytes = CompiledVfxMaterials[24 + mode];
+                    preview->rigidGlowMaterials[mode] = preview->materialLoader->Load(bytes.Data, bytes.Size, MaterialFileType::Compiled);
+                    if (preview->rigidGlowMaterials[mode] == nullptr) throw std::runtime_error("Cannot load rigid glow material");
+                }
+        if (preview->fungiMaterial == nullptr && std::any_of(preview->meshMaterials.begin(), preview->meshMaterials.end(), [](const auto& value) { return value.fungi; }))
+        {
+            if (preview->materialLoader == nullptr) preview->materialLoader = preview->renderer->CreateMaterialLoader();
+            const auto& bytes = CompiledVfxMaterials[26];
+            preview->fungiMaterial = preview->materialLoader->Load(bytes.Data, bytes.Size, MaterialFileType::Compiled);
+            if (preview->fungiMaterial == nullptr) throw std::runtime_error("Cannot load fungi material");
+        }
+        if (preview->meshDistortionMaterial == nullptr && std::any_of(preview->meshMaterials.begin(),preview->meshMaterials.end(),[](const auto& value){return value.meshDistortion;}))
+        {
+            if(preview->materialLoader == nullptr) preview->materialLoader=preview->renderer->CreateMaterialLoader();
+            const auto& bytes=CompiledVfxMaterials[27];
+            preview->meshDistortionMaterial=preview->materialLoader->Load(bytes.Data,bytes.Size,MaterialFileType::Compiled);
+            if(preview->meshDistortionMaterial == nullptr) throw std::runtime_error("Cannot load mesh distortion material");
+        }
+        preview->effect = MakeRefPtr<ResourceEffect>(preview->manager, preview->textures, preview->models, preview->material, preview->decalMaterial, preview->scrollingMaterial, preview->oneShotMaterial, preview->basicMeshMaterial, preview->gemstoneMaterial, preview->animatedUVMaterial, preview->basicSpriteMaterial, preview->premultiplyAnimatedMaterial, preview->solidMaterial, preview->prelitSpriteMaterial, preview->soulPanningMaterial, preview->growingVinesMaterial, preview->rigidDissolveMaterial, preview->distortionMaterial, preview->tidecallMaterial, preview->vertexAnimatedMaterial, preview->rigidBasicDitherMaterial, preview->colourMeshMaterials, preview->simpleMeshMaterials, preview->rigidGlowMaterials, preview->fungiMaterial, preview->meshDistortionMaterial);
         try { preview->PrepareSpriteUploads(); }
         catch (...) { preview->ResetSpriteUploads(); }
     });
@@ -1069,15 +1245,19 @@ static int ConfigureNativeAlpha(Preview* preview, const AecnHalfLayerConfig* con
         for (int index = 0; index < count; ++index)
         {
             const auto& config = configs[index];
+            const bool customMboit = config.LayerIndex>=0 && config.LayerIndex<static_cast<int>(preview->layers.size())
+                && preview->layers[config.LayerIndex].MeshMaterialIndex>=0
+                && (preview->meshMaterials[preview->layers[config.LayerIndex].MeshMaterialIndex].customFog
+                    || preview->meshMaterials[preview->layers[config.LayerIndex].MeshMaterialIndex].customBlood);
             const auto validLayer = [&](int layer) { return layer >= 0 && layer < static_cast<int>(preview->layers.size()); };
             if (!validLayer(config.LayerIndex) || config.Premultiplied < 0 || config.Premultiplied > 1
                 || !std::isfinite(config.CoveredColourMultiplier) || config.CoveredColourMultiplier < 0
                 || !std::isfinite(config.EmissionMultiplier) || config.EmissionMultiplier < 0
-                || (config.LegacyCoverageIndex == -1 && config.LegacyEmissionIndex == -1))
+                || (!customMboit && config.LegacyCoverageIndex == -1 && config.LegacyEmissionIndex == -1))
                 throw std::runtime_error("Invalid original half-resolution particle layer");
             const auto& layer = preview->layers[config.LayerIndex];
             if (layer.Kind != 0 || layer.Distortion != 0 || layer.ModelIndex >= 0 || layer.OpaqueModel != 0
-                || layer.MeshMaterialIndex >= 0 || layer.GradientIndex >= 0 || layer.MaterialMode < 0 || layer.MaterialMode > 1
+                || (layer.MeshMaterialIndex >= 0 && !customMboit) || layer.GradientIndex >= 0 || layer.MaterialMode < 0 || layer.MaterialMode > 1
                 || layer.TextureIndex < 0 || layer.Blend != 1 || layer.MaterialMode != config.Premultiplied)
                 throw std::runtime_error("Unsupported half-resolution particle material");
             const auto checkLegacy = [&](int legacy, bool coverage)
@@ -1095,10 +1275,14 @@ static int ConfigureNativeAlpha(Preview* preview, const AecnHalfLayerConfig* con
             };
             checkLegacy(config.LegacyCoverageIndex, true);
             checkLegacy(config.LegacyEmissionIndex, false);
+            if(customMboit && (config.LegacyCoverageIndex!=-1 || config.LegacyEmissionIndex!=-1 || config.Premultiplied!=0
+                || config.CoveredColourMultiplier!=1 || config.EmissionMultiplier!=0))
+                throw std::runtime_error("Invalid custom MBOIT composition");
             if (std::any_of(validated.begin(), validated.end(), [&](const AecnHalfLayerConfig& value) { return value.LayerIndex == config.LayerIndex; }))
                 throw std::runtime_error("Duplicate half-resolution layer");
             if (std::any_of(other.begin(), other.end(), [&](const AecnHalfLayerConfig& value) { return value.LayerIndex == config.LayerIndex; }))
                 throw std::runtime_error("Conflicting native alpha resolution");
+            if (SeaLayer(*preview,config.LayerIndex)) throw std::runtime_error("Conflicting native sea-overlay layer");
             validated.push_back(config);
         }
         std::vector<Preview::NativeAlphaLayer> lookup;
@@ -1122,6 +1306,45 @@ API int AecnVfxConfigureHalf(Preview* preview, const AecnHalfLayerConfig* config
 API int AecnVfxConfigureFull(Preview* preview, const AecnHalfLayerConfig* configs, int count, int configBytes)
 {
     return ConfigureNativeAlpha(preview, configs, count, configBytes, false);
+}
+
+API int AecnVfxConfigureSea(Preview* preview, const AecnHalfLayerConfig* configs, int count, int configBytes)
+{
+    return Guard([&]
+    {
+        if(!preview || preview->sceneFrame || count<0 || count>512 || configBytes!=sizeof(AecnHalfLayerConfig)
+            || (count>0 && !configs))throw std::runtime_error("Invalid sea-overlay layer configuration");
+        std::vector<AecnHalfLayerConfig> validated;validated.reserve(count);
+        for(int index=0;index<count;++index)
+        {
+            const auto& config=configs[index];
+            if(config.LayerIndex<0 || static_cast<size_t>(config.LayerIndex)>=preview->layers.size()
+                || config.Premultiplied<0 || config.Premultiplied>1 || config.LegacyCoverageIndex!=-1 || config.LegacyEmissionIndex!=-1
+                || !std::isfinite(config.CoveredColourMultiplier) || config.CoveredColourMultiplier<0
+                || !std::isfinite(config.EmissionMultiplier) || config.EmissionMultiplier<0)
+                throw std::runtime_error("Invalid original sea-overlay particle layer");
+            const auto& layer=preview->layers[config.LayerIndex];
+            if(layer.Kind!=0 || layer.Distortion!=0 || layer.ModelIndex>=0 || layer.OpaqueModel || layer.MeshMaterialIndex>=0
+                || layer.TextureIndex<0 || layer.Blend!=1 || layer.MaterialMode!=config.Premultiplied)
+                throw std::runtime_error("Unsupported sea-overlay particle material");
+            if(HalfLayer(*preview,config.LayerIndex) || std::any_of(validated.begin(),validated.end(),
+                [&](const AecnHalfLayerConfig& value){return value.LayerIndex==config.LayerIndex;}))
+                throw std::runtime_error("Conflicting native sea-overlay layer");
+            validated.push_back(config);
+        }
+        std::vector<const AecnHalfLayerConfig*> lookup;
+        if(!validated.empty())
+        {
+            lookup.resize(preview->layers.size());
+            for(const auto& config:validated)lookup[config.LayerIndex]=&config;
+        }
+        preview->seaLayers=std::move(validated);preview->seaLayerLookup=std::move(lookup);
+    });
+}
+
+static const AecnHalfLayerConfig* SeaLayer(const Preview& preview, int layer)
+{
+    return layer<0 || static_cast<size_t>(layer)>=preview.seaLayerLookup.size()?nullptr:preview.seaLayerLookup[layer];
 }
 
 static const AecnHalfLayerConfig* HalfLayer(const Preview& preview, int layer)
@@ -1155,22 +1378,28 @@ static const std::vector<AecnParticle>& ExpandHalfFallback(const Preview& previe
     return result;
 }
 
-static bool TryDrawHalfScene(Preview& owner, const std::vector<SceneDraw>& draws)
+static bool TryDrawHalfScene(Preview& owner, const std::vector<SceneDraw>& draws, bool customMboit)
 {
     std::vector<HalfResolutionScene::Draw> halfDraws;
     for (const auto& command : draws)
     {
-        // Preserve the established ordering for mixed full-resolution, model, decal and refraction scenes.
-        if (!command.opaque.empty() || !command.distortion.empty()) return false;
+        // Preserve the old compatibility gate for ordinary scenes; the two custom families use their native pass order.
+        if(!customMboit && (!command.opaque.empty() || !command.distortion.empty()))return false;
         const auto& preview = *command.preview;
         size_t begin = 0;
         while (begin < command.colour.size())
         {
             const auto layerIndex = command.colour[begin].Layer;
             const auto config = HalfLayer(preview, layerIndex);
-            if (!config) return false;
             size_t end = begin + 1;
             while (end < command.colour.size() && command.colour[end].Layer == layerIndex) ++end;
+            if (!config)
+            {
+                if(!customMboit)return false;
+                const auto index=preview.layers[layerIndex].MeshMaterialIndex;
+                if(index>=0 && (preview.meshMaterials[index].customFog || preview.meshMaterials[index].customBlood))return false;
+                begin=end;continue;
+            }
             const auto& layer = preview.layers[layerIndex];
             const auto texture = [&](int index)
             {
@@ -1183,6 +1412,16 @@ static bool TryDrawHalfScene(Preview& owner, const std::vector<SceneDraw>& draws
             draw.HalfResolution = preview.nativeAlphaLayers[layerIndex].halfResolution;
             draw.Textures = { texture(layer.TextureIndex), texture(layer.NormalIndex >= 0 ? layer.NormalIndex : layer.TextureIndex),
                 texture(layer.GradientIndex >= 0 ? layer.GradientIndex : layer.TextureIndex) };
+            if (layer.MeshMaterialIndex>=0)
+            {
+                const auto& material=preview.meshMaterials[layer.MeshMaterialIndex];
+                draw.FogBlood=material.customFog?1:material.customBlood?2:0;
+                if(draw.FogBlood)
+                {
+                    draw.FogBloodParameters=material.parameters.data();
+                    draw.Textures={texture(material.textures[0]),texture(material.textures[1]),texture(material.textures[2])};
+                }
+            }
             halfDraws.push_back(draw);
             begin = end;
         }
@@ -1202,6 +1441,42 @@ static bool TryDrawHalfScene(Preview& owner, const std::vector<SceneDraw>& draws
     { AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::HalfScene); owner.halfScene.Render(owner.renderer->GetDevice(), context, halfDraws, fullDepth); }
     owner.halfDrawCalls = static_cast<int>(owner.halfScene.DrawCallCount());
     return true;
+}
+
+static void DrawSeaScene(Preview& owner, const std::vector<SceneDraw>& draws)
+{
+    std::vector<HalfResolutionScene::Draw> seaDraws;
+    for(const auto& command:draws)
+    {
+        if(command.lighting.Parameters[2]!=1 || !std::isfinite(command.lighting.Parameters[3]))continue;
+        const auto& preview=*command.preview;
+        size_t begin=0;
+        while(begin<command.sea.size())
+        {
+            const auto layerIndex=command.sea[begin].Layer;size_t end=begin+1;
+            while(end<command.sea.size() && command.sea[end].Layer==layerIndex)++end;
+            const auto& layer=preview.layers[layerIndex];
+            const auto texture=[&](int index){return EffekseerRendererDX11::GetTextureProperty(preview.textures[index]->GetBackend()).ShaderResourceViewPtr;};
+            HalfResolutionScene::Draw draw;
+            draw.Layer=&layer;draw.Config=SeaLayer(preview,layerIndex);draw.Particles=command.sea.data()+begin;
+            draw.Count=static_cast<int>(end-begin);draw.View=command.view.data();draw.Projection=command.projection.data();
+            draw.Lighting=&command.lighting;draw.SoftDepth=command.softDepth.Get();draw.HalfResolution=false;draw.SeaOverlay=true;
+            draw.Textures={texture(layer.TextureIndex),texture(layer.NormalIndex>=0?layer.NormalIndex:layer.TextureIndex),
+                texture(layer.GradientIndex>=0?layer.GradientIndex:layer.TextureIndex)};
+            seaDraws.push_back(draw);begin=end;
+        }
+    }
+    if(seaDraws.empty())return;
+    owner.CaptureDepth(seaDraws.front().Projection);
+    ID3D11ShaderResourceView* fullDepth=nullptr;
+    if(owner.depthAvailable)
+    {
+        D3D11_TEXTURE2D_DESC description{};owner.depthCopy->GetDesc(&description);
+        fullDepth=description.SampleDesc.Count>1?owner.resolvedDepthView.Get():owner.depthView.Get();
+    }
+    owner.halfScene.RenderSeaOverlay(owner.renderer->GetDevice(),owner.renderer->GetContext(),seaDraws,fullDepth,
+        owner.depthAvailable?owner.depthView.Get():nullptr);
+    owner.halfDrawCalls=static_cast<int>(owner.halfScene.DrawCallCount());
 }
 
 static int DrawParticles(Preview* preview, const float* view, const float* projection, const AecnParticle* particles, int count, const AecnLighting* lighting,
@@ -1333,8 +1608,11 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                         preview->renderer->GetDevice(), preview->renderer->GetContext());
                     distortionPass = 0; beginRendering();
                 }
-                const bool useIndependentDepth = independentDepth != nullptr && layer.MeshMaterialIndex < 0
-                    && (layer.Distortion != 0 || layer.Kind == 0);
+                const bool nativeColourDepth = layer.MeshMaterialIndex >= 0 && (preview->meshMaterials[layer.MeshMaterialIndex].colourMesh
+                    || preview->meshMaterials[layer.MeshMaterialIndex].vertexAnimated || preview->meshMaterials[layer.MeshMaterialIndex].meshDistortion
+                    || preview->meshMaterials[layer.MeshMaterialIndex].animatedUV);
+                const bool useIndependentDepth = independentDepth != nullptr
+                    && (nativeColourDepth || layer.MeshMaterialIndex < 0 && (layer.Distortion != 0 || layer.Kind == 0));
                 if (useIndependentDepth != usingIndependentDepth)
                 {
                     // Flush the deferred batch before changing its depth input; receivers keep the raster-depth copy.
@@ -1360,8 +1638,15 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                 if (!std::isfinite(crush[0]) || !std::isfinite(crush[1]) || crush[1] < 0 || crush[1] > 2)
                     throw std::runtime_error("Invalid particle alpha crush");
                 int end = begin + 1;
+                const auto compactModel = layer.Kind == 1 && layer.ModelIndex >= 0 ? preview->compactModels[layer.ModelIndex] : nullptr;
+                const auto poseFrame = [&](const AecnParticle& particle)
+                {
+                    return static_cast<int>(std::floor(std::max(0.0f, particle.AppearancePhase) * preview->modelAnimationCycles[layer.ModelIndex]
+                        * preview->models[layer.ModelIndex]->GetFrameCount())) % preview->models[layer.ModelIndex]->GetFrameCount();
+                };
                 // A sprite renderer call silently drops instances beyond its fixed vertex buffer.
                 while (end < count && end - begin < preview->renderer->GetSquareMaxCount() && particles[end].Layer == layerIndex
+                    && (compactModel == nullptr || poseFrame(particles[end]) == poseFrame(particles[begin]))
                     && (!layer.NativeSoftDepth || (particles[end].SoftParticleScale == particles[begin].SoftParticleScale
                         && inFront(particles[end]) == inFront(particles[begin])))
                     && particles[end].AlphaCrush[0] == crush[0] && particles[end].AlphaCrush[1] == crush[1]
@@ -1463,9 +1748,9 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                 if (layer.MeshMaterialIndex >= 0)
                 {
                     const auto& source = preview->meshMaterials[layer.MeshMaterialIndex];
-                    material.MaterialIndex = source.rigidBasicDither ? 17 : source.vertexAnimated ? 16 : source.tidecall ? 15 : source.rigidDissolve ? 13 : source.growingVines ? 12 : source.soulPanning ? 11 : source.prelitSprite ? 10 : source.solid ? 9 : source.premultiplyAnimated ? 8 : source.basicSprite ? 7 : source.animatedUV ? 6 : source.gemstone ? 5 : source.basicMesh ? 4 : source.oneShot ? 3 : 2;
-                    for (size_t index = 0; index < (source.tidecall ? 6 : source.textures.size()); ++index) material.MaterialTextures.push_back({0, source.textures[index]});
-                    for (int index = 0; index < (source.rigidBasicDither ? 2 : source.tidecall || source.vertexAnimated ? 0 : source.rigidDissolve ? 15 : source.growingVines ? 3 : source.soulPanning ? 7 : source.prelitSprite ? 6 : source.solid ? 14 : source.premultiplyAnimated ? 8 : source.basicSprite ? 5 : source.animatedUV ? 9 : source.gemstone ? 10 : source.oneShot || source.basicMesh ? 14 : 13); ++index)
+                    material.MaterialIndex = source.meshDistortion ? 27 : source.fungi ? 26 : source.rigidGlow ? 24 + (layer.Distortion != 0 ? 1 : 0) : source.colourMesh ? 18 + static_cast<int>(source.parameters[68]) : source.simpleMesh ? 22 + (source.simpleAdditive ? 1 : 0) : source.rigidBasicDither ? 17 : source.vertexAnimated ? 16 : source.tidecall ? 15 : source.rigidDissolve ? 13 : source.growingVines ? 12 : source.soulPanning ? 11 : source.prelitSprite ? 10 : source.solid ? 9 : source.premultiplyAnimated ? 8 : source.basicSprite ? 7 : source.animatedUV ? 6 : source.gemstone ? 5 : source.basicMesh ? 4 : source.oneShot ? 3 : 2;
+                    for (size_t index = 0; index < (source.tidecall || source.fungi || (source.oneShot || source.basicMesh) && source.textures.size()==7 ? 6 : source.textures.size()); ++index) material.MaterialTextures.push_back({0, source.textures[index]});
+                    for (int index = 0; index < (source.meshDistortion ? 3 : source.colourMesh || source.fungi ? 0 : source.simpleMesh || source.rigidGlow ? 1 : source.rigidBasicDither ? 2 : source.tidecall || source.vertexAnimated ? 0 : source.rigidDissolve ? 15 : source.growingVines ? 3 : source.soulPanning ? 7 : source.prelitSprite ? 6 : source.solid ? 14 : source.premultiplyAnimated ? 8 : source.basicSprite ? 5 : source.animatedUV ? 9 : source.gemstone ? 10 : source.oneShot || source.basicMesh ? 14 : 13); ++index)
                     {
                         const auto offset = index * 4;
                         material.MaterialUniforms.push_back({source.parameters[offset], ((source.soulPanning && index == 4) || (!source.rigidBasicDither && !source.rigidDissolve && !source.oneShot && !source.basicMesh && index == 12)) && projection[11] == 0 ? 1.0f : source.parameters[offset + 1],
@@ -1473,7 +1758,78 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                             source.basicMesh && index == 13 && projection[11] == 0 ? 1.0f : source.parameters[offset + 3]});
                     }
                     const auto front = preview->renderer->GetCameraFrontDirection();
-                    if (source.tidecall || source.vertexAnimated)
+                    if ((source.oneShot || source.basicMesh) && source.textures.size()==7)
+                    {
+                        endRendering();
+                        auto context=preview->renderer->GetContext();
+                        if(!extendedMeshState)extendedMeshState=std::make_unique<ExtendedMeshStageState>(context);
+                        if(!displacementSampler)
+                        {
+                            D3D11_SAMPLER_DESC d{};d.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;d.AddressU=d.AddressV=d.AddressW=D3D11_TEXTURE_ADDRESS_WRAP;
+                            d.MaxLOD=D3D11_FLOAT32_MAX;d.ComparisonFunc=D3D11_COMPARISON_NEVER;
+                            if(FAILED(preview->renderer->GetDevice()->CreateSamplerState(&d,displacementSampler.GetAddressOf())))throw std::runtime_error("Cannot create mesh colour distortion sampler");
+                        }
+                        auto texture=EffekseerRendererDX11::GetTextureProperty(preview->textures[source.textures[6]]->GetBackend()).ShaderResourceViewPtr;
+                        auto sampler=displacementSampler.Get();
+                        beginRendering();
+                        context->PSSetShaderResources(8,1,&texture);context->PSSetSamplers(8,1,&sampler);
+                    }
+                    if (source.fungi)
+                    {
+                        endRendering();
+                        auto context=preview->renderer->GetContext();
+                        if(!extendedMeshState)extendedMeshState=std::make_unique<ExtendedMeshStageState>(context);
+                        if(!displacementSampler)
+                        {
+                            D3D11_SAMPLER_DESC d{};d.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;d.AddressU=d.AddressV=d.AddressW=D3D11_TEXTURE_ADDRESS_WRAP;
+                            d.MaxLOD=D3D11_FLOAT32_MAX;d.ComparisonFunc=D3D11_COMPARISON_NEVER;
+                            if(FAILED(preview->renderer->GetDevice()->CreateSamplerState(&d,displacementSampler.GetAddressOf())))throw std::runtime_error("Cannot create fungi sampler");
+                        }
+                        auto constants=source.extendedParameters.Get();auto sampler=displacementSampler.Get();
+                        auto displacement=EffekseerRendererDX11::GetTextureProperty(preview->textures[source.textures[8]]->GetBackend()).ShaderResourceViewPtr;
+                        ID3D11ShaderResourceView* extras[3];for(int i=0;i<3;++i)extras[i]=EffekseerRendererDX11::GetTextureProperty(preview->textures[source.textures[6+i]]->GetBackend()).ShaderResourceViewPtr;
+                        context->VSSetConstantBuffers(2,1,&constants);context->PSSetConstantBuffers(2,1,&constants);
+                        beginRendering();
+                        context->VSSetShaderResources(8,1,&displacement);context->VSSetSamplers(8,1,&sampler);
+                        context->PSSetShaderResources(8,3,extras);context->PSSetSamplers(8,1,&sampler);
+                        D3D11_VIEWPORT viewport{};UINT n=1;context->RSGetViewports(&n,&viewport);
+                        material.MaterialUniforms.push_back({viewport.Width,viewport.Height,0,0});
+                        for(auto value:{lighting->PositiveX,lighting->NegativeX,lighting->PositiveY,lighting->NegativeY,lighting->PositiveZ,lighting->NegativeZ,lighting->SunDirection,lighting->SunColour})
+                            material.MaterialUniforms.push_back({value[0],value[1],value[2],value[3]});
+                        material.MaterialUniforms.push_back({1,1,1,1});material.MaterialUniforms.push_back({1,1,1,1});
+                    }
+                    else if (source.meshDistortion)
+                    {
+                        Matrix44 viewProjection,inverseViewProjection;
+                        Matrix44::Mul(viewProjection,camera,lens);Matrix44::Inverse(inverseViewProjection,viewProjection);
+                        D3D11_VIEWPORT viewport{};UINT count=1;preview->renderer->GetContext()->RSGetViewports(&count,&viewport);
+                        material.MaterialUniforms.push_back({preview->depthAvailable ? 1.0f : 0.0f,0,static_cast<float>(distortionPass),0});
+                        for(const auto& row:inverseViewProjection.Values) material.MaterialUniforms.push_back({row[0],row[1],row[2],row[3]});
+                        material.MaterialUniforms.push_back({viewport.Width,viewport.Height,viewport.TopLeftX,viewport.TopLeftY});
+                    }
+                    else if (source.rigidGlow)
+                    {
+                        D3D11_VIEWPORT viewport{}; UINT count=1; preview->renderer->GetContext()->RSGetViewports(&count,&viewport);
+                        material.MaterialUniforms.push_back({viewport.Width,viewport.Height,static_cast<float>(distortionPass),0});
+                    }
+                    else if (source.colourMesh)
+                    {
+                        endRendering();
+                        auto context = preview->renderer->GetContext();
+                        if (!extendedMeshState) extendedMeshState = std::make_unique<ExtendedMeshStageState>(context);
+                        auto constants = source.extendedParameters.Get();
+                        context->VSSetConstantBuffers(2, 1, &constants); context->PSSetConstantBuffers(2, 1, &constants);
+                        beginRendering();
+                        Matrix44 viewProjection, inverseViewProjection;
+                        Matrix44::Mul(viewProjection, camera, lens); Matrix44::Inverse(inverseViewProjection, viewProjection);
+                        D3D11_VIEWPORT viewport{}; UINT viewportCount = 1; context->RSGetViewports(&viewportCount, &viewport);
+                        material.MaterialUniforms.push_back({preview->depthAvailable ? 1.0f : 0.0f, 0, 0, 0});
+                        for (int row = 0; row < 4; ++row)
+                            material.MaterialUniforms.push_back({inverseViewProjection.Values[row][0], inverseViewProjection.Values[row][1],
+                                inverseViewProjection.Values[row][2], inverseViewProjection.Values[row][3]});
+                        material.MaterialUniforms.push_back({viewport.Width, viewport.Height, viewport.TopLeftX, viewport.TopLeftY});
+                    }
+                    else if (source.tidecall || source.vertexAnimated)
                     {
                         endRendering();
                         auto context = preview->renderer->GetContext();
@@ -1493,22 +1849,38 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                         for (int slot = 0; slot < 5; ++slot)
                             extraTextures[slot] = source.tidecall ? EffekseerRendererDX11::GetTextureProperty(preview->textures[source.textures[slot + 6]]->GetBackend()).ShaderResourceViewPtr : texture;
                         context->VSSetConstantBuffers(2, 1, &constants); context->PSSetConstantBuffers(2, 1, &constants);
-                        context->VSSetShaderResources(0, 1, &texture); context->VSSetSamplers(0, 1, &sampler);
-                        context->PSSetShaderResources(8, 5, extraTextures); context->PSSetSamplers(8, 1, &sampler);
                         beginRendering();
+                        context->VSSetShaderResources(8, 1, &texture); context->VSSetSamplers(8, 1, &sampler);
+                        context->PSSetShaderResources(8, 5, extraTextures); context->PSSetSamplers(8, 1, &sampler);
                         D3D11_VIEWPORT viewport{}; UINT viewportCount = 1; context->RSGetViewports(&viewportCount, &viewport);
                         material.MaterialUniforms.push_back({preview->depthAvailable ? 1.0f : 0.0f, viewport.Width, viewport.Height, 0});
                         material.MaterialUniforms.push_back({front.X, front.Y, front.Z, projection[11] == 0 ? 1.0f : 0.0f});
+                        if (source.vertexAnimated)
+                        {
+                            Matrix44 viewProjection, inverseViewProjection;
+                            Matrix44::Mul(viewProjection, camera, lens); Matrix44::Inverse(inverseViewProjection, viewProjection);
+                            for (int row = 0; row < 4; ++row)
+                                material.MaterialUniforms.push_back({inverseViewProjection.Values[row][0], inverseViewProjection.Values[row][1],
+                                    inverseViewProjection.Values[row][2], inverseViewProjection.Values[row][3]});
+                            material.MaterialUniforms.push_back({viewport.Width, viewport.Height, viewport.TopLeftX, viewport.TopLeftY});
+                        }
                     }
                     else if (source.rigidDissolve)
                     {
+                        endRendering();
+                        auto context = preview->renderer->GetContext();
+                        if (!extendedMeshState) extendedMeshState = std::make_unique<ExtendedMeshStageState>(context);
+                        auto constants = source.extendedParameters.Get();
+                        context->VSSetConstantBuffers(2, 1, &constants);
+                        context->PSSetConstantBuffers(2, 1, &constants);
+                        beginRendering();
                         D3D11_VIEWPORT viewport{}; UINT viewportCount = 1;
                         preview->renderer->GetContext()->RSGetViewports(&viewportCount, &viewport);
                         material.MaterialUniforms.push_back({viewport.Width, viewport.Height, 0, 0});
                     }
                     else material.MaterialUniforms.push_back({preview->depthAvailable ? 1.0f : 0.0f, front.X, front.Y, front.Z});
                     basic.MaterialType = RendererMaterialType::File; basic.MaterialRenderDataPtr = &material;
-                    basic.AlphaBlend = source.gemstone || source.rigidBasicDither || source.tidecall || source.solid || source.growingVines || source.rigidDissolve ? AlphaBlendType::Opacity : AlphaBlendType::Blend; basic.SoftParticleDistanceFar = 1;
+                    basic.AlphaBlend = (source.meshDistortion || source.rigidGlow && layer.Distortion != 0) ? (distortionPass == 0 ? AlphaBlendType::Add : AlphaBlendType::Mul) : source.simpleAdditive ? AlphaBlendType::Blend : (source.simpleMesh || source.fungi || source.gemstone || source.rigidBasicDither || source.tidecall || source.solid || source.growingVines || source.rigidDissolve ? AlphaBlendType::Opacity : AlphaBlendType::Blend); basic.SoftParticleDistanceFar = 1;
                     basic.TextureWraps.fill(TextureWrapType::Repeat);
                 }
                 else if (layer.Distortion != 0)
@@ -1692,7 +2064,8 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                         {
                             instance.AllColor = Color(255,255,255,255);
                             for (int c = 0; c < 4; ++c) instance.Colors[c] = instance.AllColor;
-                            instance.CustomData1 = {particle.MaterialTime, particle.AppearancePhase, particle.ParticleSize, 0};
+                            instance.CustomData1 = {particle.MaterialTime, particle.AppearancePhase,
+                                preview->meshMaterials[layer.MeshMaterialIndex].animatedUV ? particle.SoftParticleScale : particle.ParticleSize, 0};
                             std::copy_n(particle.Colour, 4, instance.CustomData2.begin());
                         }
                         AECN_VFX_TIMING_FINISH(instanceTiming);
@@ -1711,11 +2084,13 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                     const bool mirroredProjection = projection[0] * projection[5] - projection[1] * projection[4] < 0;
                     // These shipped shaders cull back faces before transparent composition.
                     const bool singleSided = layer.MeshMaterialIndex >= 0
-                        && (preview->meshMaterials[layer.MeshMaterialIndex].gemstone || preview->meshMaterials[layer.MeshMaterialIndex].vertexAnimated || preview->meshMaterials[layer.MeshMaterialIndex].tidecall || preview->meshMaterials[layer.MeshMaterialIndex].soulPanning || preview->meshMaterials[layer.MeshMaterialIndex].scrollingMesh || preview->meshMaterials[layer.MeshMaterialIndex].growingVines || preview->meshMaterials[layer.MeshMaterialIndex].rigidDissolve || preview->meshMaterials[layer.MeshMaterialIndex].rigidBasicDither);
+                        && (preview->meshMaterials[layer.MeshMaterialIndex].fungi || (preview->meshMaterials[layer.MeshMaterialIndex].rigidGlow && layer.Distortion == 0) || preview->meshMaterials[layer.MeshMaterialIndex].colourMesh || preview->meshMaterials[layer.MeshMaterialIndex].simpleMesh || preview->meshMaterials[layer.MeshMaterialIndex].gemstone || preview->meshMaterials[layer.MeshMaterialIndex].vertexAnimated || preview->meshMaterials[layer.MeshMaterialIndex].tidecall || preview->meshMaterials[layer.MeshMaterialIndex].soulPanning || preview->meshMaterials[layer.MeshMaterialIndex].scrollingMesh || preview->meshMaterials[layer.MeshMaterialIndex].growingVines || preview->meshMaterials[layer.MeshMaterialIndex].rigidDissolve || preview->meshMaterials[layer.MeshMaterialIndex].rigidBasicDither);
                     node.Culling = layer.Kind == 2 ? (mirroredProjection ? CullingType::Back : CullingType::Front)
                         : singleSided ? (mirroredProjection ? CullingType::Front : CullingType::Back) : CullingType::Double;
                     node.ModelIndex = layer.ModelIndex; node.Magnification = 1;
                     node.DepthParameterPtr = &depth; node.BasicParameterPtr = &basic;
+                    if (compactModel != nullptr)
+                        compactModel->PrepareFrame(preview->renderer->GetGraphicsDevice().Get(), poseFrame(particles[begin]));
                     preview->meshes->BeginRendering(node, end - begin, nullptr);
                     for (int i = begin; i < end; ++i)
                     {
@@ -1734,9 +2109,23 @@ static int DrawParticles(Preview* preview, const float* view, const float* proje
                         if (layer.MeshMaterialIndex >= 0)
                         {
                             instance.CustomData1 = {particle.MaterialTime, particle.AppearancePhase, particle.Time, 0};
+                            if (preview->meshMaterials[layer.MeshMaterialIndex].fungi)
+                                instance.CustomData1 = {particle.MaterialTime, particle.NormalRotation[0], particle.Time, 0};
+                            if (preview->meshMaterials[layer.MeshMaterialIndex].rigidDissolve)
+                                instance.CustomData1 = {particle.MaterialTime, particle.NormalRotation[0], particle.Time, particle.NormalRotation[1]};
                             std::copy_n(particle.Colour, 4, instance.CustomData2.begin());
                         }
                         preview->meshes->Rendering(node, instance, nullptr);
+                    }
+                    std::unique_ptr<NativeMeshBlendScope> nativeBlend;
+                    if (layer.MeshMaterialIndex >= 0)
+                    {
+                        const auto& source = preview->meshMaterials[layer.MeshMaterialIndex];
+                        if (source.colourMesh || source.simpleMesh || source.vertexAnimated || source.fungi || source.rigidGlow && layer.Distortion == 0)
+                            nativeBlend = std::make_unique<NativeMeshBlendScope>(
+                                static_cast<EffekseerRendererDX11::RendererImplemented*>(preview->renderer.Get()),
+                                preview->nativeMeshBlends[source.fungi || source.simpleMesh && !source.simpleAdditive ? 1 : 0],
+                                basic.AlphaBlend, source.fungi || source.simpleMesh && !source.simpleAdditive);
                     }
                     preview->meshes->EndRendering(node, nullptr);
                 }
@@ -1775,7 +2164,7 @@ API int AecnVfxDraw(Preview* preview, const float* view, const float* projection
 {
     AECN_VFX_TIMING_ACTIVATE(active, preview->timing);
     AECN_VFX_TIMING_SCOPE(timing, AecnRenderTiming::NativeDraw);
-    if (preview && (!preview->halfLayers.empty() || !preview->fullLayers.empty()))
+    if (preview && (!preview->halfLayers.empty() || !preview->fullLayers.empty() || !preview->seaLayers.empty()))
     {
         if (!AecnVfxBeginScene(preview, lighting)) return 0;
         if (!AecnVfxDrawInScene(preview, preview, view, projection, particles, count, lighting, softDepth))
@@ -1806,7 +2195,7 @@ API int AecnVfxDrawInScene(Preview* owner, Preview* preview, const float* view, 
                 throw std::runtime_error("Soft depth must be a single-sample Texture2D view");
         }
         // Validate each submission before retaining it so a rejected effect cannot poison the scene queue.
-        size_t opaqueCount = 0, colourCount = 0, distortionCount = 0;
+        size_t opaqueCount = 0, colourCount = 0, distortionCount = 0, seaCount = 0;
         for (int index = 0; index < count; ++index)
         {
             const auto& particle = particles[index];
@@ -1815,7 +2204,7 @@ API int AecnVfxDrawInScene(Preview* owner, Preview* preview, const float* view, 
             const auto& layer = preview->layers[particle.Layer];
             for (float value : particle.Colour)
                 if (!std::isfinite(value)) throw std::runtime_error("Invalid particle colour");
-            if (HalfLayer(*preview, particle.Layer))
+            if (HalfLayer(*preview, particle.Layer) || SeaLayer(*preview, particle.Layer))
                 for (float value : particle.Transform)
                     if (!std::isfinite(value)) throw std::runtime_error("Invalid particle transform");
             if (!std::isfinite(particle.AlphaCrush[0]) || !std::isfinite(particle.AlphaCrush[1])
@@ -1836,7 +2225,8 @@ API int AecnVfxDrawInScene(Preview* owner, Preview* preview, const float* view, 
                 for (float value : particle.NormalRotation)
                     if (!std::isfinite(value)) throw std::runtime_error("Invalid distortion shading basis");
             }
-            if (layer.Distortion != 0) ++distortionCount;
+            if (SeaLayer(*preview,particle.Layer)) ++seaCount;
+            else if (layer.Distortion != 0) ++distortionCount;
             else if (layer.OpaqueModel) ++opaqueCount;
             else ++colourCount;
         }
@@ -1853,10 +2243,12 @@ API int AecnVfxDrawInScene(Preview* owner, Preview* preview, const float* view, 
         command.opaque.reserve(opaqueCount);
         command.colour.reserve(colourCount);
         command.distortion.reserve(distortionCount);
+        command.sea.reserve(seaCount);
         for (int index = 0; index < count; ++index)
         {
             const auto& particle = particles[index]; const auto& layer = preview->layers[particle.Layer];
-            auto& target = layer.Distortion != 0 ? command.distortion : layer.OpaqueModel ? command.opaque : command.colour;
+            auto& target = SeaLayer(*preview,particle.Layer) ? command.sea
+                : layer.Distortion != 0 ? command.distortion : layer.OpaqueModel ? command.opaque : command.colour;
             target.push_back(particle);
         }
         owner->sceneDraws.push_back(std::move(command));

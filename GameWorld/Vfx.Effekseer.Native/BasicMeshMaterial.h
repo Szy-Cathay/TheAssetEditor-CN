@@ -1,6 +1,6 @@
 #pragma once
 
-// Zero colour-distortion branch of wh3_vfx_basic_mesh's shipped pixel shader.
+// wh3_vfx_basic_mesh's original colour-distortion and overlay inputs.
 std::string BasicMeshCode()
 {
     return R"(
@@ -29,7 +29,14 @@ std::string BasicMeshCode()
         $F4$ vertexColour = lerp($F4$(1,1,1,1), vcolor, mesh13.y);
         mask *= mesh12.w * pow(abs(vertexColour.a), mesh13.x);
         mask *= lerp(1, floor(customData2.a * 1000) * 0.001, mesh13.z);
-        $F2$ colourUV = (uv1 + sourceTime * mesh0.xy) * $F2$(mesh0.w, mesh1.x);
+        $F2$ colourBaseUV = uv1;
+        if (mesh8.z != 0)
+        {
+            $F2$ distortionUV = uv1 * -.35 + sourceTime * $F2$(0,.1);
+            $F4$ distortion = AecnMeshColourDistortion(distortionUV);
+            colourBaseUV += mesh8.z * distortion.rb * .1;
+        }
+        $F2$ colourUV = (colourBaseUV + sourceTime * mesh0.xy) * $F2$(mesh0.w, mesh1.x);
         $F4$ overlay = $TEX_P3$colourUV$TEX_S3$;
         $F3$ colour = overlay.rgb * (1 + overlay.a * (mesh0.z - 1));
         colour *= vertexColour.rgb * $F3$(mesh8.w, mesh9.xy) * mesh9.z * customData2.rgb;

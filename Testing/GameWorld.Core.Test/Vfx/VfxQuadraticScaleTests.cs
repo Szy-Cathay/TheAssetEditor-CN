@@ -104,12 +104,17 @@ public class VfxQuadraticScaleTests
     [TestCase("ParticleScale", false)]
     [TestCase("ParticleInitialScale", true)]
     [TestCase("curve_alpha", false)]
-    public void QuadraticScaleSupport_DoesNotOpenModelsInitialScaleOrOtherFields(string field, bool planar)
+    public void NativeFloatQuadraticEndpoints_KeepTheirActualChannelBindingsOutsidePlanarScale(string field, bool planar)
     {
         using var fixture = Fixture();
         var text = Central(fixture).GetProperty("Source").GetString();
-        var error = Assert.Throws<VfxMappingException>(() => new VfxPreviewCurve(text, field, 1, planar));
-        Assert.That(error!.Reason, Is.EqualTo("Vfx.Preview.InterpolationUnsupported"));
+        var curve = new VfxPreviewCurve(text, field, 1, planar);
+        Assert.That(float.IsFinite(curve.Sample("x", .35, .375f)), Is.True);
+        if (field == "curve_alpha")
+        {
+            var error = Assert.Throws<VfxMappingException>(() => curve.RequireChannels("alpha"));
+            Assert.That(error!.Reason, Is.EqualTo("Vfx.Preview.InvalidData"), "XYZ size data must not become an authored alpha binding.");
+        }
     }
 
     [TestCase("exp1", "bezier_q")]

@@ -1,5 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
+using Microsoft.Xna.Framework;
 
 namespace GameWorld.Core.Vfx;
 
@@ -46,6 +47,7 @@ internal struct EffekseerParticle
     public Microsoft.Xna.Framework.Vector4 Colour, UV;
     public float Time, Flipbook;
     // Lit coverage uses a quaternion; velocity distortion carries T.xy/B.xy or N.xyz/1.
+    // Sprite shading basis, or model instance UV offsets in XY.
     public Microsoft.Xna.Framework.Vector4 NormalRotation;
     public float ParticleSize;
     public float MaterialTime;
@@ -99,12 +101,16 @@ internal static class EffekseerNative
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxTextureAlias(EffekseerHandle preview, int sourceIndex);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxModel(EffekseerHandle preview, EffekseerVertex[] vertices, int vertexCount, int[] indices, int indexCount);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxModelFrames(EffekseerHandle preview, EffekseerVertex[] vertices, int vertexLength, int verticesPerFrame, int frameCount, int[] indices, int indexCount, float cycles);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxModelSkinned(EffekseerHandle preview,
+        EffekseerVertex[] vertices, int vertexCount, int[] indices, int indexCount, EffekseerSkinWeight[] weights, int weightBytes,
+        Matrix[] poses, int poseCount, int boneCount, int frameCount, float cycles, float offsetX, float offsetY, float offsetZ);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxModelAlias(EffekseerHandle preview, int sourceIndex);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxPrepareModel(EffekseerHandle preview, int modelIndex);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxMeshMaterial(EffekseerHandle preview, int[] textures, int textureCount, float[] parameters, int parameterCount);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxConfigure(EffekseerHandle preview, [In] EffekseerLayer[] layers, int count);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxConfigureHalf(EffekseerHandle preview, [In] EffekseerHalfLayer[] layers, int count, int configBytes);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxConfigureFull(EffekseerHandle preview, [In] EffekseerHalfLayer[] layers, int count, int configBytes);
+    [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxConfigureSea(EffekseerHandle preview, [In] EffekseerHalfLayer[] layers, int count, int configBytes);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxDraw(EffekseerHandle preview, float[] view, float[] projection, [In] EffekseerParticle[] particles, int count, in EffekseerLighting lighting = default, nint softDepth = 0);
     [DllImport(Library, CallingConvention = CallingConvention.Cdecl)] internal static extern int AecnVfxDrawInScene(nint owner, EffekseerHandle preview, float[] view, float[] projection, [In] EffekseerParticle[] particles, int count, in EffekseerLighting lighting = default, nint softDepth = 0);
 

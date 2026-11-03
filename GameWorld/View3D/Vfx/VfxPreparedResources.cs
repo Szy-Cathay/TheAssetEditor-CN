@@ -104,7 +104,7 @@ internal sealed partial class VfxPreparedResources(VfxPreparedTexture[] textures
                 }
                 masks[index] = prepared;
             }
-            else if (slots.Length == 10 && material.Parameters.Length == 60)
+            else if (slots.Length == 10 && material.Parameters.Length is 60 or VfxLegacyRigidDissolveMaterial.ParameterCount)
             {
                 var key = (textures[slots[1]].Identity, textures[slots[2]].Identity, textures[slots[4]].Identity);
                 if (!triples.TryGetValue(key, out var prepared))

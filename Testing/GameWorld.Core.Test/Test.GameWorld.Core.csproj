@@ -32,6 +32,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Vfx/Fixtures/NativeRejectedMeshMaterials.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/NativeRigidDissolveMaterials.json" />
+    <EmbeddedResource Include="Vfx/Fixtures/OfficialSoundOnlyVfx.xml" />
+    <EmbeddedResource Include="Vfx/Fixtures/OfficialAffectedVfxRoots.json" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeVerticalForce.json" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeParticleForceCurves.json" />
     <EmbeddedResource Include="Vfx/Fixtures/NativeConstantForceDamping.json" />
