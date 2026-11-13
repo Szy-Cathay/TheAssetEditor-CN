@@ -1741,6 +1741,8 @@
   "AnimationView.EnableAnimation": "启用动画播放",
   "AnimationView.ExternalSkeleton": "外部骨架",
   "AnimationView.TargetAnim": "目标动画",
+  "AnimationView.NoSkeleton": "未加载骨架",
+  "AnimationView.NoAnimation": "未选择动画",
 
   "SkeletonEditor.Header": "骨架编辑器",
   "SkeletonEditor.Skeleton": "骨架",

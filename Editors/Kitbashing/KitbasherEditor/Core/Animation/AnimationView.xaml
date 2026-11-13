@@ -31,15 +31,14 @@
             Header="{loc:Loc SharedAnimPlayer.Title}"
             AutomationProperties.Name="{loc:Loc SharedAnimPlayer.Title}"
             IsExpanded="{Binding IsEnabled, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-            <Grid
-                Margin="0,4,0,4"
-                Visibility="{Binding AnimationControllerVisability.Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+            <Grid Margin="0,4,0,4">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0">
+                <Grid Grid.Row="0"
+                      Visibility="{Binding AnimationControllerVisability.Value, Mode=OneWay}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />

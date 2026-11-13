@@ -11,6 +11,7 @@ using Shared.Core.Events;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles;
 using Shared.Core.PackFiles.Models;
+using Shared.Core.Services;
 using Shared.GameFormats.Animation;
 using static CommonControls.FilterDialog.FilterUserControl;
 
@@ -27,7 +28,7 @@ namespace Editors.KitbasherEditor.ViewModels
         private readonly KitbasherRootScene _kitbasherRootScene;
         private readonly AnimationPlayer _player;
 
-        string _headerText = "No animation selected";
+        string _headerText = LocalizationManager.Instance?.Get("AnimationView.NoSkeleton") ?? "";
         public string HeaderText { get { return _headerText; } set { SetAndNotify(ref _headerText, value); } }
 
         ObservableCollection<AnimationReference> _animationList = new ObservableCollection<AnimationReference>();
@@ -174,7 +175,7 @@ namespace Editors.KitbasherEditor.ViewModels
         {
             string animationFolder = "animations\\skeletons\\";
             var skeletonFilePath = animationFolder + e.SkeletonName + ".anim";
-            if (SelectedSkeleton != skeletonFilePath)
+            if (SelectedSkeleton != skeletonFilePath || _skeletonPackFile == null)
             {
                 SelectedSkeleton = skeletonFilePath;
                 SelectedAnimation = null;
@@ -184,6 +185,8 @@ namespace Editors.KitbasherEditor.ViewModels
                 if (defaultIdleAnim != null)
                     AnimationChanged(defaultIdleAnim);
             }
+
+            OnEnableChanged(IsEnabled);
         }
 
         private void SkeletonChanged(string selectedSkeletonPath)
@@ -195,10 +198,10 @@ namespace Editors.KitbasherEditor.ViewModels
             {
                 _skeletonPackFile = _packFileService.FindFile(selectedSkeletonPath);
                 if (_skeletonPackFile == null)
-                    HeaderText = "No skeleton";
+                    HeaderText = LocalizationManager.Instance?.Get("AnimationView.NoSkeleton") ?? "";
                 else
                 {
-                    HeaderText = _skeletonPackFile.Name + " - No Animation";
+                    HeaderText = _skeletonPackFile.Name + " - " + LocalizationManager.Instance?.Get("AnimationView.NoAnimation");
                     AnimationsForCurrentSkeleton = _skeletonAnimationLookUpHelper.GetAnimationsForSkeleton(Path.GetFileNameWithoutExtension(_skeletonPackFile.Name));
                 }
             }
@@ -215,9 +218,9 @@ namespace Editors.KitbasherEditor.ViewModels
             if (Animation != null)
                 HeaderText = _skeletonPackFile.Name + " - " + Animation.Name;
             else if (_skeletonPackFile != null)
-                HeaderText = _skeletonPackFile.Name + " - No Animation";
+                HeaderText = _skeletonPackFile.Name + " - " + LocalizationManager.Instance?.Get("AnimationView.NoAnimation");
             else
-                HeaderText = "No Skeleton - No Animation";
+                HeaderText = LocalizationManager.Instance?.Get("AnimationView.NoSkeleton") ?? "";
 
             var skeleton = _kitbasherRootScene.Skeleton;
             var isAnimationDataPresent = Animation != null && skeleton != null;
