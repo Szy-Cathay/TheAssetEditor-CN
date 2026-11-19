@@ -52,8 +52,9 @@ namespace Shared.Core.PackFiles.Serialization
             BinaryWriter writer,
             GameInformation currentGameInformation,
             bool enableCompression = true,
-            bool enableCorruptionDetection = false)
+            bool enableCorruptionDetection = false, CancellationToken cancellationToken = default)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (container.Header.HasEncryptedData || container.Header.HasEncryptedIndex)
                 throw new InvalidOperationException("Saving encrypted packs is not supported.");
 
@@ -82,7 +83,7 @@ namespace Shared.Core.PackFiles.Serialization
             SerializeFileTable(fileMetaDataTable, container, writer);
             var outputParent = new PackedFileSourceParent { FilePath = outputFileName };
             var pendingUpdates = new List<PendingDataSourceUpdate>(fileMetaDataTable.Count);
-            SerializeFileBlob(fileMetaDataTable, container, writer, outputParent, pendingUpdates);
+            SerializeFileBlob(fileMetaDataTable, container, writer, outputParent, pendingUpdates, cancellationToken);
             if (enableCorruptionDetection)
             {
                 ValidateCorruptionDetectionFiles(
@@ -369,10 +370,11 @@ namespace Shared.Core.PackFiles.Serialization
             PackFileContainer container,
             BinaryWriter writer,
             PackedFileSourceParent outputParent,
-            List<PendingDataSourceUpdate> pendingUpdates)
+            List<PendingDataSourceUpdate> pendingUpdates, CancellationToken cancellationToken = default)
         {
             foreach (var fileMetaData in fileMetaDataTabel)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var packFile = fileMetaData.PackFile;
                 uint uncompressedSize = 0;
                 var shouldCompress = fileMetaData.CompressionInfo.IntendedCompressionFormat != CompressionFormat.None;

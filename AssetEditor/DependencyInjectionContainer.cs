@@ -1,5 +1,8 @@
 ﻿using AssetEditor.Services;
 using AssetEditor.Services.Settings;
+using AssetEditor.ModAssistant;
+using Shared.Core.ModAssistant;
+using System.Net.Http;
 using AssetEditor.UiCommands;
 using AssetEditor.ViewModels;
 using AssetEditor.Views;
@@ -20,6 +23,15 @@ namespace AssetEditor
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<IAssistantSecretStore, AssistantSecretStore>();
+            serviceCollection.AddSingleton(_ => new HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan });
+            serviceCollection.AddScoped<IAssistantModelClient, DeepSeekClient>();
+            serviceCollection.AddScoped<AssistantWorkspace>();
+            serviceCollection.AddScoped<IAssistantWorkspace>(services => services.GetRequiredService<AssistantWorkspace>());
+            serviceCollection.AddSingleton<AssistantSelectionContext>();
+            serviceCollection.AddScoped<AssistantViewModel>();
+            serviceCollection.AddTransient<AssistantView>();
+            serviceCollection.AddTransient<AssistantSettingsViewModel>();
             serviceCollection.AddScoped<MainWindow>();
             serviceCollection.AddScoped<MainViewModel>();
             serviceCollection.AddSingleton<IEditorCreator>(x => x.GetRequiredService<IEditorManager>());
@@ -82,5 +94,9 @@ namespace AssetEditor
 
             RegisterAllAsInterface<IDeveloperConfiguration>(serviceCollection, ServiceLifetime.Transient);
         }
+
+        public override void RegisterTools(IEditorDatabase database) =>
+            EditorInfoBuilder.Create<AssistantViewModel, AssistantView>(EditorEnums.ModAssistant)
+                .AddToToolbar("Assistant.Title").Build(database);
     }
 }

@@ -14,6 +14,7 @@ namespace Editors.AnimatioReTarget
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, RetargetAssistantAdapter>();
             serviceCollection.AddScoped<AnimationRetargetEditor>();
             serviceCollection.AddScoped<CharacterRetargetProfileStore>();
             serviceCollection.AddScoped<BoneManager>();

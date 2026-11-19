@@ -23,6 +23,8 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
         private readonly uint _outputFormat;
         private readonly bool _ensureUnique;
         private readonly HashSet<string> _reservedPaths = new(StringComparer.OrdinalIgnoreCase);
+        internal IReadOnlyList<string> WrittenPaths { get; private set; } = [];
+        internal ErrorList Diagnostics { get; private set; } = new();
 
         public BatchProcessorService(IPackFileService pfs, ISkeletonAnimationLookUpHelper lookup,
             MountAnimationGeneratorService generator, BatchProcessOptions options,
@@ -38,8 +40,11 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
             _ensureUnique = ensureUnique;
         }
 
-        public bool Process(IAnimationBinGenericFormat mountFragment, IAnimationBinGenericFormat riderFragment)
+        public bool Process(IAnimationBinGenericFormat mountFragment, IAnimationBinGenericFormat riderFragment,
+            CancellationToken cancellationToken = default, Func<bool>? canCommit = null, bool showResults = true)
         {
+            WrittenPaths = [];
+            cancellationToken.ThrowIfCancellationRequested();
             if (mountFragment is not AnimationBinWh3 mount || mount.TableVersion != 4 ||
                 riderFragment is not AnimationBinWh3 rider || rider.TableVersion != 4)
                 throw new InvalidOperationException(Text("MountAnim.Wh3TablesRequired"));
@@ -67,6 +72,7 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
                 throw new InvalidOperationException(Text("Msg.FragmentSkeletonMismatch"));
 
             var results = new ErrorList();
+            Diagnostics = results;
             var writes = new List<PackFileWrite>();
             var generated = new Dictionary<(string Mount, string Rider, bool IsDeath), (string Path, float TimeScale)>();
             var riderLoader = new RiderAnimationService(_pfs, _lookup);
@@ -74,6 +80,7 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
             var auxiliary = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             string ConvertAuxiliary(string path)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (auxiliary.TryGetValue(path, out var existing))
                     return existing;
                 var outputPath = GetAnimationPath(path);
@@ -87,6 +94,7 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
             var metadata = new RiderMetadataService(_pfs, sourceSkeleton, riderSkeleton, ConvertAuxiliary, GetAnimationPath, writes, results);
             AnimationBinEntry.AnimationRef ConvertReference(string mountPath, AnimationBinEntry.AnimationRef riderRef, bool isDeath)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var key = (mountPath, riderRef.AnimationFile, isDeath);
                 if (!generated.TryGetValue(key, out var conversion))
                 {
@@ -240,9 +248,10 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             if (results.Errors.Any(x => x.IsError))
             {
-                _dialogs.ShowErrorViewDialog(Text("MountAnim.BatchFailed"), results, false);
+                if (showResults) _dialogs.ShowErrorViewDialog(Text("MountAnim.BatchFailed"), results, false);
                 return false;
             }
             if (writes.Count == 0)
@@ -273,9 +282,18 @@ namespace Editors.AnimationVisualEditors.MountAnimationCreator.Services
                 return false;
 
             // Commit the complete output together; a failed generation never leaves a partial animation set.
-            _pfs.ApplyFileWrites(project, writes, !_ensureUnique);
+            void Commit()
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (canCommit?.Invoke() == false || !ReferenceEquals(_pfs.GetEditablePack(), project))
+                    throw new InvalidOperationException(Text("MountAnim.OutputChanged"));
+                _pfs.ApplyFileWrites(project, writes, !_ensureUnique);
+                WrittenPaths = writes.Select(w => w.Path).ToArray();
+            }
+            if (System.Windows.Application.Current?.Dispatcher is { } dispatcher && !dispatcher.CheckAccess()) dispatcher.Invoke(Commit);
+            else Commit();
             results.Ok(output.Name, LocalizationManager.Instance.GetFormat("MountAnim.BatchSucceeded", writes.Count - 1));
-            _dialogs.ShowErrorViewDialog(Text("MountAnim.BatchResult"), results, false);
+            if (showResults) _dialogs.ShowErrorViewDialog(Text("MountAnim.BatchResult"), results, false);
             return true;
         }
 

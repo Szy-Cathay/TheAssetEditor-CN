@@ -107,7 +107,7 @@ public class SkeletonDirtyStateTests
         });
     }
 
-    private static void WithSkeleton(Action<SkeletonEditorViewModel, IPackFileService, FolderProjectContainer> action)
+    internal static void WithSkeleton(Action<SkeletonEditorViewModel, IPackFileService, FolderProjectContainer> action)
     {
         var root = Directory.CreateTempSubdirectory("ae-skeleton-save-");
         try

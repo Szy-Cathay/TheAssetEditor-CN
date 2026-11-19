@@ -18,6 +18,7 @@ namespace Shared.Core.ToolCreation
         void DestroyEditor(IEditorInterface instance);
         Type GetViewTypeFromViewModel(Type viewModelType);
         List<EditorInfo> GetEditorInfos();
+        IReadOnlyList<EditorInfo> GetEditorsForFile(string fullFileName);
     }
 
     public class EditorDatabase : IEditorDatabase
@@ -163,6 +164,7 @@ namespace Shared.Core.ToolCreation
         }
 
         public List<EditorInfo> GetEditorInfos() => _editors; 
+        public IReadOnlyList<EditorInfo> GetEditorsForFile(string fullFileName) => GetAllPossibleEditors(fullFileName);
 
         public void DestroyEditor(IEditorInterface instance) => _scopeRepository.RemoveScope(instance);
     }

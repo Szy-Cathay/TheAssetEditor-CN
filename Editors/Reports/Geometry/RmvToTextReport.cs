@@ -113,7 +113,7 @@ namespace Editors.Reports.Geometry
                 : sanitized;
         }
 
-        public string Format(RmvFile rmvFile)
+        public string Format(RmvFile rmvFile, bool includeVertices = true)
         {
             var output = new StringBuilder();
             output.AppendLine("=== RMV2 模型诊断报告 ===");
@@ -159,7 +159,8 @@ namespace Editors.Reports.Geometry
                     WriteModel(
                         output,
                         models[modelIndex],
-                        modelIndex);
+                        modelIndex,
+                        includeVertices);
                 }
             }
 
@@ -171,7 +172,8 @@ namespace Editors.Reports.Geometry
         private static void WriteModel(
             StringBuilder output,
             RmvModel model,
-            int modelIndex)
+            int modelIndex,
+            bool includeVertices)
         {
             var modelName = string.IsNullOrWhiteSpace(
                 model.Material.ModelName)
@@ -238,6 +240,7 @@ namespace Editors.Reports.Geometry
                     $"{weightedMaterial.Vec4Params.Values.Count}");
             }
 
+            if (!includeVertices) return;
             output.AppendLine("顶点:");
             var vertices = model.Mesh.VertexList;
             for (var vertexIndex = 0;

@@ -17,6 +17,8 @@ namespace Editors.Shared.Core
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, TextAssistantAdapter>();
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, AssistantPlaybackAdapter>();
             serviceCollection.AddTransient<VariantMeshToXmlConverter>();
             serviceCollection.AddTransient<TextEditorViewModel<VariantMeshToXmlConverter>>();
 

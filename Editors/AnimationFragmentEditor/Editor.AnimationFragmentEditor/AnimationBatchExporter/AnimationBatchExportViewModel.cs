@@ -227,8 +227,10 @@ namespace CommonControls.Editors.AnimationBatchExporter
             UpdateSelection();
         }
 
-        public async Task<ErrorList?> Process()
+        internal IReadOnlyList<string> AssistantWrittenPaths { get; private set; } = [];
+        public async Task<ErrorList?> Process(CancellationToken cancellationToken = default)
         {
+            AssistantWrittenPaths = [];
             if (IsBusy.Value || _closed)
                 return null;
 
@@ -279,12 +281,14 @@ namespace CommonControls.Editors.AnimationBatchExporter
                     CompletedCount.Value = value.Count;
                     CurrentFile.Value = value.Path;
                 });
-                var converted = await Task.Run(() => ConvertAnimations(selected, format, errors, progress));
+                var converted = await Task.Run(() => ConvertAnimations(selected, format, errors, progress, cancellationToken), cancellationToken);
                 EnsureSourcesAvailable(selected, output);
+                cancellationToken.ThrowIfCancellationRequested();
                 if (converted.Writes.Count > 0)
                 {
                     Status.Value = Text("AnimBatchExport.Writing");
-                    await _pfs.ApplyFileWritesAsync(output, converted.Writes, true, CancellationToken.None);
+                    await _pfs.ApplyFileWritesAsync(output, converted.Writes, true, cancellationToken);
+                    AssistantWrittenPaths = converted.Writes.Select(write => write.Path).ToArray();
                 }
                 CompletedCount.Value = selected.Length;
                 Status.Value = Format("AnimBatchExport.Completed",
@@ -315,7 +319,7 @@ namespace CommonControls.Editors.AnimationBatchExporter
 
         private (List<PackFileWrite> Writes, int AnimationCount) ConvertAnimations(
             AnimationListItem[] selected, uint format, ErrorList errors,
-            IProgress<(int Count, string Path)> progress)
+            IProgress<(int Count, string Path)> progress, CancellationToken cancellationToken)
         {
             var writes = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             var matrices = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
@@ -327,6 +331,7 @@ namespace CommonControls.Editors.AnimationBatchExporter
             var animationCount = 0;
             for (var index = 0; index < selected.Length; index++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var item = selected[index];
                 try
                 {

@@ -17,6 +17,8 @@ namespace Editors.Reports
 
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantResourceAdapter, ReportAssistantAdapter>();
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantWorkspaceAdapter, ReportTemplateAssistantAdapter>();
             serviceCollection.AddTransient<DeepSearchReport>();
             serviceCollection.AddTransient<DeepSearchCommand>();
 

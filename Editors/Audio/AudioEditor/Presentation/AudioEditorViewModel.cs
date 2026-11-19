@@ -114,6 +114,7 @@ namespace Editors.Audio.AudioEditor.Presentation
         public SettingsViewModel SettingsViewModel { get; }
         public WaveformVisualiserViewModel WaveformVisualiserViewModel { get; }
         public IReadOnlyList<AudioProjectCompileTargetOption> CompileTargets { get; }
+        internal bool? AssistantCompileSucceeded { get; private set; }
 
         public string DisplayName { get; set; } = LocalizationManager.Instance.Get("DisplayName.AudioEditor");
 
@@ -274,6 +275,7 @@ namespace Editors.Audio.AudioEditor.Presentation
             AudioProjectCompileTarget compileTarget,
             CancellationToken cancellationToken = default)
         {
+            AssistantCompileSucceeded = null;
             if (!CanEditAudioProject)
                 return;
 
@@ -320,6 +322,7 @@ namespace Editors.Audio.AudioEditor.Presentation
                     compileCompleted
                         ? "AudioEditor.Compile.Completed"
                         : "AudioEditor.Compile.Cancelled");
+                AssistantCompileSucceeded = compileCompleted;
             }
             catch (OperationCanceledException)
             {

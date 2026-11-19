@@ -11,6 +11,7 @@ namespace Editors.CscEditor
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, CscAssistantAdapter>();
             // Views
             serviceCollection.AddTransient<CscEditorView>();
 

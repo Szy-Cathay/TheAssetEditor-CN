@@ -8,6 +8,7 @@ public class DependencyInjectionContainer : DependencyContainer
 {
     public override void Register(IServiceCollection services)
     {
+        services.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, VfxAssistantAdapter>();
         services.AddTransient<VfxEditorView>();
         services.AddScoped<VfxEditorViewModel>();
         services.AddScoped<VfxScenePreview>();

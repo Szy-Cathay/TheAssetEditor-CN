@@ -354,6 +354,7 @@ public class OperationProgressViewTests
             {
                 ["AssetEditor", "Views", "FolderProjectHistory", "FolderProjectHistoryView.xaml"],
                 ["Editors", "Audio", "AudioExplorer", "AudioExplorerView.xaml"],
+                ["AssetEditor", "ModAssistant", "AssistantView.xaml"],
             })
             .Select(parts => Path.GetFullPath(Path.Combine(
                 [solutionRoot, .. parts])))

@@ -26,6 +26,8 @@ namespace Editors.ImportExport
     {
         public override void Register(IServiceCollection services)
         {
+            services.AddSingleton<global::Shared.Core.ModAssistant.IAssistantResourceAdapter, ImportExportAssistantAdapter>();
+            services.AddSingleton<global::Shared.Core.ModAssistant.IAssistantWorkspaceAdapter, ImportExportAssistantAdapter>();
             // Exporter ViewModels
             RegisterWindow<ExportWindow>(services);
             services.AddTransient<ExporterCoreViewModel>();

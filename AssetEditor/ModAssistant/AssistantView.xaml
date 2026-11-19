@@ -1,0 +1,211 @@
+<UserControl x:Class="AssetEditor.ModAssistant.AssistantView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:AssetEditor.ModAssistant"
+    xmlns:icons="clr-namespace:Material.Icons.WPF;assembly=Material.Icons.WPF"
+    xmlns:progress="clr-namespace:Shared.Ui.Common.OperationProgress;assembly=Shared.Ui"
+    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
+    Language="zh-CN" Background="{DynamicResource AeBrush.Canvas}" Foreground="{DynamicResource AeBrush.TextPrimary}"
+    FontFamily="{DynamicResource AppFontFamily}" SizeChanged="WorkspaceSizeChanged">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="pack://application:,,,/Shared.Ui;component/Common/Styles/EditorWorkspaceStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="VisibleWhenTrue"/>
+            <Style x:Key="OptionalText" TargetType="TextBlock" BasedOn="{StaticResource AeText.Caption}">
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Style.Triggers><Trigger Property="Text" Value=""><Setter Property="Visibility" Value="Collapsed"/></Trigger></Style.Triggers>
+            </Style>
+            <Style x:Key="AssistantToggle" TargetType="ToggleButton" BasedOn="{StaticResource AeEditor.ToggleIcon}">
+                <Setter Property="Width" Value="Auto"/><Setter Property="Height" Value="28"/><Setter Property="Padding" Value="8,4"/>
+            </Style>
+            <DataTemplate DataType="{x:Type local:AssistantTextPart}">
+                <local:AssistantMarkdownView Text="{Binding Text}" Margin="0,4,0,8" AutomationProperties.Name="{loc:Loc Assistant.Answer}"/>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type local:AssistantReasoningPart}">
+                <Expander Header="{loc:Loc Assistant.Reasoning}" Background="Transparent" Margin="0,4,0,8">
+                    <TextBox Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent"
+                        MaxHeight="240" VerticalScrollBarVisibility="Auto" Foreground="{DynamicResource AeBrush.TextSecondary}" AutomationProperties.Name="{loc:Loc Assistant.Reasoning}"/>
+                </Expander>
+            </DataTemplate>
+            <DataTemplate DataType="{x:Type local:AssistantOperationCard}">
+                <StackPanel Margin="0,4">
+                    <Expander Background="Transparent" HorizontalContentAlignment="Stretch">
+                        <Expander.Header><WrapPanel>
+                            <TextBlock Text="{Binding Title}" Style="{DynamicResource AeText.Body}" Margin="0,0,12,0" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding Status}" Style="{DynamicResource AeText.Caption}" VerticalAlignment="Center"/>
+                        </WrapPanel></Expander.Header>
+                        <Border BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="1,0,0,0" Padding="12,4,0,8" Margin="8,0,0,0">
+                            <StackPanel>
+                                <TextBlock Text="{Binding TargetLabel}" Style="{StaticResource OptionalText}" Margin="0,4"/>
+                                <TextBlock Text="{Binding Impact}" Style="{StaticResource OptionalText}" Margin="0,4"/>
+                                <ItemsControl ItemsSource="{Binding Changes}"><ItemsControl.ItemTemplate><DataTemplate>
+                                    <StackPanel Margin="0,4"><TextBlock Text="{Binding Field}" Style="{DynamicResource AeText.Technical}" TextWrapping="Wrap"/>
+                                        <WrapPanel><TextBlock Text="{loc:Loc Assistant.Before}" Style="{DynamicResource AeText.Caption}" Margin="0,0,8,0"/><TextBlock Text="{Binding Before}" TextWrapping="Wrap"/></WrapPanel>
+                                        <WrapPanel><TextBlock Text="{loc:Loc Assistant.After}" Style="{DynamicResource AeText.Caption}" Margin="0,0,8,0"/><TextBlock Text="{Binding After}" TextWrapping="Wrap"/></WrapPanel>
+                                    </StackPanel>
+                                </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                                <WrapPanel IsEnabled="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType={x:Type local:AssistantView}}}" Margin="0,4">
+                                    <Button Content="{loc:Loc Assistant.Locate}" Command="{Binding LocateCommand}" Style="{DynamicResource AeButton.Quiet}" Visibility="{Binding CanLocate, Converter={StaticResource VisibleWhenTrue}}"/>
+                                    <Button Content="{loc:Loc Assistant.Undo}" Command="{Binding UndoCommand}" Style="{DynamicResource AeButton.Quiet}" Visibility="{Binding CanEdit, Converter={StaticResource VisibleWhenTrue}}"/>
+                                    <Button Content="{loc:Loc Assistant.Redo}" Command="{Binding RedoCommand}" Style="{DynamicResource AeButton.Quiet}" Visibility="{Binding CanEdit, Converter={StaticResource VisibleWhenTrue}}"/>
+                                </WrapPanel>
+                                <Expander Header="{loc:Loc Assistant.OperationDetails}" Background="Transparent">
+                                    <TextBox Text="{Binding Detail, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="280" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="{loc:Loc Assistant.OperationDetails}"/>
+                                </Expander>
+                            </StackPanel>
+                        </Border>
+                    </Expander>
+                    <TextBlock Text="{Binding Error}" Style="{StaticResource OptionalText}" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="24,4,0,4"/>
+                </StackPanel>
+            </DataTemplate>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <Grid>
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+        <Border x:Name="HistoryPane" Background="{DynamicResource AeBrush.Surface1}" BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="0,0,1,0"
+            Visibility="{Binding ShowHistory, Converter={StaticResource VisibleWhenTrue}}">
+            <Border.Style><Style TargetType="Border"><Setter Property="Width" Value="216"/><Style.Triggers><DataTrigger Binding="{Binding IsCompact}" Value="True"><Setter Property="Width" Value="{Binding ActualWidth, RelativeSource={RelativeSource AncestorType={x:Type local:AssistantView}}}"/></DataTrigger></Style.Triggers></Style></Border.Style>
+            <DockPanel Margin="12">
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+                    <Button DockPanel.Dock="Right" Style="{DynamicResource AeButton.Icon}" Command="{Binding ToggleHistoryCommand}" ToolTip="{loc:Loc Assistant.CloseHistory}" AutomationProperties.Name="{loc:Loc Assistant.CloseHistory}"><icons:MaterialIcon Kind="ChevronLeft" Width="16" Height="16"/></Button>
+                    <TextBlock Text="{loc:Loc Assistant.Title}" Style="{DynamicResource AeText.SectionTitle}" VerticalAlignment="Center"/>
+                </DockPanel>
+                <Button DockPanel.Dock="Top" Command="{Binding NewConversationCommand}" Style="{DynamicResource AeButton.Secondary}" HorizontalContentAlignment="Left" Margin="0,0,0,24">
+                    <StackPanel Orientation="Horizontal"><icons:MaterialIcon Kind="Plus" Width="16" Height="16" Margin="0,0,8,0"/><TextBlock Text="{loc:Loc Assistant.NewConversation}"/></StackPanel>
+                </Button>
+                <TextBlock DockPanel.Dock="Top" Text="{loc:Loc Assistant.RecentSessions}" Style="{DynamicResource AeText.Label}" Margin="0,0,0,8"/>
+                <ListBox x:Name="SessionList" ItemsSource="{Binding Sessions}" SelectedItem="{Binding CurrentSession}" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" AutomationProperties.Name="{loc:Loc Assistant.RecentSessions}">
+                    <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem" BasedOn="{StaticResource AeList.Item}"><Setter Property="IsEnabled" Value="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType=ListBox}}"/></Style></ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" Margin="4,8"/></DataTemplate></ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+        <Grid Grid.Column="1" Visibility="{Binding ShowWorkspace, Converter={StaticResource VisibleWhenTrue}}">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <Border BorderBrush="{DynamicResource AeBrush.Border}" BorderThickness="0,0,0,1" Padding="12,8">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Command="{Binding NewConversationCommand}" Style="{DynamicResource AeButton.Icon}" ToolTip="{loc:Loc Assistant.NewConversation}" AutomationProperties.Name="{loc:Loc Assistant.NewConversation}"><icons:MaterialIcon Kind="SquareEditOutline" Width="16" Height="16"/></Button>
+                        <Button Command="{Binding ShowPanelCommand}" CommandParameter="settings" Style="{DynamicResource AeButton.Icon}" ToolTip="{loc:Loc Assistant.Settings}" AutomationProperties.Name="{loc:Loc Assistant.Settings}"><icons:MaterialIcon Kind="CogOutline" Width="16" Height="16"/></Button>
+                    </StackPanel>
+                    <Button DockPanel.Dock="Left" Command="{Binding ToggleHistoryCommand}" Style="{DynamicResource AeButton.Icon}" Margin="0,0,8,0" ToolTip="{loc:Loc Assistant.RecentSessions}" AutomationProperties.Name="{loc:Loc Assistant.RecentSessions}"><icons:MaterialIcon Kind="Menu" Width="16" Height="16"/></Button>
+                    <StackPanel>
+                        <TextBlock Text="{Binding CurrentSession.Title}" Style="{DynamicResource AeText.SectionTitle}" TextTrimming="CharacterEllipsis"/>
+                        <Button Command="{Binding ShowPanelCommand}" CommandParameter="context" Style="{DynamicResource AeButton.Quiet}" HorizontalContentAlignment="Left" Padding="0" ToolTip="{loc:Loc Assistant.Context}" AutomationProperties.Name="{loc:Loc Assistant.Context}">
+                            <TextBlock Text="{Binding TargetSummary}" Style="{DynamicResource AeText.Caption}" TextTrimming="CharacterEllipsis"/>
+                        </Button>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+            <Grid x:Name="ConversationPage" Grid.Row="1">
+                <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Panel}" Value="conversation"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
+                <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Grid>
+                    <ScrollViewer x:Name="ConversationScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" ScrollChanged="ConversationScrolled" PreviewMouseWheel="ConversationWheel" Padding="24,16">
+                        <ItemsControl x:Name="Transcript" ItemsSource="{Binding Messages}" MaxWidth="680" HorizontalAlignment="Stretch">
+                            <ItemsControl.ItemTemplate><DataTemplate>
+                                <Grid Margin="0,8,0,16">
+                                    <StackPanel>
+                                        <StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding IsUser}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                                        <ItemsControl ItemsSource="{Binding Parts}"/>
+                                        <local:AssistantMarkdownView Text="{Binding Text}" AutomationProperties.Name="{loc:Loc Assistant.Answer}">
+                                            <local:AssistantMarkdownView.Style><Style TargetType="local:AssistantMarkdownView"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Parts.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></local:AssistantMarkdownView.Style>
+                                        </local:AssistantMarkdownView>
+                                        <TextBlock Text="{Binding Outcome}" Style="{StaticResource OptionalText}" Foreground="{DynamicResource AeBrush.TextPrimary}" Margin="0,8"/>
+                                        <ItemsControl ItemsSource="{Binding Sources}"><ItemsControl.ItemTemplate><DataTemplate>
+                                            <TextBlock Margin="0,4" TextWrapping="Wrap"><Hyperlink NavigateUri="{Binding Url}" RequestNavigate="OpenSource"><Run Text="{Binding Title}"/></Hyperlink></TextBlock>
+                                        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                                        <WrapPanel>
+                                            <Button Command="{Binding DataContext.CopyMessageCommand, RelativeSource={RelativeSource AncestorType={x:Type local:AssistantView}}}" CommandParameter="{Binding}" Style="{DynamicResource AeButton.Icon}" ToolTip="{loc:Loc Assistant.CopyAnswer}" AutomationProperties.Name="{loc:Loc Assistant.CopyAnswer}"><icons:MaterialIcon Kind="ContentCopy" Width="16" Height="16"/></Button>
+                                            <Expander Header="{loc:Loc Assistant.ResponseDetails}" Background="Transparent" Margin="8,0,0,0">
+                                                <Expander.Style><Style TargetType="Expander" BasedOn="{StaticResource {x:Type Expander}}"><Style.Triggers><DataTrigger Binding="{Binding Usage}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Expander.Style>
+                                                <StackPanel><TextBlock Text="{Binding TargetSummary}" Style="{StaticResource OptionalText}" Margin="0,8"/><TextBlock Text="{loc:Loc Assistant.Usage}" Style="{DynamicResource AeText.Caption}" TextWrapping="Wrap"/><TextBox Text="{Binding Usage, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" AutomationProperties.Name="{loc:Loc Assistant.Usage}"/></StackPanel>
+                                            </Expander>
+                                        </WrapPanel>
+                                    </StackPanel>
+                                    <Border HorizontalAlignment="Right" Margin="32,0,0,0" Padding="12" Background="{DynamicResource AeBrush.Surface1}" CornerRadius="{StaticResource AeRadius.Surface}" Visibility="{Binding IsUser, Converter={StaticResource VisibleWhenTrue}}">
+                                        <StackPanel>
+                                            <TextBox Text="{Binding Text, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" BorderThickness="0" Background="Transparent" Padding="0" FontSize="14" AutomationProperties.Name="{loc:Loc Assistant.You}"/>
+                                            <Image Source="{Binding Attachment}" MaxWidth="240" MaxHeight="160" Stretch="Uniform" HorizontalAlignment="Right" AutomationProperties.Name="{Binding AttachmentName}"/>
+                                            <TextBlock Text="{Binding AttachmentName}" Style="{StaticResource OptionalText}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate></ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <ScrollViewer x:Name="WelcomePane" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="24">
+                        <ScrollViewer.Style><Style TargetType="ScrollViewer"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Messages.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></ScrollViewer.Style>
+                        <Grid MinHeight="240" MaxWidth="600" VerticalAlignment="Center">
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock Text="{loc:Loc Assistant.Welcome}" Style="{DynamicResource AeText.PageTitle}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                <TextBlock Text="{loc:Loc Assistant.WelcomeHelp}" Style="{DynamicResource AeText.Body}" TextWrapping="Wrap" Margin="0,0,0,24"/>
+                                <Button Command="{Binding UseSuggestionCommand}" CommandParameter="{loc:Loc Assistant.SuggestInspect}" Content="{loc:Loc Assistant.SuggestInspect}" Style="{DynamicResource AeButton.Quiet}" HorizontalAlignment="Left" Margin="0,4"/>
+                                <Button Command="{Binding UseSuggestionCommand}" CommandParameter="{loc:Loc Assistant.SuggestReferences}" Content="{loc:Loc Assistant.SuggestReferences}" Style="{DynamicResource AeButton.Quiet}" HorizontalAlignment="Left" Margin="0,4"/>
+                                <Button Command="{Binding UseSuggestionCommand}" CommandParameter="{loc:Loc Assistant.SuggestFrame}" Content="{loc:Loc Assistant.SuggestFrame}" Style="{DynamicResource AeButton.Quiet}" HorizontalAlignment="Left" Margin="0,4"/>
+                                <Button Command="{Binding ShowPanelCommand}" CommandParameter="settings" Content="{loc:Loc Assistant.ConfigureKey}" HorizontalAlignment="Left" Margin="0,24,0,0">
+                                    <Button.Style><Style TargetType="Button" BasedOn="{StaticResource AeButton.Secondary}"><Style.Triggers><DataTrigger Binding="{Binding Settings.HasKey}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Button.Style>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                    <Button x:Name="JumpToLatest" Click="ScrollToLatest" Style="{DynamicResource AeButton.Secondary}" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="24,12" Visibility="Collapsed" ToolTip="{loc:Loc Assistant.Latest}" AutomationProperties.Name="{loc:Loc Assistant.Latest}"><icons:MaterialIcon Kind="ArrowDown" Width="16" Height="16"/></Button>
+                </Grid>
+                <StackPanel Grid.Row="1" Margin="16,8,16,16" MaxWidth="712">
+                    <progress:OperationProgressView x:Name="TaskProgress" IsOperationActive="{Binding IsBusy}" IsProgressIndeterminate="True" StatusText="{Binding Status}" ShowDetails="False" Margin="8,0,8,8"/>
+                    <Border x:Name="Composer" Background="{DynamicResource AeBrush.Surface1}" BorderBrush="{DynamicResource AeBrush.BorderStrong}" BorderThickness="1" CornerRadius="{StaticResource AeRadius.Surface}" Padding="12,8">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,8">
+                                <DockPanel.Style><Style TargetType="DockPanel"><Style.Triggers><DataTrigger Binding="{Binding Attachment}" Value="{x:Null}"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></DockPanel.Style>
+                                <Button DockPanel.Dock="Right" Command="{Binding RemoveAttachmentCommand}" Style="{DynamicResource AeButton.Icon}" ToolTip="{loc:Loc Assistant.RemoveAttachment}" AutomationProperties.Name="{loc:Loc Assistant.RemoveAttachment}"><icons:MaterialIcon Kind="Close" Width="16" Height="16"/></Button>
+                                <Image Source="{Binding Attachment}" MaxHeight="80" MaxWidth="120" HorizontalAlignment="Left" AutomationProperties.Name="{Binding AttachmentName}"/>
+                                <TextBlock Text="{Binding AttachmentName}" Style="{DynamicResource AeText.Caption}" Margin="12,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                            </DockPanel>
+                            <Label x:Name="InputLabel" Content="{loc:Loc Assistant.Input}" Target="{Binding ElementName=Prompt}" Padding="0" MinHeight="0" FontSize="11" Foreground="{DynamicResource AeBrush.TextSecondary}"/>
+                            <TextBox x:Name="Prompt" Text="{Binding Input, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" MaxHeight="144" VerticalScrollBarVisibility="Auto"
+                                BorderThickness="0" Background="Transparent" Padding="0,8" FontSize="14" PreviewKeyDown="PromptKeyDown" AutomationProperties.LabeledBy="{Binding ElementName=InputLabel}" AutomationProperties.HelpText="{loc:Loc Assistant.InputHelp}" ToolTip="{loc:Loc Assistant.InputHelp}"/>
+                            <DockPanel LastChildFill="True" Margin="0,4,0,0">
+                                <Grid DockPanel.Dock="Right" Margin="8,0,0,0">
+                                    <Button x:Name="SendButton" Command="{Binding SendCommand}" Style="{DynamicResource AeButton.Primary}" Padding="8,4" MinWidth="32" ToolTip="{loc:Loc Assistant.Send}" AutomationProperties.Name="{loc:Loc Assistant.Send}" Visibility="{Binding IsIdle, Converter={StaticResource VisibleWhenTrue}}"><icons:MaterialIcon Kind="ArrowUp" Width="16" Height="16"/></Button>
+                                    <Button x:Name="StopButton" Command="{Binding StopCommand}" Style="{DynamicResource AeButton.Secondary}" Padding="8,4" MinWidth="32" ToolTip="{loc:Loc Assistant.Stop}" AutomationProperties.Name="{loc:Loc Assistant.Stop}" Visibility="{Binding IsBusy, Converter={StaticResource VisibleWhenTrue}}"><icons:MaterialIcon Kind="Stop" Width="16" Height="16"/></Button>
+                                </Grid>
+                                <WrapPanel>
+                                    <Button x:Name="AttachmentButton" Click="OpenAttachmentMenu" IsEnabled="{Binding IsIdle}" Style="{DynamicResource AeButton.Icon}" ToolTip="{loc:Loc Assistant.Attachments}" AutomationProperties.Name="{loc:Loc Assistant.Attachments}" Margin="0,0,4,0">
+                                        <icons:MaterialIcon Kind="Paperclip" Width="16" Height="16"/>
+                                        <Button.ContextMenu><ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"><MenuItem Header="{loc:Loc Assistant.AttachImage}" Command="{Binding AttachImageCommand}"/><MenuItem Header="{loc:Loc Assistant.PasteImage}" Command="{Binding PasteImageCommand}"/></ContextMenu></Button.ContextMenu>
+                                    </Button>
+                                    <ToggleButton Content="{loc:Loc Assistant.Thinking}" IsChecked="{Binding Thinking}" IsEnabled="{Binding IsIdle}" Style="{StaticResource AssistantToggle}" Margin="0,0,4,0"/>
+                                    <ToggleButton Content="{loc:Loc Assistant.Web}" IsChecked="{Binding WebEnabled}" IsEnabled="{Binding IsIdle}" Style="{StaticResource AssistantToggle}"/>
+                                </WrapPanel>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="{Binding Notification, NotifyOnTargetUpdated=True}" TargetUpdated="StatusUpdated" AutomationProperties.LiveSetting="Polite" Style="{StaticResource OptionalText}" Margin="8,4,8,0"/>
+                </StackPanel>
+            </Grid>
+            <Grid Grid.Row="1" Margin="24">
+                <Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding Panel}" Value="conversation"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Grid.Style>
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                <Button Command="{Binding ShowPanelCommand}" CommandParameter="conversation" Content="{loc:Loc Assistant.BackToConversation}" Style="{DynamicResource AeButton.Quiet}" HorizontalAlignment="Left" Margin="0,0,0,16"/>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <Grid MaxWidth="748" HorizontalAlignment="Stretch">
+                        <local:AssistantSettingsView DataContext="{Binding Settings}" IsEnabled="{Binding DataContext.IsIdle, RelativeSource={RelativeSource AncestorType={x:Type local:AssistantView}}}">
+                            <local:AssistantSettingsView.Style><Style TargetType="local:AssistantSettingsView"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding DataContext.Panel, RelativeSource={RelativeSource AncestorType={x:Type local:AssistantView}}}" Value="settings"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></local:AssistantSettingsView.Style>
+                        </local:AssistantSettingsView>
+                        <StackPanel>
+                            <StackPanel.Style><Style TargetType="StackPanel"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Panel}" Value="context"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></StackPanel.Style>
+                            <TextBlock Text="{loc:Loc Assistant.Context}" Style="{DynamicResource AeText.PageTitle}" Margin="0,0,0,16"/>
+                            <TextBlock Text="{Binding TargetSummary}" Style="{DynamicResource AeText.SectionTitle}" TextWrapping="Wrap"/>
+                            <TextBlock Text="{Binding SaveSummary}" Style="{DynamicResource AeText.Body}" TextWrapping="Wrap" Margin="0,8,0,16"/>
+                            <TextBlock Text="{loc:Loc Assistant.Privacy}" Style="{DynamicResource AeText.Body}" TextWrapping="Wrap"/>
+                            <Button Content="{loc:Loc Assistant.RefreshContext}" Command="{Binding RefreshContextCommand}" Style="{DynamicResource AeButton.Secondary}" HorizontalAlignment="Left" Margin="0,16"/>
+                            <Expander Header="{loc:Loc Assistant.ContextDetails}" Background="Transparent"><TextBox Text="{Binding Context, Mode=OneWay}" IsReadOnly="True" TextWrapping="Wrap" AutomationProperties.Name="{loc:Loc Assistant.Context}"/></Expander>
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

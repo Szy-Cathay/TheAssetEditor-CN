@@ -20,6 +20,8 @@ namespace Editors.AnimationFragmentEditor
 
         public override void Register(IServiceCollection services)
         {
+            services.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, AnimPackAssistantAdapter>();
+            services.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, AnimationBatchAssistantAdapter>();
             services.AddTransient<CreateEmptyWarhammer3AnimSetFileCommand>();
             services.AddTransient<CreateExampleAnimationDbCommand>();
             services.AddTransient<ExportAnimationSlotCommand>();

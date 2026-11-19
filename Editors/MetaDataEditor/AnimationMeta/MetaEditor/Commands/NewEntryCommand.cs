@@ -66,12 +66,17 @@ namespace Editors.AnimationMeta.MetaEditor.Commands
             {
                 var newEntry = _metaDataFileParser.CreateDefault(
                     selectedItem.Name);
-                parsedFile.Attributes.Add(newEntry);
-                controller.UpdateView();
-                controller.SelectedTag = controller.Tags.LastOrDefault();
+                Add(controller, newEntry);
             }
 
             dialog.DataContext = null;
+        }
+
+        internal static void Add(MetaDataEditorViewModel controller, ParsedMetadataAttribute newEntry)
+        {
+            controller.ParsedFile!.Attributes.Add(newEntry);
+            controller.UpdateView();
+            controller.SelectedTag = controller.Tags.LastOrDefault();
         }
     }
 }

@@ -182,11 +182,11 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
         public ImportResult Import(
             GltfImporterSettings settings,
             IProgress<OperationProgressUpdate>? progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, Func<bool>? canCommit = null)
         {
             try
             {
-                return ImportCore(settings, progress, cancellationToken);
+                return ImportCore(settings, progress, cancellationToken, canCommit);
             }
             catch (OperationCanceledException)
             {
@@ -202,7 +202,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
         private ImportResult ImportCore(
             GltfImporterSettings settings,
             IProgress<OperationProgressUpdate>? progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, Func<bool>? canCommit)
         {
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(new OperationProgressUpdate(
@@ -327,7 +327,7 @@ namespace Editors.ImportExport.Importing.Importers.GltfToRmv
                     _packFileService,
                     settings.DestinationPackFileContainer,
                     validation.Files,
-                    validation.Paths);
+                    validation.Paths, canCommit);
                 if (conflicts.Count != 0)
                 {
                     return ImportResult.Failure(conflicts

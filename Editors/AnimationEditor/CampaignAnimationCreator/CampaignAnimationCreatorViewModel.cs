@@ -81,6 +81,7 @@ namespace AnimationEditor.CampaignAnimationCreator
         {
             _saveCommand.Execute(_selectedUnit?.Skeleton, _selectedUnit?.AnimationClip);
         }
+        internal Shared.Core.PackFiles.Models.PackFile? AssistantSavedFile => _saveCommand.LastSavedFile;
 
         public void Convert()
         {

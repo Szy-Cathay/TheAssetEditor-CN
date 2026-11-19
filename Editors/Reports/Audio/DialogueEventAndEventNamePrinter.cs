@@ -18,11 +18,11 @@ namespace Editors.Reports.Audio
         public DialogueEventAndEventNamePrinter(IAudioRepository audioRepository)
         {
             _audioRepository = audioRepository;
-            _audioRepository.Load(Wh3LanguageInformation.GetAllLanguages());
         }
 
         public void Create()
         {
+            _audioRepository.Load(Wh3LanguageInformation.GetAllLanguages());
             var printer = new DialogueEventAndEventNamePrinter(_audioRepository);
             printer.PrintInfo();
             _audioRepository.Clear();
@@ -40,11 +40,13 @@ namespace Editors.Reports.Audio
 
         private void ProcessItem(HircItem item)
         {
-            var itemName = _audioRepository.GetNameFromId(item.Id);
+            var itemName = Format(item, _audioRepository.GetNameFromId);
             Console.WriteLine(itemName);
 
             var filePath = $"{DirectoryHelper.ReportsDirectory}\\dialogue_event_and_event_names.txt";
             File.AppendAllText(filePath, itemName + Environment.NewLine);
         }
+
+        public static string Format(HircItem item, Func<uint, string> resolveName) => resolveName(item.Id);
     }
 }

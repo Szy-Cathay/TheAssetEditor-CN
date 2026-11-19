@@ -30,12 +30,13 @@ namespace Editors.Reports.Geometry
             _applicationSettingsService = applicationSettingsService;
         }
 
-        public void Create(string outputDir = @"c:\temp\AssReports\rmv\")
+        public void Create(string outputDir = @"c:\temp\AssReports\rmv\", ReportExecutionContext? context = null)
         {
+            outputDir = context?.OutputDirectory ?? outputDir;
             var gameName = GameInformationDatabase.GetGameById(_applicationSettingsService.CurrentSettings.CurrentGame).DisplayName;
             var gameDirectory = gameName;
             
-            var fileList = PackFileServiceUtility.FindAllWithExtention(_pfs, ".rigid_model_v2");
+            var fileList = context?.Files(".rigid_model_v2") ?? PackFileServiceUtility.FindAllWithExtention(_pfs, ".rigid_model_v2");
 
             var failedMeshRecords = new List<dynamic>();
             var versionInfoRecords = new List<dynamic>();
@@ -44,8 +45,9 @@ namespace Editors.Reports.Geometry
             var modelFactory = ModelFactory.Create();
             for (var i = 0; i < fileList.Count; i++)
             {
+                context?.Check();
                 var meshFile = fileList[i];
-                var path = _pfs.GetFullPath(meshFile);
+                var path = context?.PathOf(meshFile) ?? _pfs.GetFullPath(meshFile);
                 if (path.Contains("terrain\\tiles"))
                     continue;
                 var rmvData = meshFile.DataSource.ReadData();
@@ -93,6 +95,7 @@ namespace Editors.Reports.Geometry
                     failedRecord.Path = path;
                     failedRecord.Error = ExceptionHelper.GetErrorString(e, " - ");
                     failedMeshRecords.Add(failedRecord);
+                    context?.Error(path, e);
                 }
             }
 
@@ -101,24 +104,25 @@ namespace Editors.Reports.Geometry
                 var fullOutputDir = outputDir + gameDirectory + "\\";
 
                 DirectoryHelper.EnsureCreated(outputDir);
-                Write(failedMeshRecords, outputDir + "LoadResult.csv");
-                Write(versionInfoRecords, outputDir + "VersionAndMaterialInfo.csv");
-                Write(weightedMaterialRecords, outputDir + "WeightedMaterialInfo.csv");
+                Write(failedMeshRecords, outputDir + "LoadResult.csv", context);
+                Write(versionInfoRecords, outputDir + "VersionAndMaterialInfo.csv", context);
+                Write(weightedMaterialRecords, outputDir + "WeightedMaterialInfo.csv", context);
 
-                MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.ReportCreated", outputDir));
+                if (context == null) MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.ReportCreated", outputDir));
             }
             catch
             {
+                if (context != null) throw;
                 MessageBox.Show(LocalizationManager.Instance.Get("Msg.UnableToWriteReport"));
             }
         }
 
-        void Write(List<dynamic> dataRecords, string filePath)
+        void Write(List<dynamic> dataRecords, string filePath, ReportExecutionContext? context)
         {
             using var writer = new StringWriter();
             using var csv = new CsvWriter(writer, CultureInfo.InvariantCulture);
             csv.WriteRecords(dataRecords);
-            File.WriteAllText(filePath, writer.ToString());
+            ReportExecutionContext.WriteText(context, filePath, writer.ToString());
         }
     }
 }

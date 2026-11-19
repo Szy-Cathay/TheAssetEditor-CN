@@ -10,10 +10,11 @@ internal static class PackFileDispatcherWriter
         IPackFileService packFileService,
         PackFileContainer container,
         List<NewPackFileEntry> files,
-        IReadOnlyList<string> targetPaths)
+        IReadOnlyList<string> targetPaths, Func<bool>? canCommit = null)
     {
         IReadOnlyList<string> AddFiles()
         {
+            if (canCommit?.Invoke() == false) throw new InvalidOperationException(global::Shared.Core.ModAssistant.AssistantJson.Text("StaleTarget"));
             var existingPaths = container.FileList.Keys
                 .Select(path => path.Replace('/', '\\').Trim())
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);

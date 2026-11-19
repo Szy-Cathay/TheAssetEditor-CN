@@ -27,6 +27,7 @@ namespace AssetEditor.ViewModels
         private bool _allowPreview;
 
         public bool IsSaved { get; private set; }
+        public AssetEditor.ModAssistant.AssistantSettingsViewModel? AssistantSettings { get; }
 
         public ObservableCollection<ThemeType> AvailableThemes { get; set; } = [];
         public ObservableCollection<BackgroundColour> RenderEngineBackgroundColours { get; set; } = [];
@@ -120,8 +121,10 @@ namespace AssetEditor.ViewModels
         public SettingsViewModel(
             ApplicationSettingsService settingsService,
             ApplicationSettingsApplier settingsApplier,
-            IStandardDialogs standardDialogs)
+            IStandardDialogs standardDialogs,
+            AssetEditor.ModAssistant.AssistantSettingsViewModel? assistantSettings = null)
         {
+            AssistantSettings = assistantSettings;
             _settingsService = settingsService;
             _settingsApplier = settingsApplier;
             _standardDialogs = standardDialogs;

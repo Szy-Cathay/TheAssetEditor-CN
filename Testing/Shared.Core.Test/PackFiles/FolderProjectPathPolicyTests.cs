@@ -5,6 +5,18 @@ namespace Test.Shared.Core.PackFiles;
 
 public class FolderProjectPathPolicyTests
 {
+    [Test]
+    public void ExternalOutput_ValidatesFullPathWithoutTreatingDriveAsAProject()
+    {
+        using var directory = new TemporaryDirectory();
+        var output = Path.Combine(directory.Path, "new", "image.png");
+        Assert.That(FolderProjectPathPolicy.ResolveExternalOutputPath(output), Is.EqualTo(output));
+        Assert.That(Directory.Exists(Path.GetDirectoryName(output)), Is.False);
+        Assert.That(() => FolderProjectPathPolicy.ResolveExternalOutputPath("relative.png"), Throws.TypeOf<InvalidDataException>());
+        Assert.That(() => FolderProjectPathPolicy.ResolveExternalOutputPath(Path.Combine(directory.Path, "aux.txt")), Throws.TypeOf<InvalidDataException>());
+        Assert.That(() => FolderProjectPathPolicy.ResolveExternalOutputPath(Path.Combine(directory.Path, "file.txt:stream")), Throws.TypeOf<InvalidDataException>());
+    }
+
     [TestCase(@"db\units_tables\data.bin", @"db\units_tables\data.bin")]
     [TestCase(@"db/units_tables/data.bin", @"db\units_tables\data.bin")]
     [TestCase(@"./db/units_tables/data.bin", @"db\units_tables\data.bin")]

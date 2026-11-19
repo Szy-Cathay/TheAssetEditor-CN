@@ -17,6 +17,7 @@ namespace Editors.AnimationMeta
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, MetaAssistantAdapter>();
             serviceCollection.AddTransient<MainEditorView>();
             serviceCollection.AddTransient<MetaDataEditorViewModel>();
 

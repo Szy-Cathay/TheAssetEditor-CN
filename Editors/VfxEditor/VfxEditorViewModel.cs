@@ -490,6 +490,40 @@ public sealed class VfxEditorViewModel : ObservableObject, IEditorInterface, IFi
         ScheduleScenePreview();
     }
 
+    internal byte[] AssistantDocumentBytes => _document?.Write() ?? [];
+
+    internal void ApplyAssistantGroup(Action action)
+    {
+        if (HasErrors) throw new InvalidOperationException(Localization.Get("Vfx.Number.Invalid"));
+        var count = _undo.Count;
+        var before = _revision;
+        var redo = _redo.ToArray();
+        try
+        {
+            action();
+            if (HasErrors) throw new InvalidOperationException(Localization.Get("Vfx.Number.Invalid"));
+            var changes = new List<Edit>();
+            while (_undo.Count > count) changes.Add(_undo.Pop());
+            if (changes.Count > 0)
+            {
+                changes.Reverse();
+                _undo.Push(new Edit(() => changes.ForEach(x => x.Apply()),
+                    () => { for (var i = changes.Count - 1; i >= 0; i--) changes[i].Restore(); }, before, _revision));
+            }
+        }
+        catch
+        {
+            while (_undo.Count > count) _undo.Pop().Restore();
+            _revision = before;
+            _redo.Clear();
+            foreach (var edit in redo.Reverse()) _redo.Push(edit);
+            RebuildLayers(true);
+            Changed();
+            throw;
+        }
+        Changed();
+    }
+
     internal void RefreshLayerStatus(VfxFieldViewModel field)
     {
         if (field.Model.Name is not ("Enable" or "enable")) return;

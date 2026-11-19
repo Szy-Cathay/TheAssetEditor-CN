@@ -11,6 +11,7 @@ namespace Editors.TextureEditor
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, TextureAssistantAdapter>();
             serviceCollection.AddTransient<TexturePreviewView>();
             serviceCollection.AddTransient<TextureEditorViewModel>();
             serviceCollection.AddTransient<TextureBuilder>();  

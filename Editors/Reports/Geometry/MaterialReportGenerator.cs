@@ -23,31 +23,35 @@ namespace Editors.Reports.Geometry
             _pfs = pfs;
         }
 
-        public void Create()
+        public void Create(ReportExecutionContext? context = null)
         {
-            var dirPath = $"{DirectoryHelper.ReportsDirectory}\\Material";
+            var dirPath = context?.OutputDirectory ?? $"{DirectoryHelper.ReportsDirectory}\\Material";
             DirectoryHelper.EnsureCreated(dirPath);
 
             var shaderMap = new Dictionary<string, List<WsModelMaterialFile>>();
 
             // Collect all files and sort them
-            var fileList = PackFileServiceUtility.FindAllWithExtention(_pfs, ".wsmodel");
+            var fileList = context?.Files(".wsmodel") ?? PackFileServiceUtility.FindAllWithExtention(_pfs, ".wsmodel");
             var notFoundFiles = new List<string>();
             var errorFiles = new List<(string, Exception)>();
             foreach (var file in fileList)
             {
                 try
                 {
+                    context?.Check();
                     var wsModel = new WsModelFile(file);
 
                     foreach (var wsModelMaterialPath in wsModel.MaterialList)
                     {
-                        var materialPackFile = _pfs.FindFile(wsModelMaterialPath.MaterialPath);
+                        var materialPackFile = context == null ? _pfs.FindFile(wsModelMaterialPath.MaterialPath)
+                            : context.Dependencies.GetValueOrDefault(wsModelMaterialPath.MaterialPath);
                         if (materialPackFile == null)
                         {
                             notFoundFiles.Add(wsModelMaterialPath.MaterialPath);
+                            context?.Diagnostics.Add(global::Shared.Core.ModAssistant.AssistantJson.Text("ReportMissingMaterial") + " " + wsModelMaterialPath.MaterialPath);
                             continue;
                         }
+                        if (context != null && materialPackFile.DataSource.Size > 32 * 1024 * 1024) throw new InvalidDataException(global::Shared.Core.ModAssistant.AssistantJson.Text("ResourceTooLarge"));
                         var material = new WsModelMaterialFile(materialPackFile);
 
                         if (shaderMap.ContainsKey(material.ShaderPath) == false)
@@ -58,6 +62,7 @@ namespace Editors.Reports.Geometry
                 catch (Exception ex)
                 {
                     errorFiles.Add((file.Name, ex));
+                    context?.Error(file.Name, ex);
                 }
             }
 
@@ -89,8 +94,8 @@ namespace Editors.Reports.Geometry
                     sb.AppendLine();
                 }
 
-                var outputFileName = path.Replace(".", "_").Replace("/", "_");
-                File.WriteAllText(dirPath + "\\" + outputFileName + "_" + instances.Count + ".csv", sb.ToString());
+                var outputFileName = path.Replace(".", "_").Replace("/", "_").Replace("\\", "_");
+                ReportExecutionContext.WriteText(context, dirPath + "\\" + outputFileName + "_" + instances.Count + ".csv", sb.ToString());
             }
 
             // Create a summary
@@ -139,8 +144,8 @@ namespace Editors.Reports.Geometry
                 summarySb.AppendLine($"{path}|{instanceCount}|{error}|{differentParameters}");
             }
 
-            File.WriteAllText(dirPath + "\\Summary.csv", summarySb.ToString());
-            MessageBox.Show(LocalizationManager.Instance.Get("Msg.ReportCompleted"));
+            ReportExecutionContext.WriteText(context, dirPath + "\\Summary.csv", summarySb.ToString());
+            if (context == null) MessageBox.Show(LocalizationManager.Instance.Get("Msg.ReportCompleted"));
 
         }
     }

@@ -46,7 +46,7 @@ namespace Shared.Core.Services
                 var item = new NewPackFileEntry(directoryPath!, newPackFile);
                 _packFileService.AddFilesToPack(editablePack, [item]);
 
-                return newPackFile;
+                return _packFileService.FindFile(selectedFilePath, editablePack);
             }
 
             _packFileService.SaveFile(isExistingFile, content);
@@ -79,7 +79,7 @@ namespace Shared.Core.Services
                 var directoryPath = Path.GetDirectoryName(fullPathWithExtention);
                 var item = new NewPackFileEntry(directoryPath!, newPackFile);
                 _packFileService.AddFilesToPack(editablePack, [item]);
-                return newPackFile;
+                return _packFileService.FindFile(fullPathWithExtention, editablePack);
             }
             else
             {

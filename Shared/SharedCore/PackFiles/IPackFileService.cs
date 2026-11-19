@@ -75,6 +75,8 @@ namespace Shared.Core.PackFiles
             PackFileContainer pf,
             string path,
             GameInformation gameInformation);
+        Task GenerateFolderProjectPackAsync(FolderProjectContainer project, string path, GameInformation gameInformation, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Asynchronous Pack generation is not supported by this service.");
         void SetEditablePack(PackFileContainer? pf);
         bool TryUnloadPackContainer(PackFileContainer pf);
         void UnloadPackContainer(PackFileContainer pf);

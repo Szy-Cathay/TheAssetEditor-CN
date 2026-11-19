@@ -328,6 +328,8 @@ namespace KitbasherEditor.ViewModels.MenuBarViews
             _uiCommands[typeof(T)] = new KitbasherMenuItem<T>(_uiCommandFactory);
         }
 
+        internal MenuAction? AssistantAction<T>() where T : IKitbasherUiCommand => _uiCommands.GetValueOrDefault(typeof(T));
+
         void RegisterHotkeys()
         {
             var actionList = _uiCommands

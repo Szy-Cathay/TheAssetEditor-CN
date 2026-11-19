@@ -26,18 +26,8 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
 
         public void Execute(TreeNode _selectedNode)
         {
-            var systemPath = GetSavePath(_selectedNode.FileOwner);
-            if (string.IsNullOrWhiteSpace(systemPath))
-            {
-                var saveFileDialog = new SaveFileDialog();
-                saveFileDialog.FileName = _selectedNode.FileOwner.Name;
-                saveFileDialog.Filter = LocalizationManager.Instance.Get(
-                    "FolderProject.PackFilter");
-                saveFileDialog.DefaultExt = "pack";
-                if (saveFileDialog.ShowDialog() != DialogResult.OK)
-                    return;
-                systemPath = saveFileDialog.FileName;
-            }
+            var systemPath = SelectOutputPath(_selectedNode.FileOwner);
+            if (systemPath == null) return;
 
             if (!packGenerationGuard.CanGenerate(_selectedNode.FileOwner))
                 return;
@@ -73,18 +63,8 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                 return;
             }
 
-            var systemPath = GetSavePath(pack);
-            if (string.IsNullOrWhiteSpace(systemPath))
-            {
-                var saveFileDialog = new SaveFileDialog();
-                saveFileDialog.FileName = pack.Name;
-                saveFileDialog.Filter = LocalizationManager.Instance.Get(
-                    "FolderProject.PackFilter");
-                saveFileDialog.DefaultExt = "pack";
-                if (saveFileDialog.ShowDialog() != DialogResult.OK)
-                    return;
-                systemPath = saveFileDialog.FileName;
-            }
+            var systemPath = SelectOutputPath(pack);
+            if (systemPath == null) return;
 
             if (!packGenerationGuard.CanGenerate(pack))
                 return;
@@ -109,6 +89,14 @@ namespace Shared.Ui.BaseDialogs.PackFileTree.ContextMenu.Commands
                         LocalizationManager.Instance.Get("Msg.GeneralError"));
                 }
             }
+        }
+
+        public static string? SelectOutputPath(PackFileContainer container)
+        {
+            var configured = GetSavePath(container);
+            if (!string.IsNullOrWhiteSpace(configured)) return configured;
+            using var dialog = new SaveFileDialog { FileName = container.Name, DefaultExt = "pack", Filter = LocalizationManager.Instance.Get("FolderProject.PackFilter") };
+            return dialog.ShowDialog() == DialogResult.OK ? dialog.FileName : null;
         }
 
         private static string? GetSavePath(PackFileContainer container)

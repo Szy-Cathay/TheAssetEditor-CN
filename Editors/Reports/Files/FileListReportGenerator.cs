@@ -50,8 +50,23 @@ namespace Editors.Reports.Files
             instance.Create();
         }
 
-        public string Create()
+        public string Create(ReportExecutionContext? context = null)
         {
+            if (context != null)
+            {
+                using var content = new StringWriter();
+                WriteHeader(content);
+                foreach (var input in context.Inputs)
+                {
+                    context.Check();
+                    var item = CreateFileItemFromFile(input.Path, input.File);
+                    item.PackFileName = input.Container;
+                    WriteItem(content, item);
+                }
+                var destination = Path.Combine(context.OutputDirectory, "FileList.csv");
+                ReportExecutionContext.WriteText(context, destination, content.ToString());
+                return destination;
+            }
             var outputFolder = DirectoryHelper.ReportsDirectory + "\\FileList";
             DirectoryHelper.EnsureCreated(outputFolder);
             var gameName = GameInformationDatabase.GetGameById(_settingsService.CurrentSettings.CurrentGame).DisplayName;
@@ -278,13 +293,13 @@ namespace Editors.Reports.Files
             throw new Exception("Unknown version");
         }
 
-        void WriteHeader(StreamWriter streamWriter)
+        void WriteHeader(TextWriter streamWriter)
         {
             streamWriter.WriteLine("sep=|");
             streamWriter.WriteLine("FileName|Extention|ExtentionLast|Size|PackFile|CheckSum|IsDb");
         }
 
-        void WriteItem(StreamWriter writer, FileItem fileItem)
+        void WriteItem(TextWriter writer, FileItem fileItem)
         {
             writer.WriteLine($"{fileItem.FileName}|{fileItem.Extention}|{fileItem.ExtentionLast}|{fileItem.Size}|{fileItem.PackFileName}|{fileItem.CheckSum}|{fileItem.IsDb}");
         }

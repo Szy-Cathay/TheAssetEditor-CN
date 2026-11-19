@@ -13,7 +13,7 @@ using System.Windows.Input;
 
 namespace Editors.Twui.Editor
 {
-    public partial class TwuiEditor : ObservableObject, IEditorInterface, ISaveableEditor, IFileEditor
+    public partial class TwuiEditor : ObservableObject, IEditorInterface, ISaveableEditor, IFileEditor, global::Shared.Core.ModAssistant.IAssistantReadOnlyDocument
     {
         private readonly IEventHub _eventHub;
         private readonly TwuiRenderComponent _renderComponent;

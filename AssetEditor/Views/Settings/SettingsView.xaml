@@ -6,6 +6,7 @@
              xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui"
              xmlns:local="clr-namespace:AssetEditor.Views.Settings"
              xmlns:viewmodels="clr-namespace:AssetEditor.ViewModels"
+             xmlns:assistant="clr-namespace:AssetEditor.ModAssistant"
              xmlns:colourpicker="clr-namespace:Shared.Ui.BaseDialogs.ColourPickerButton;assembly=Shared.Ui"
              d:DataContext="{d:DesignInstance Type=viewmodels:SettingsViewModel}"
              mc:Ignorable="d">
@@ -397,5 +398,8 @@
             </ScrollViewer>
         </TabItem>
 
+        <TabItem Header="{loc:Loc Assistant.Title}" Style="{StaticResource AeWorkflow.SettingsNavigationItem}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto"><assistant:AssistantSettingsView DataContext="{Binding AssistantSettings}"/></ScrollViewer>
+        </TabItem>
     </TabControl>
 </UserControl>

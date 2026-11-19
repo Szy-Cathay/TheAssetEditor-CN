@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -507,53 +507,12 @@ public partial class FolderProjectHistoryViewModel : ObservableObject
         Action<T> rollback)
     {
         HistorySnapshot? snapshot = null;
-        using var reloadEditors = _unsavedChangesService.PrepareFileReload(
-            project.ProjectRoot, repositoryPaths);
-        try
-        {
-            await _coordinator.ExecuteInPlaceTransactionalAsync(
-                project.ProjectRoot,
-                () =>
-                {
-                    var result = operation();
-                    ReportProgress(new FolderProjectHistoryProgress(
-                        FolderProjectHistoryProgressStage.ReconcilingProject,
-                        project.ProjectRoot));
-                    return result;
-                },
-                result =>
-                {
-                    project.RefreshFromDiskAndNotify();
-                    ReportProgress(new FolderProjectHistoryProgress(
-                        FolderProjectHistoryProgressStage.RefreshingInterface,
-                        project.ProjectRoot));
-                    snapshot = LoadSnapshot(project.ProjectRoot);
-                    ReloadEditors();
-                    complete(result);
-                },
-                rollback);
-        }
-        catch
-        {
-            ReloadEditors();
-            throw;
-        }
+        await FolderProjectFileOperation.ExecuteAsync(
+            _coordinator, _unsavedChangesService, project, repositoryPaths,
+            operation, complete, rollback,
+            () => snapshot = LoadSnapshot(project.ProjectRoot),
+            ReportProgress, _synchronizationContext);
         return snapshot!;
-
-        void ReloadEditors()
-        {
-            if (reloadEditors == null)
-                return;
-            if (_synchronizationContext == null ||
-                ReferenceEquals(SynchronizationContext.Current, _synchronizationContext))
-            {
-                reloadEditors.Reload();
-            }
-            else
-            {
-                _synchronizationContext.Send(_ => reloadEditors.Reload(), null);
-            }
-        }
     }
 
     partial void OnSelectedRestorePointChanged(

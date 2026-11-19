@@ -24,5 +24,6 @@
         Csc_Editor,
         None,
         Vfx_Editor,
+        ModAssistant,
     }
 }

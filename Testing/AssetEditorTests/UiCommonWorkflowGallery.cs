@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -35,6 +35,7 @@ public class UiCommonWorkflowGallery
         "settings-theme",
         "settings-rendering",
         "settings-audio",
+        "settings-assistant",
         "confirm",
         "error",
         "loading",
@@ -131,7 +132,7 @@ public class UiCommonWorkflowGallery
             NUnitAssert.Multiple(() =>
             {
                 NUnitAssert.That(categories.SelectedIndex, Is.EqualTo(category));
-                NUnitAssert.That(categories.Items.Count, Is.EqualTo(4));
+                NUnitAssert.That(categories.Items.Count, Is.EqualTo(5));
                 NUnitAssert.That(window.ActualWidth, Is.GreaterThanOrEqualTo(760));
                 NUnitAssert.That(window.ActualHeight, Is.GreaterThanOrEqualTo(600));
             });

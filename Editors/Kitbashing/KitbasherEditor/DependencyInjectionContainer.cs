@@ -50,6 +50,8 @@ namespace Editors.KitbasherEditor
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, KitbashAssistantAdapter>();
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, PhotoAssistantAdapter>();
             // Creators
             serviceCollection.AddScoped<KitbashSceneCreator>();
             serviceCollection.AddScoped<KitbashSceneComponentSet>();

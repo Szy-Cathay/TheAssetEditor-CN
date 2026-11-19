@@ -30,47 +30,49 @@ namespace Editors.Reports.Audio
             instance.Create();
         }
 
-        public void Create()
+        public void Create(ReportExecutionContext? context = null)
         {
             var datDumper = new DatDumper(_packFileService, _applicationSettingsService);
-            datDumper.LoadDatFiles(_packFileService, _applicationSettingsService, out var _);
+            datDumper.LoadDatFiles(_packFileService, _applicationSettingsService, out var _, context);
         }
 
-        private void LoadDatFiles(IPackFileService packFileService, ApplicationSettingsService applicationSettingsService, out List<string> failedFiles)
+        private void LoadDatFiles(IPackFileService packFileService, ApplicationSettingsService applicationSettingsService, out List<string> failedFiles, ReportExecutionContext? context)
         {
-            var reportsFolderName = $"{DirectoryHelper.ReportsDirectory}\\";
+            var reportsFolderName = context?.OutputDirectory ?? $"{DirectoryHelper.ReportsDirectory}\\";
             DirectoryHelper.EnsureCreated(reportsFolderName);
 
-            var datFiles = PackFileServiceUtility.FindAllWithExtention(packFileService, ".dat");
+            var datFiles = context?.Files(".dat") ?? PackFileServiceUtility.FindAllWithExtention(packFileService, ".dat");
 
             var failedDatParsing = new List<(string, string)>();
             var masterDat = new SoundDatFile();
 
             foreach (var datFile in datFiles)
             {
-                var datDump = $"{reportsFolderName}\\dat_dump_{datFile}.txt";
+                context?.Check();
+                var datDump = context == null ? $"{reportsFolderName}\\dat_dump_{datFile}.txt" : Path.Combine(reportsFolderName, context.PathOf(datFile) + ".txt");
                 try
                 {
-                    var parsedFile = LoadDatFile(datFile);
+                    var parsedFile = LoadDatFile(datFile, context?.Game);
                     masterDat.Merge(parsedFile);
-                    parsedFile.DumpToFile(datDump);
+                    ReportExecutionContext.WriteText(context, datDump, parsedFile.Format());
                 }
                 catch (Exception e)
                 {
-                    var fullPath = packFileService.GetFullPath(datFile);
+                    var fullPath = context?.PathOf(datFile) ?? packFileService.GetFullPath(datFile);
                     failedDatParsing.Add((fullPath, e.Message));
+                    context?.Error(fullPath, e);
                 }
             }
 
             failedFiles = failedDatParsing.Select(x => x.Item1).ToList();
 
             var masterDatDump = $"{reportsFolderName}\\dat_dump_master.txt";
-            masterDat.DumpToFile(masterDatDump);
+            ReportExecutionContext.WriteText(context, masterDatDump, masterDat.Format());
         }
 
-        private SoundDatFile LoadDatFile(PackFile datFile)
+        private SoundDatFile LoadDatFile(PackFile datFile, GameTypeEnum? game)
         {
-            if (_applicationSettingsService.CurrentSettings.CurrentGame == GameTypeEnum.Attila)
+            if ((game ?? _applicationSettingsService.CurrentSettings.CurrentGame) == GameTypeEnum.Attila)
                 return DatFileParser.Parse(datFile, true);
             else
                 return DatFileParser.Parse(datFile, false);

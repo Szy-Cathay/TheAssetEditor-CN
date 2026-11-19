@@ -1,0 +1,17 @@
+<UserControl x:Class="AssetEditor.ModAssistant.AssistantSettingsView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:Shared.Ui.Common;assembly=Shared.Ui" Language="zh-CN">
+    <StackPanel MaxWidth="600" HorizontalAlignment="Stretch">
+        <TextBlock Text="{loc:Loc Assistant.Settings}" Style="{DynamicResource AeText.PageTitle}" Margin="0,0,0,16"/>
+        <TextBlock Text="{loc:Loc Assistant.KeyHelp}" Style="{DynamicResource AeText.Body}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+        <Label x:Name="KeyLabel" Content="{loc:Loc Assistant.ApiKey}" Target="{Binding ElementName=KeyBox}" Padding="0,4"/>
+        <PasswordBox x:Name="KeyBox" MaxLength="512" MinHeight="{StaticResource AeSize.ControlHeight}" Margin="0,4,0,12" AutomationProperties.LabeledBy="{Binding ElementName=KeyLabel}" AutomationProperties.HelpText="{loc:Loc Assistant.KeyHelp}"/>
+        <WrapPanel>
+            <Button Content="{loc:Loc Assistant.SaveKey}" Click="SaveKey" Style="{DynamicResource AeButton.Primary}" Margin="0,0,8,0"/>
+            <Button Content="{loc:Loc Assistant.ClearKey}" Command="{Binding ClearKeyCommand}" Style="{DynamicResource AeButton.Secondary}"/>
+        </WrapPanel>
+        <TextBlock Text="{Binding Status, NotifyOnTargetUpdated=True}" TargetUpdated="StatusUpdated" AutomationProperties.LiveSetting="Polite" Style="{DynamicResource AeText.Caption}" TextWrapping="Wrap" Margin="0,12,0,0"/>
+        <TextBlock Text="{loc:Loc Assistant.Privacy}" Style="{DynamicResource AeText.Body}" TextWrapping="Wrap" Margin="0,16,0,0"/>
+    </StackPanel>
+</UserControl>

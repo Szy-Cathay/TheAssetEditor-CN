@@ -21,6 +21,17 @@ namespace Editors.AnimationMeta.Presentation
         public event Action<MetaDataEditorViewModel>? StructureChanged;
         public event Action<MetaDataEditorViewModel>? FieldValidityChanged;
         public ParsedMetadataFile? ParsedFile { get; private set; }
+        internal global::Shared.Core.ModAssistant.AssistantUndoJournal AssistantHistory { get; }
+        internal byte[] AssistantBytes() => ParsedFile == null ? [] : _metaDataFileParser.GenerateBytes(MetaDataFileVersion, ParsedFile);
+
+        private void RestoreAssistantBytes(byte[] bytes)
+        {
+            ParsedFile = _metaDataFileParser.ParseFile(bytes);
+            MetaDataFileVersion = ParsedFile.Version;
+            UpdateView();
+            SelectedTag = null;
+            HasUnsavedChanges = CurrentFile == null || !bytes.SequenceEqual(CurrentFile.DataSource.ReadData());
+        }
         public ParsedMetadataAttribute? SelectedAttribute { get; private set; }
 
         [ObservableProperty] string _displayName = "Metadata Editor";
@@ -70,6 +81,7 @@ namespace Editors.AnimationMeta.Presentation
             _uiCommandFactory = uiCommandFactory;
             _metaDataFileParser = metaDataFileParser;
             _eventHub = eventHub;
+            AssistantHistory = new(AssistantBytes, RestoreAssistantBytes);
         }
 
         partial void OnSelectedTagChanged(MetaDataEntry? value)
@@ -93,6 +105,8 @@ namespace Editors.AnimationMeta.Presentation
         {
             if (file == CurrentFile)
                 return;
+
+            AssistantHistory.Clear();
 
             CurrentFile = file!;
             DisplayName = file == null ? "Metadata Editor" : file.Name;

@@ -48,25 +48,26 @@ namespace Editors.Reports.Animation
             instance.Create();
         }
 
-        public void Create()
+        public void Create(ReportExecutionContext? context = null)
         {
             var gameName = GameInformationDatabase.GetGameById(_settingsService.CurrentSettings.CurrentGame).DisplayName;
             var timeStamp = DateTime.Now.ToString("yyyyMMddHHmmssfff");
-            var gameOutputDir = $"{DirectoryHelper.ReportsDirectory}\\MetaData\\{gameName}_{timeStamp}\\";
+            var gameOutputDir = context?.OutputDirectory ?? $"{DirectoryHelper.ReportsDirectory}\\MetaData\\{gameName}_{timeStamp}\\";
             var gameOutputDirFailed = $"{gameOutputDir}\\Failed\\";
-            if (Directory.Exists(gameOutputDir))
+            if (context == null && Directory.Exists(gameOutputDir))
                 Directory.Delete(gameOutputDir, true);
             DirectoryHelper.EnsureCreated(gameOutputDir);
             DirectoryHelper.EnsureCreated(gameOutputDirFailed);
 
             var output = new Dictionary<string, FileReport>();
 
-            var fileList = PackFileServiceUtility.FindAllWithExtentionIncludePaths(_pfs, ".meta");
+            var fileList = context?.WithPaths(".meta") ?? PackFileServiceUtility.FindAllWithExtentionIncludePaths(_pfs, ".meta");
             var failedFiles = new List<string>();
 
             var metaTable = new List<(string Path, ParsedMetadataFile File)>();
             for (var i = 0; i < fileList.Count; i++)
             {
+                context?.Check();
                 var fileName = fileList[i].FileName;
                 //if (fileName.Contains("hu1_2hh_knockback_l_01.anm.meta") == false)
                 //    continue;
@@ -114,12 +115,14 @@ namespace Editors.Reports.Animation
                             {
                                 var variableValues = new List<string>() { fileName, errorMessage, item.Data.Length.ToString() };
                                 output[tagName].FailedFiles.Add(variableValues);
+                                context?.Diagnostics.Add(fileName + ": " + tagName + " " + global::Shared.Core.ModAssistant.AssistantJson.Text("ReportParseFailure"));
                             }
                         }
                         catch (Exception e)
                         {
                             var variableValues = new List<string>() { fileName, e.Message, item.Data.Length.ToString() };
                             output[tagName].FailedFiles.Add(variableValues);
+                                context?.Diagnostics.Add(fileName + ": " + tagName + " " + global::Shared.Core.ModAssistant.AssistantJson.Text("ReportParseFailure"));
                         }
                     }
 
@@ -129,6 +132,7 @@ namespace Editors.Reports.Animation
                 {
                     _logger.Here().Information($"File processed {i}/{fileList.Count} - Parsing failed completly");
                     failedFiles.Add(fileName);
+                    context?.Diagnostics.Add(fileName + ": " + global::Shared.Core.ModAssistant.AssistantJson.Text("ReportParseFailure"));
                 }
             }
 
@@ -144,7 +148,7 @@ namespace Editors.Reports.Animation
                         content.WriteLine(string.Join("|", competed));
 
                     var fileName = gameOutputDir + item.Key + $"_{item.Value.CompletedFiles.Count}.csv";
-                    File.WriteAllText(fileName, content.ToString());
+                    ReportExecutionContext.WriteText(context, fileName, content.ToString());
                 }
 
                 if (item.Value.FailedFiles.Count != 0)
@@ -156,7 +160,7 @@ namespace Editors.Reports.Animation
                         content.WriteLine(string.Join("|", failed));
 
                     var fileName = gameOutputDirFailed + item.Key + $"_{item.Value.FailedFiles.Count}.csv";
-                    File.WriteAllText(fileName, content.ToString());
+                    ReportExecutionContext.WriteText(context, fileName, content.ToString());
                 }
             }
 
@@ -170,7 +174,7 @@ namespace Editors.Reports.Animation
                 summaryContent.WriteLine(str);
             }
             var summaryFileName = gameOutputDir + "Summary.csv";
-            File.WriteAllText(summaryFileName, summaryContent.ToString());
+            ReportExecutionContext.WriteText(context, summaryFileName, summaryContent.ToString());
 
             var commonHeaderContent = new StringWriter();
             commonHeaderContent.WriteLine("sep=|");
@@ -185,10 +189,13 @@ namespace Editors.Reports.Animation
             }
 
             var commonHeaderFile = gameOutputDir + "CommonHeader.csv";
-            File.WriteAllText(commonHeaderFile, commonHeaderContent.ToString());
+            ReportExecutionContext.WriteText(context, commonHeaderFile, commonHeaderContent.ToString());
 
-            MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.ReportCreated", gameOutputDir));
-            Process.Start("explorer.exe", gameOutputDir);
+            if (context == null)
+            {
+                MessageBox.Show(LocalizationManager.Instance.GetFormat("Msg.ReportCreated", gameOutputDir));
+                Process.Start("explorer.exe", gameOutputDir);
+            }
         }
 
         void Write(List<dynamic> dataRecords, string filePath)

@@ -35,6 +35,12 @@ namespace Editors.Reports.DeepSearch
 
     public class DeepSearchReport
     {
+        public static bool Contains(PackFile file, string search, bool caseSensitive) =>
+            Contains(file.DataSource.ReadData(), search, caseSensitive);
+
+        private static bool Contains(byte[] bytes, string search, bool caseSensitive) =>
+            Encoding.ASCII.GetString(bytes).Contains(search,
+                caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
         private readonly ILogger _logger = Logging.Create<DeepSearchReport>();
         private readonly IPackFileService _packFileService;
         private readonly IPackFileContainerLoader _loader;
@@ -87,9 +93,7 @@ namespace Editors.Reports.DeepSearch
                                   var pf = packFile;
                                   var ds = pf.DataSource as PackedFileSource;
                                   var bytes = ds.ReadData(fileStram);
-                                  var str = Encoding.ASCII.GetString(bytes);
-
-                                  if (str.Contains(searchStr, StringComparison.InvariantCultureIgnoreCase))
+                                  if (Contains(bytes, searchStr, caseSensetive))
                                   {
                                       var fillPathFile = pfc.FileList.FirstOrDefault(x => x.Value == packFile).Key;
                                       _logger.Here().Information($"Found result in '{fillPathFile}' in '{packFilePath}'");

@@ -18,6 +18,12 @@ namespace CommonControls.Editors.TextEditor
 {
     public interface ITextEditor
     {
+        bool SupportsAssistantHistory => false;
+        bool CanUndo => false;
+        bool CanRedo => false;
+        void ReplaceText(int offset, int length, string text) => throw new NotSupportedException();
+        void Undo() => throw new NotSupportedException();
+        void Redo() => throw new NotSupportedException();
         void ClearUndoStack();
         void SetSyntaxHighlighting(string type);
         void ShowLineNumbers(bool value);
@@ -86,6 +92,17 @@ namespace CommonControls.Editors.TextEditor
         {
             textEditor.Document.UndoStack.ClearAll();
         }
+
+        public bool SupportsAssistantHistory => true;
+        public bool CanUndo => textEditor.CanUndo;
+        public bool CanRedo => textEditor.CanRedo;
+        public void ReplaceText(int offset, int length, string text)
+        {
+            using (textEditor.Document.RunUpdate())
+                textEditor.Document.Replace(offset, length, text);
+        }
+        public void Undo() => textEditor.Undo();
+        public void Redo() => textEditor.Redo();
 
         public void SetSyntaxHighlighting(string type)
         {

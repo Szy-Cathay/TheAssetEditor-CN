@@ -15,6 +15,32 @@ namespace Test.AnimatioReTarget;
 
 public class BatchAnimationRetargetServiceTests
 {
+    [Test]
+    public void Assistant_ChangesSettingsWithUndoGeneratesAndSavesReadableAnimation()
+    {
+        using var context = new BatchTestContext(_inputPackFile,
+            "animations\\battle\\humanoid01\\2handed_hammer\\stand\\hu1_2hh_stand_idle_01.anim");
+        var adapter = new Editors.AnimatioReTarget.RetargetAssistantAdapter(context.Files);
+        var ids = new Shared.Core.ModAssistant.AssistantIds();
+        System.Text.Json.Nodes.JsonNode Run(string name, System.Text.Json.Nodes.JsonObject? args = null)
+        {
+            var operation = adapter.GetOperations(context.Editor, ids).Single(o => o.Name == name);
+            Assert.That(operation.Unavailable?.Invoke(), Is.Null);
+            Shared.Core.ModAssistant.AssistantJson.Validate(args ?? new(), operation.Parameters);
+            return operation.Execute(args ?? new(), default).GetAwaiter().GetResult();
+        }
+        var original = context.Editor.Settings.AnimationSpeedMult;
+        Run("retarget.settings", new() { ["speed"] = .8 }); Assert.That(context.Editor.Settings.AnimationSpeedMult, Is.EqualTo(.8f));
+        Run("retarget.undo_settings"); Assert.That(context.Editor.Settings.AnimationSpeedMult, Is.EqualTo(original));
+        Run("retarget.redo_settings"); Assert.That(context.Editor.Settings.AnimationSpeedMult, Is.EqualTo(.8f));
+        Run("retarget.generate");
+        var result = Run("retarget.save_generated", new() { ["prefix"] = "assistant_", ["version"] = 7 });
+        var path = result["saved"]!.GetValue<string>();
+        var file = context.Files.FindFile(path, context.OutputProject)!;
+        Assert.That(AnimationFile.Create(file).Header.Version, Is.EqualTo(7));
+        Assert.That(File.Exists(Path.Combine(context.OutputProject.ProjectRoot, path)), Is.True);
+    }
+
     private readonly string _inputPackFile =
         PathHelper.GetDataFile("Karl_and_celestialgeneral.pack");
 
@@ -561,6 +587,7 @@ public class BatchAnimationRetargetServiceTests
         public FolderProjectContainer OutputProject { get; }
         public PackFileContainer SourceContainer { get; }
         public AnimationRetargetEditor Editor { get; }
+        public IPackFileService Files { get; }
 
         public BatchTestContext(
             string inputPackFile,
@@ -568,6 +595,7 @@ public class BatchAnimationRetargetServiceTests
         {
             ProjectRoot = new TemporaryDirectory();
             var runner = new AssetEditorTestRunner();
+            Files = runner.PackFileService;
             runner.CreateCaContainer();
             runner.LoadPackFile(
                 inputPackFile,

@@ -12,6 +12,9 @@ namespace GameWorld.Core.Components.Rendering
         string OutputFolder)
     {
         public Action<Exception>? FailureHandler { get; init; }
+        public Action<string>? CompletionHandler { get; init; }
+        public Action<string>? ValidateOutput { get; init; }
+        public System.Threading.CancellationToken CancellationToken { get; init; }
     }
 
     internal sealed class PendingRenderCapture
@@ -26,9 +29,10 @@ namespace GameWorld.Core.Components.Rendering
 
         public SaveRenderImageSettings? Consume()
         {
-            return _pending.TryDequeue(out var settings)
-                ? settings
-                : null;
+            while (_pending.TryDequeue(out var settings))
+                if (!settings.CancellationToken.IsCancellationRequested)
+                    return settings;
+            return null;
         }
     }
 

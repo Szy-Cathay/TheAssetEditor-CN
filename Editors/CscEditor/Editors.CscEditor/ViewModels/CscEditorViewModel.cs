@@ -425,6 +425,24 @@ namespace Editors.CscEditor.ViewModels
                 ? []
                 : CscSceneWriter.Write(SceneData);
 
+        internal byte[] AssistantBytes() => CaptureSceneSnapshot();
+        internal void ApplyAssistantGroup(Action action)
+        {
+            _editHistory.BeginGesture();
+            try
+            {
+                action();
+                CscScene.Load(CaptureSceneSnapshot());
+                EndEditGesture("Csc.History.Edit");
+            }
+            catch
+            {
+                _editHistory.CancelGesture();
+                NotifyHistoryState();
+                throw;
+            }
+        }
+
         CscSelectionSnapshot CaptureSelection()
         {
             if (SelectedSceneRoot != null)
