@@ -552,7 +552,13 @@ internal static class TotalWarVfxConverter
                     && orientation.IsZero && position.IsConstant && box.IsZero && radius.Minimum >= 0
                     && spawnDirection is null or "RELATIVE_TO_VFX_UP_AXIS"
                     && Scalar(properties.GetValueOrDefault("EventEnable"), 0) == 0;
-                var spawnAreaArc = nativeSpawnArea && spawnArc != null
+                // The distance emitter samples its authored birth sector independently of inherited velocity.
+                var distanceSpawnArea = native.Kind == 0 && native.Distortion == 0 && simulation == "WORLD_SPACE"
+                    && spawnSpacing > 0 && spawnAngle == null && spawnArc != null && radius.Minimum >= 0
+                    && !radius.IsZero && box.IsZero && Scalar(spreadMethod, 0) == 0
+                    && Scalar(properties.GetValueOrDefault("UseSurfaceNormal"), 0) == 0
+                    && Scalar(properties.GetValueOrDefault("AllowEmitFromMesh"), 0) == 0;
+                var spawnAreaArc = (nativeSpawnArea || distanceSpawnArea) && spawnArc != null
                     ? new VfxRange(Attribute(spawnArc, "x", 0), Attribute(spawnArc, "y", 0)) : (VfxRange?)null;
                 var spawnAreaAngle = angle;
                 if (radialSpawnDirection)
@@ -562,7 +568,12 @@ internal static class TotalWarVfxConverter
                 }
                 else if (native.Kind == 0 && spreadMethod != null && Scalar(spreadMethod, 1) == 0)
                     Note("SpreadMethod/ParticleRelativeSpawnDirection", "Vfx.Preview.Unmapped");
-                var legacySpreadSpawn = native.Kind == 0 && spawnSpread != null
+                var fixedModelSector = native.Kind == 1 && layer.Type == "continuous_rigid"
+                    && spawnAngle == null && spawnArc == null && spread.Min == 0 && spread.Max == 0
+                    && spawnDirection is null or "RELATIVE_TO_VFX_UP_AXIS"
+                    && properties.GetValueOrDefault("SpreadArc") is { } modelSector
+                    && Range(modelSector, 0) is var sector && sector.Min == sector.Max;
+                var legacySpreadSpawn = (native.Kind == 0 || fixedModelSector) && spawnSpread != null
                     && (spawnArc == null || zeroArc && spawnAngle == null && spawnArc.Attribute("x") != null && spawnArc.Attribute("y") != null)
                     && Scalar(properties.GetValueOrDefault("SpreadMethod"), 0) == 0
                     && Scalar(properties.GetValueOrDefault("UseSurfaceNormal"), 0) == 0
@@ -631,6 +642,9 @@ internal static class TotalWarVfxConverter
                 var verticalAcceleration = 0f;
                 float? constantForceDamping = null;
                 var particleForceCurve = false;
+                var verticalTrailForce = distanceSpawnArea && force.HasSingleKeyVector
+                    && force.Range("x", 0) == default && force.Range("z", 0) == default
+                    && orientation.TryConstantVector(out var trailAngles) && trailAngles.X == 0 && trailAngles.Z == 0;
                 var modelConstantForce = false;
                 VfxModelNativeForce? modelForceCurve = null;
                 if (!force.IsZero || native.Kind == 1 && additionalForces)
@@ -702,7 +716,7 @@ internal static class TotalWarVfxConverter
                         constantForceDamping = .1f;
                         Note("ForceA/ParticleInitialSpeed/ParticleDeceleration", "Vfx.Preview.DefaultVerticalMotionCandidate");
                     }
-                    else if (native.Kind == 0 && orientation.IsZero
+                    else if (native.Kind == 0 && (orientation.IsZero || verticalTrailForce)
                         && Curve("ForceB", 0).IsZero && Curve("ForceC", 0).IsZero
                         && Scalar(Get("AllowEmitFromMesh"), 0) == 0 && Scalar(Get("ParticlesFollowTerrain"), 0) == 0
                         && Scalar(Get("UseSurfaceNormal"), 0) == 0)
@@ -1044,6 +1058,7 @@ internal static class TotalWarVfxConverter
                     AlphaStartOffset = alphaStart, AlphaEndOffset = alphaEnd,
                     CalibratedVerticalAcceleration = verticalAcceleration,
                     ParticleForceCurve = particleForceCurve,
+                    VerticalTrailForce = verticalTrailForce && particleForceCurve,
                     ModelConstantForce = modelConstantForce,
                     ModelForceCurve = modelForceCurve,
                     DestroyOnExplicitStop = native.Kind == 1 && Scalar(Get("ParticleDestroyImmediately"), 0) != 0,

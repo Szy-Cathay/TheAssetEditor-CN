@@ -353,6 +353,7 @@ internal sealed class VfxPreviewEmitter
     public float CalibratedVerticalAcceleration { get; init; }
     public float? ConstantForceDamping { get; init; }
     public bool ParticleForceCurve { get; init; }
+    public bool VerticalTrailForce { get; init; }
     public bool ModelConstantForce { get; init; }
     public VfxModelNativeForce? ModelForceCurve { get; init; }
     public bool DestroyOnExplicitStop { get; init; }

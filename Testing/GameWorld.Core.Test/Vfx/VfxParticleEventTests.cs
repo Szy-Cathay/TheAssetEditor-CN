@@ -104,6 +104,29 @@ public class VfxParticleEventTests
         Assert.That(conversion.Diagnostics.Any(d => d.ReasonKey == "Vfx.Preview.ParticleEventEmitterUnsupported"), Is.True);
     }
 
+    [TestCase(7, 1, 7)]
+    [TestCase(1, 4, 1)]
+    public void FixedSectorRigidModel_BirthDimensionsDoNotStretchItsEventSprites(int x, int y, int z)
+    {
+        var parent = VfxDocument.Read(Source(true, "true"));
+        var emitter = parent.Root.Descendants("emitter").Single();
+        var rigid = VfxDocument.Read(VfxModelVariantTests.Source(1)).Root.Descendants("rigid_entry").Single();
+        emitter.Element("property_rigid_data")!.Add(rigid);
+        emitter.Element("property_event")!.SetAttributeValue("track_scale", "true");
+        emitter.Add(new XElement("property", new XAttribute("name", "ParticleInitialScale"), Curve(["x", "y", "z"], x, y, z)),
+            new XElement("ranged_property", new XAttribute("name", "SpawnSpread"), new XAttribute("min", 0), new XAttribute("max", 0)),
+            new XElement("ranged_property", new XAttribute("name", "SpreadArc"), new XAttribute("min", -90), new XAttribute("max", -90)));
+        var conversion = TotalWarVfxConverter.Convert(new(parent.Write(), "vfx/parent.xml",
+            path => path.EndsWith("child.xml", StringComparison.OrdinalIgnoreCase) ? Source(false) : VfxModelVariantTests.Resolve(path)));
+        var simulation = new TotalWarVfxSimulation(conversion);
+        simulation.Seek(.3f, Matrix.Identity);
+        var particles = simulation.Frame(Camera);
+        Assert.That(particles.Single(p => p.Layer == 0).Transform.Right.Length(), Is.EqualTo(x).Within(.001f));
+        var child = particles.Single(p => p.Layer != 0).Transform;
+        Assert.That(child.Right.Length(), Is.EqualTo(1).Within(.001f));
+        Assert.That(child.Up.Length(), Is.EqualTo(1).Within(.001f));
+    }
+
     [TestCase(true)]
     [TestCase(false)]
     public void VisibleRigidEventAnchor_FollowsActualMotionAndFreezesAfterParentDeath(bool track)
