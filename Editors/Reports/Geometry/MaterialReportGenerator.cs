@@ -48,7 +48,7 @@ namespace Editors.Reports.Geometry
                         if (materialPackFile == null)
                         {
                             notFoundFiles.Add(wsModelMaterialPath.MaterialPath);
-                            context?.Diagnostics.Add(global::Shared.Core.ModAssistant.AssistantJson.Text("ReportMissingMaterial") + wsModelMaterialPath.MaterialPath);
+                            context?.Diagnostics.Add(global::Shared.Core.ModAssistant.AssistantJson.Text("ReportMissingMaterial") + " " + wsModelMaterialPath.MaterialPath);
                             continue;
                         }
                         if (context != null && materialPackFile.DataSource.Size > 32 * 1024 * 1024) throw new InvalidDataException(global::Shared.Core.ModAssistant.AssistantJson.Text("ResourceTooLarge"));

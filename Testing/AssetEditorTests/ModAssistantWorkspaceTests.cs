@@ -77,6 +77,11 @@ public class ModAssistantWorkspaceTests
             foreach (var family in new[] { "kitbash.", "retarget.", "mount.", "superview.", "audio_project.", "audio.", "campaign.", "animation_batch." })
                 Assert.IsTrue(operations.Any(o => o.Name.StartsWith(family, StringComparison.Ordinal)), family);
             Assert.IsFalse(operations.Any(o => o.Name.StartsWith("skeleton.")), "Unloaded skeleton must not advertise editable bones.");
+#if DEBUG
+            Assert.IsTrue(operations.Any(o => o.Name == "kitbash.delete_lower_lods"));
+#else
+            Assert.IsFalse(operations.Any(o => o.Name == "kitbash.delete_lower_lods"), "Release must only expose registered menu commands.");
+#endif
             foreach (var target in operations.Select(o => o.TargetId).Distinct())
                 Assert.IsNotNull(workspace.InspectAsync(target, default).GetAwaiter().GetResult()["revision"]);
         });
@@ -84,7 +89,8 @@ public class ModAssistantWorkspaceTests
 
     private static byte[] MetaBytes(MetaDataFileParser parser) => parser.GenerateBytes(2, new ParsedMetadataFile
     {
-        Version = 2, Attributes = [new Effect_v1 { Name = "EFFECT", Version = 1, VfxName = "diagnostic", BoolUnknown = "true", NodeIndex = -1, EffectStartTime = .25f, EffectEndTime = 1.75f }],
+        Version = 2,
+        Attributes = [new Effect_v1 { Name = "EFFECT", Version = 1, VfxName = "diagnostic", BoolUnknown = "true", NodeIndex = -1, EffectStartTime = .25f, EffectEndTime = 1.75f }],
     });
 
     [TestMethod]
@@ -101,9 +107,12 @@ public class ModAssistantWorkspaceTests
                 var adapter = new MetaAssistantAdapter(parser, database, new ApplicationSettingsService(GameTypeEnum.Warhammer3) { AllowSettingsUpdate = false });
                 var ids = new AssistantIds();
                 var id = ids.Get(vm.ParsedFile.Attributes.Single());
-                ModAssistantDataTests.Run(adapter, vm, ids, "meta.fields.set", new() { ["changes"] = new JsonArray(
+                ModAssistantDataTests.Run(adapter, vm, ids, "meta.fields.set", new()
+                {
+                    ["changes"] = new JsonArray(
                     new JsonObject { ["event"] = id, ["field"] = "EffectStartTime", ["text"] = "0.5" },
-                    new JsonObject { ["event"] = id, ["field"] = "EffectEndTime", ["text"] = "2.5" }) });
+                    new JsonObject { ["event"] = id, ["field"] = "EffectEndTime", ["text"] = "2.5" })
+                });
                 Assert.AreEqual(.5f, ((Effect_v1)vm.ParsedFile.Attributes[0]).EffectStartTime);
                 Assert.IsTrue(vm.HasUnsavedChanges);
                 ModAssistantDataTests.Run(adapter, vm, ids, "meta.undo");
@@ -195,9 +204,13 @@ public class ModAssistantWorkspaceTests
                 var adapter = new CscAssistantAdapter(); var ids = new AssistantIds();
                 ModAssistantDataTests.Run(adapter, vm, ids, "csc.add_locator");
                 var id = ids.Get(vm.SceneData.Elements.Single());
-                ModAssistantDataTests.Run(adapter, vm, ids, "csc.properties.set", new() { ["node"] = id, ["changes"] = new JsonArray(
+                ModAssistantDataTests.Run(adapter, vm, ids, "csc.properties.set", new()
+                {
+                    ["node"] = id,
+                    ["changes"] = new JsonArray(
                     new JsonObject { ["field"] = "begin", ["value_json"] = "2" },
-                    new JsonObject { ["field"] = "end", ["value_json"] = "8" }) });
+                    new JsonObject { ["field"] = "end", ["value_json"] = "8" })
+                });
                 Assert.AreEqual(2f, vm.SceneData.Elements.Single().Begin);
                 ModAssistantDataTests.Run(adapter, vm, ids, "csc.undo"); Assert.AreNotEqual(2f, vm.SceneData.Elements.Single().Begin);
                 ModAssistantDataTests.Run(adapter, vm, ids, "csc.redo");

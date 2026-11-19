@@ -185,7 +185,8 @@ public class SettingsViewVisualTests
                             localization.Get("SettingsWindow.General"),
                             localization.Get("SettingsWindow.ThemeCategory"),
                             localization.Get("SettingsWindow.Rendering"),
-                            localization.Get("SettingsWindow.Audio")
+                            localization.Get("SettingsWindow.Audio"),
+                            localization.Get("Assistant.Title")
                         }));
                     NUnitAssert.That(colourPickers, Has.Count.EqualTo(2));
                     NUnitAssert.That(lighting.IsExpanded, Is.False);

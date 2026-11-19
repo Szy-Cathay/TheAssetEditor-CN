@@ -38,17 +38,32 @@ public sealed class KitbashAssistantAdapter(IScopeRepository scopes, IPackFileSe
         ISceneNode[] Nodes() => scene.GetEnumeratorConditional(_ => true).ToArray();
         JsonNode State() => Node(new
         {
-            document_revision = history.CurrentDocumentStateId, vm.HasUnsavedChanges,
-            nodes = Nodes().Select(n => new { id = ids.Get(n), parent = n.Parent == null ? null : ids.Get(n.Parent), n.Name,
-                type = n.GetType().Name, n.IsEditable, n.IsVisible,
-                transform = n is Rmv2MeshNode mesh ? new { position = Vector(mesh.Position), scale = Vector(mesh.Scale),
+            document_revision = history.CurrentDocumentStateId,
+            vm.HasUnsavedChanges,
+            nodes = Nodes().Select(n => new
+            {
+                id = ids.Get(n),
+                parent = n.Parent == null ? null : ids.Get(n.Parent),
+                n.Name,
+                type = n.GetType().Name,
+                n.IsEditable,
+                n.IsVisible,
+                transform = n is Rmv2MeshNode mesh ? new
+                {
+                    position = Vector(mesh.Position),
+                    scale = Vector(mesh.Scale),
                     rotation = new[] { mesh.Orientation.X, mesh.Orientation.Y, mesh.Orientation.Z, mesh.Orientation.W },
-                    vertex_revision = mesh.Geometry.VertexDataVersion, vertices = mesh.Geometry.VertexCount(),
-                    bounds_min = Vector(mesh.Geometry.BoundingBox.Min), bounds_max = Vector(mesh.Geometry.BoundingBox.Max) } : null }).ToArray(),
+                    vertex_revision = mesh.Geometry.VertexDataVersion,
+                    vertices = mesh.Geometry.VertexCount(),
+                    bounds_min = Vector(mesh.Geometry.BoundingBox.Min),
+                    bounds_max = Vector(mesh.Geometry.BoundingBox.Max)
+                } : null
+            }).ToArray(),
             selection = selection.GetState().SelectedObjects().Select(n => ids.Get(n)).ToArray(),
             selected_vertices = (selection.GetState() as VertexSelectionState)?.SelectedVertices,
             selected_faces = (selection.GetState() as FaceSelectionState)?.SelectedFaces,
-            mode = selection.GetState().Mode.ToString(), skeleton = vm.Animation.SelectedSkeleton,
+            mode = selection.GetState().Mode.ToString(),
+            skeleton = vm.Animation.SelectedSkeleton,
             animation = vm.Animation.SelectedAnimation?.ToString(),
         });
         AssistantOperation Op(string name, string label, JsonObject schema, AssistantEffect effect, Func<JsonObject, JsonNode> run, Func<string?>? unavailable = null) =>
@@ -88,38 +103,50 @@ public sealed class KitbashAssistantAdapter(IScopeRepository scopes, IPackFileSe
         }, () => !vm.MenuBar.TransformTool.CanEditValues || !vm.MenuBar.TransformTool.ButtonEnabled ||
             selection.GetState().SelectedObjects().Any(n => !n.IsEditable) ? Text("Unavailable") : null);
 
-        AssistantOperation Command<T>(string name, AssistantEffect effect = AssistantEffect.Edit) where T : IKitbasherUiCommand
+        AssistantOperation? Command<T>(string name, AssistantEffect effect = AssistantEffect.Edit) where T : IKitbasherUiCommand
         {
             var action = vm.MenuBar.AssistantAction<T>();
+            if (action == null) return null;
             return AssistantOperation.Sync(name, ids.Get(editor), action.ToolTipAttribute.Value, Schema(), effect,
                 Text(effect == AssistantEffect.Edit ? "EditorUndo" : "NoDataChange"), State,
                 _ => { action.TriggerInternal(); return State(); }, () => action.IsActionEnabled.Value ? null : Text("Unavailable"));
         }
-        yield return Command<UndoCommand>("kitbash.undo");
-        yield return Command<RedoCommand>("kitbash.redo");
-        yield return Command<DuplicateObjectCommand>("kitbash.duplicate");
-        yield return Command<DeleteObjectCommand>("kitbash.delete");
-        yield return Command<GroupItemsCommand>("kitbash.group");
-        yield return Command<MergeObjectsCommand>("kitbash.merge");
-        yield return Command<DivideSubMeshCommand>("kitbash.split");
-        yield return Command<SortMeshesCommand>("kitbash.sort_meshes");
-        yield return Command<CreateStaticMeshCommand>("kitbash.static_mesh");
-        yield return Command<ReduceMeshCommand>("kitbash.reduce_mesh");
-        yield return Command<ConstructBoxUiCommand>("kitbash.create_box");
-        yield return Command<ConstructPlaneUiCommand>("kitbash.create_plane");
-        yield return Command<ConstructSphereUiCommand>("kitbash.create_sphere");
-        yield return Command<FocusCameraCommand>("kitbash.focus", AssistantEffect.Preview);
-        yield return Command<ResetCameraCommand>("kitbash.reset_camera", AssistantEffect.Preview);
-        yield return Command<ToggleViewSelectedCommand>("kitbash.isolate", AssistantEffect.Preview);
-        yield return Command<BrowseForReferenceCommand>("kitbash.import_reference", AssistantEffect.Preview);
-        yield return Command<DeleteLodsCommand>("kitbash.delete_lower_lods");
-        yield return Command<ConvertFaceToVertexCommand>("kitbash.faces_to_vertices", AssistantEffect.Preview);
-        yield return Command<ExpandFaceSelectionCommand>("kitbash.expand_face_selection", AssistantEffect.Preview);
+        AssistantOperation?[] menuOperations =
+        [
+            Command<UndoCommand>("kitbash.undo"),
+            Command<RedoCommand>("kitbash.redo"),
+            Command<DuplicateObjectCommand>("kitbash.duplicate"),
+            Command<DeleteObjectCommand>("kitbash.delete"),
+            Command<GroupItemsCommand>("kitbash.group"),
+            Command<MergeObjectsCommand>("kitbash.merge"),
+            Command<DivideSubMeshCommand>("kitbash.split"),
+            Command<SortMeshesCommand>("kitbash.sort_meshes"),
+            Command<CreateStaticMeshCommand>("kitbash.static_mesh"),
+            Command<ReduceMeshCommand>("kitbash.reduce_mesh"),
+            Command<ConstructBoxUiCommand>("kitbash.create_box"),
+            Command<ConstructPlaneUiCommand>("kitbash.create_plane"),
+            Command<ConstructSphereUiCommand>("kitbash.create_sphere"),
+            Command<FocusCameraCommand>("kitbash.focus", AssistantEffect.Preview),
+            Command<ResetCameraCommand>("kitbash.reset_camera", AssistantEffect.Preview),
+            Command<ToggleViewSelectedCommand>("kitbash.isolate", AssistantEffect.Preview),
+            Command<BrowseForReferenceCommand>("kitbash.import_reference", AssistantEffect.Preview),
+            Command<DeleteLodsCommand>("kitbash.delete_lower_lods"),
+            Command<ConvertFaceToVertexCommand>("kitbash.faces_to_vertices", AssistantEffect.Preview),
+            Command<ExpandFaceSelectionCommand>("kitbash.expand_face_selection", AssistantEffect.Preview),
+        ];
+        foreach (var operation in menuOperations)
+            if (operation != null) yield return operation;
         yield return Op("kitbash.geometry", "GeometryInspect", Schema(("object", Str(), true), ("offset", Num(0, 10000000, integer: true), false)), AssistantEffect.Query, args =>
         {
             var mesh = Nodes().OfType<Rmv2MeshNode>().Single(m => ids.Get(m) == args.String("object"));
-            return Node(new { mesh.Name, mesh.Geometry.SkeletonName, mesh.Geometry.WeightCount, vertex_count = mesh.Geometry.VertexCount(),
-                vertices = mesh.Geometry.VertexArray.Select((v, i) => new { index = i, position = Vector(v.Position3()), v.BlendIndices, v.BlendWeights }).Skip(args.Integer("offset")).Take(100) });
+            return Node(new
+            {
+                mesh.Name,
+                mesh.Geometry.SkeletonName,
+                mesh.Geometry.WeightCount,
+                vertex_count = mesh.Geometry.VertexCount(),
+                vertices = mesh.Geometry.VertexArray.Select((v, i) => new { index = i, position = Vector(v.Position3()), v.BlendIndices, v.BlendWeights }).Skip(args.Integer("offset")).Take(100)
+            });
         });
         yield return Op("kitbash.select_geometry", "GeometrySelect", Schema(("object", Str(), true), ("mode", Str("", "vertices", "faces"), true),
             ("indices", Array(Num(0, 10000000, integer: true), 10000), true)), AssistantEffect.Preview, args =>
@@ -155,8 +182,14 @@ public sealed class KitbashAssistantAdapter(IScopeRepository scopes, IPackFileSe
             var lookup = scopes.GetRequiredService<ISkeletonAnimationLookUpHelper>(editor);
             var source = lookup.GetSkeletonFileFromName(mesh.Geometry.SkeletonName);
             var target = scopes.GetRequiredService<KitbasherRootScene>(editor).Skeleton;
-            return Node(new { source = mesh.Geometry.SkeletonName, target = target?.SkeletonName, source_bones = source?.Bones.Select(b => new { b.Id, b.Name }),
-                target_bones = target?.BoneNames, used_bones = mesh.Geometry.GetUniqeBlendIndices() });
+            return Node(new
+            {
+                source = mesh.Geometry.SkeletonName,
+                target = target?.SkeletonName,
+                source_bones = source?.Bones.Select(b => new { b.Id, b.Name }),
+                target_bones = target?.BoneNames,
+                used_bones = mesh.Geometry.GetUniqeBlendIndices()
+            });
         });
         yield return Op("kitbash.rerig", "Rerig", Schema(("objects", Array(Str(), 100), true), ("mappings", Array(Schema(
             ("source_bone", Str(), true), ("target_bone", Str(), true)), 512), true), ("fit_mesh", Bool(), false), ("fit_scale", Num(.001, 1000), false),
@@ -176,8 +209,13 @@ public sealed class KitbashAssistantAdapter(IScopeRepository scopes, IPackFileSe
                 throw new ArgumentException(Text("InvalidParameters"));
             if (args.Boolean("fit_mesh"))
             {
-                var configuration = new RemappedAnimatedBoneConfiguration { MeshSkeletonName = meshes[0].Geometry.SkeletonName, ParnetModelSkeletonName = target.SkeletonName,
-                    MeshBones = AnimatedBoneHelper.CreateFromSkeleton(source, used), ParentModelBones = AnimatedBoneHelper.CreateFromSkeleton(targetFile) };
+                var configuration = new RemappedAnimatedBoneConfiguration
+                {
+                    MeshSkeletonName = meshes[0].Geometry.SkeletonName,
+                    ParnetModelSkeletonName = target.SkeletonName,
+                    MeshBones = AnimatedBoneHelper.CreateFromSkeleton(source, used),
+                    ParentModelBones = AnimatedBoneHelper.CreateFromSkeleton(targetFile)
+                };
                 foreach (var map in mapping)
                 {
                     var bone = configuration.MeshBones.Select(b => b.GetFromBoneId(map.OriginalValue)).First(b => b != null);
@@ -230,9 +268,12 @@ public sealed class KitbashAssistantAdapter(IScopeRepository scopes, IPackFileSe
         });
 
         yield return Op("kitbash.animation_choices", "AnimationChoices", Schema(("query", Str(), false), ("offset", Num(0, 1000000, integer: true), false)), AssistantEffect.Query,
-            args => Node(new { skeletons = vm.Animation.SkeletonList.Where(x => x.Contains(args["query"]?.GetValue<string>() ?? "", StringComparison.OrdinalIgnoreCase)).Skip(args.Integer("offset")).Take(100),
+            args => Node(new
+            {
+                skeletons = vm.Animation.SkeletonList.Where(x => x.Contains(args["query"]?.GetValue<string>() ?? "", StringComparison.OrdinalIgnoreCase)).Skip(args.Integer("offset")).Take(100),
                 animations = vm.Animation.AnimationsForCurrentSkeleton.Where(x => x.ToString().Contains(args["query"]?.GetValue<string>() ?? "", StringComparison.OrdinalIgnoreCase))
-                    .Skip(args.Integer("offset")).Take(100).Select(x => new { id = ids.Get(x), name = x.ToString() }) }));
+                    .Skip(args.Integer("offset")).Take(100).Select(x => new { id = ids.Get(x), name = x.ToString() })
+            }));
         yield return Op("kitbash.animation_select", "SelectAnimation", Schema(("skeleton", Str(), false), ("animation", Str("stable animation id"), false)), AssistantEffect.Preview, args =>
         {
             if (args["skeleton"] != null && args["animation"] != null) throw new ArgumentException(Text("InvalidParameters"));
@@ -255,13 +296,29 @@ public sealed class KitbashAssistantAdapter(IScopeRepository scopes, IPackFileSe
 
         foreach (var mesh in Nodes().OfType<Rmv2MeshNode>())
         {
-            JsonNode MaterialState() => Node(new { owner = ids.Get(editor), mesh = ids.Get(mesh), mesh.Name, mesh.IsEditable,
-                type = mesh.Material.Type.ToString(), document_revision = history.CurrentDocumentStateId,
+            JsonNode MaterialState() => Node(new
+            {
+                owner = ids.Get(editor),
+                mesh = ids.Get(mesh),
+                mesh.Name,
+                mesh.IsEditable,
+                type = mesh.Material.Type.ToString(),
+                document_revision = history.CurrentDocumentStateId,
                 fields = MaterialFields(mesh.Material).Select(f => new { f.Name, schema = f.Schema, value = f.Read() }),
-                preview_fields = PreviewFields(mesh.Material).Select(f => new { f.Name, schema = f.Schema, value = f.Read() }) });
+                preview_fields = PreviewFields(mesh.Material).Select(f => new { f.Name, schema = f.Schema, value = f.Read() })
+            });
             yield return AssistantOperation.Sync("material.inspect", ids.Get(mesh), Text("MaterialInspect"), Schema(), AssistantEffect.Query, Text("NoDataChange"), MaterialState,
-                _ => Node(new { state = MaterialState(), textures = Textures(mesh.Material).Select(t => new { slot = t.Type.ToString(), path = t.TexturePath, t.UseTexture,
-                    found = string.IsNullOrEmpty(t.TexturePath) || TexturePathResolver.FindTextureFile(files, t.TexturePath, out var resolved) != null }) }));
+                _ => Node(new
+                {
+                    state = MaterialState(),
+                    textures = Textures(mesh.Material).Select(t => new
+                    {
+                        slot = t.Type.ToString(),
+                        path = t.TexturePath,
+                        t.UseTexture,
+                        found = string.IsNullOrEmpty(t.TexturePath) || TexturePathResolver.FindTextureFile(files, t.TexturePath, out var resolved) != null
+                    })
+                }));
             yield return AssistantOperation.Sync("material.set", ids.Get(mesh), Text("MaterialSet"), Schema(("changes", ChangesSchema(), true)), AssistantEffect.Edit,
                 Text("EditorUndo"), MaterialState, args =>
                 {
