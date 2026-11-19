@@ -41,6 +41,7 @@ namespace AssetEditor.ViewModels
                 EditorEnums.AudioExplorer_Editor => MaterialIconKind.VolumeHigh,
                 EditorEnums.SuperView_Editor => MaterialIconKind.LayersOutline,
                 EditorEnums.Vfx_Editor => MaterialIconKind.Creation,
+                EditorEnums.ModAssistant => MaterialIconKind.ChatOutline,
                 _ => MaterialIconKind.CubeOutline,
             };
             DisplayName = LocalizationManager.Instance.Get(editorInfo.ToolbarName);

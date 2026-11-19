@@ -1039,10 +1039,24 @@ namespace Shared.Core.PackFiles
             _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(pf));
         }
 
+        public async Task GenerateFolderProjectPackAsync(FolderProjectContainer project, string path, GameInformation gameInformation, CancellationToken cancellationToken)
+        {
+            EnsureWritable(project);
+            await Task.Run(() =>
+            {
+                lock (s_saveGate)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    SaveFolderProjectContainerCore(project, path, gameInformation, cancellationToken);
+                }
+            }, cancellationToken);
+            _globalEventHub?.PublishGlobalEvent(new PackFileContainerSavedEvent(project));
+        }
+
         private void SaveFolderProjectContainerCore(
             FolderProjectContainer project,
             string path,
-            GameInformation gameInformation)
+            GameInformation gameInformation, CancellationToken cancellationToken = default)
         {
             var outputPath = Path.GetFullPath(path);
             var loadedOutput = _packFileContainers.FirstOrDefault(
@@ -1124,7 +1138,7 @@ namespace Shared.Core.PackFiles
                         snapshot.Container,
                         path,
                         gameInformation,
-                        snapshot.EnableCorruptionDetection);
+                        snapshot.EnableCorruptionDetection, cancellationToken);
 
                     project.ExecuteSynchronized(
                         () =>
@@ -1141,7 +1155,7 @@ namespace Shared.Core.PackFiles
             PackFileContainer pf,
             string path,
             GameInformation gameInformation,
-            bool enableCorruptionDetection = false)
+            bool enableCorruptionDetection = false, CancellationToken cancellationToken = default)
         {
             var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
             try
@@ -1184,8 +1198,10 @@ namespace Shared.Core.PackFiles
                         writer,
                         gameInformation,
                         enableCompression,
-                        enableCorruptionDetection);
+                        enableCorruptionDetection, cancellationToken);
                 }
+
+                cancellationToken.ThrowIfCancellationRequested();
 
                 foreach (var parent in oldParents)
                     parent.CloseStream();

@@ -77,6 +77,7 @@ namespace Editors.KitbasherEditor.Components
             _gizmo.StopEvent += GizmoTransformEnd;
             _gizmo.ReplacePreviewFromInitialRequested +=
                 OnReplacePreviewFromInitial;
+            OnSelectionChanged(_selectionManager.GetState());
         }
 
         /// <summary>
@@ -106,6 +107,9 @@ namespace Editors.KitbasherEditor.Components
 
         private void OnSelectionChanged(ISelectionState state)
         {
+            // Commands may change selection before the viewport has loaded.
+            if (_gizmo == null)
+                return;
             ExceptionDispatchInfo primaryError = null;
             var previousTransformation = _activeTransformation;
             if (previousTransformation?.IsTransformActive == true)

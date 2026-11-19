@@ -7,6 +7,7 @@ namespace AnimationEditor.CampaignAnimationCreator.Commands
 {
     public class SaveCampaignAnimationCommand
     {
+        public Shared.Core.PackFiles.Models.PackFile? LastSavedFile { get; private set; }
         private readonly IPackFileService _packFileService;
         private readonly IFileSaveService _fileSaveService;
         private readonly IStandardDialogs _standardDialogs;
@@ -26,6 +27,7 @@ namespace AnimationEditor.CampaignAnimationCreator.Commands
 
         public bool Execute(GameSkeleton? skeleton, AnimationClip? animationClip)
         {
+            LastSavedFile = null;
             if (skeleton == null)
             {
                 ShowError("CampaignAnim.Error.NoSkeletonToSave");
@@ -46,7 +48,8 @@ namespace AnimationEditor.CampaignAnimationCreator.Commands
 
             var animationFile = animationClip.ConvertToFileFormat(skeleton);
             var bytes = AnimationFile.ConvertToBytes(animationFile);
-            return _fileSaveService.SaveAs(".anim", bytes) != null;
+            LastSavedFile = _fileSaveService.SaveAs(".anim", bytes);
+            return LastSavedFile != null;
         }
 
         private void ShowError(string localizationKey)

@@ -30,6 +30,13 @@
 - `Shared/SharedCore/ToolCreation/EditorDatabase.cs` 保存编辑器注册，`AssetEditor/Services/EditorManager.cs` 管理标签页、窗口、作用域和关闭流程。
 - 保存失败或用户取消时必须保留编辑器脏状态。WPF `Closing` 回调中不要在同一调用栈再次同步 `Close()`。
 
+### 模组操作助手
+
+- 应用组合根管理工程、资源、编辑器作用域与中文界面；模块通过自身 DI 注册 `IAssistantEditorAdapter`、`IAssistantResourceAdapter` 或 `IAssistantWorkspaceAdapter`，复用原生业务。
+- `Shared.Core/ModAssistant` 只保存 UI 无关协议、参数校验、执行与模型交互。稳定对象身份、修订检查、防重复、取消与真实结果回传由本地保证。
+- 预览、内存、磁盘、Git 和输出 Pack 分开；默认编辑不保存。只读模块不注册假编辑或假保存。网页／文件不拥有用户授权，资料发送有界，密钥使用当前 Windows 账户加密。
+- 具体范围见[模组操作助手](mod-assistant-coverage.md)。模拟 API、原生解析／服务、离屏、真实窗口与游戏效果分层验证。
+
 ### VFX 可视化编辑
 
 VFX 的修改路由、文档与预览状态所有权、编辑器交互、游戏语义及具体验证条件统一见 [VFX 编辑、实时预览与验证](vfx-editor.md)。修改时先读该页的硬边界、修改路由和验证门禁，再按受影响的材质、运动或合成章节加载细节；本节只保留跨模块契约。

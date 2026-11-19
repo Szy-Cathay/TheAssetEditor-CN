@@ -102,6 +102,16 @@ public static class FolderProjectPathPolicy
         }
     }
 
+    public static string ResolveExternalOutputPath(string path)
+    {
+        if (!Path.IsPathFullyQualified(path))
+            throw new InvalidDataException("The output path must be absolute.");
+        var fullPath = Path.GetFullPath(path);
+        NormalizeRelativePath(Path.GetRelativePath(Path.GetPathRoot(fullPath)!, fullPath));
+        EnsureNoReparsePointsInAbsolutePath(fullPath);
+        return fullPath;
+    }
+
     public static bool IsControlFile(string relativePath)
     {
         var normalized = NormalizeRelativePath(relativePath);

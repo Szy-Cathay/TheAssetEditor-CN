@@ -52,7 +52,8 @@ namespace Shared.Ui.Editors.TextEditor
             if (behavior.AssociatedObject != null)
             {
                 var editor = behavior.AssociatedObject as ICSharpCode.AvalonEdit.TextEditor;
-                if (editor.Document != null && dependencyPropertyChangedEventArgs.NewValue != null)
+                if (editor.Document != null && dependencyPropertyChangedEventArgs.NewValue != null &&
+                    editor.Document.Text != dependencyPropertyChangedEventArgs.NewValue.ToString())
                 {
                     var caretOffset = editor.CaretOffset;
                     editor.Document.Text = dependencyPropertyChangedEventArgs.NewValue.ToString();

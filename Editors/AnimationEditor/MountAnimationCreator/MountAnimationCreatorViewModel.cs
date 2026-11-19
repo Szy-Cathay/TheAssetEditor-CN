@@ -13,6 +13,7 @@ using GameWorld.Core.Services;
 using Microsoft.Xna.Framework;
 using Newtonsoft.Json;
 using Shared.Core.Events;
+using Shared.Core.ErrorHandling;
 using Shared.Core.Events.Global;
 using Shared.Core.Misc;
 using Shared.Core.PackFiles;
@@ -223,9 +224,20 @@ namespace AnimationEditor.MountAnimationCreator
                 _dialogs.ShowDialogBox(Text("MountAnim.SelectMountVertex"), DisplayName);
                 return;
             }
+            SetAttachment(mesh, selection.CurrentSelection().Order().ToArray());
+        }
+
+        internal IEnumerable<Rmv2MeshNode> AssistantMountMeshes => _mount.ModelNode == null ? [] : SceneNodeHelper.GetChildrenOfType<Rmv2MeshNode>(_mount.ModelNode);
+        internal string? AssistantLastSavedPath { get; private set; }
+        internal AnimationClip? AssistantGeneratedClip => _preview.AnimationClip;
+        internal GameSkeleton? AssistantGeneratedSkeleton => _preview.Skeleton;
+        internal void SetAttachment(Rmv2MeshNode mesh, IReadOnlyCollection<int> vertices)
+        {
+            if (!IsMountMesh(mesh) || mesh.Geometry.WeightCount == 0 || vertices.Count == 0 || vertices.Any(v => v < 0 || v >= mesh.Geometry.VertexCount()))
+                throw new ArgumentException(Text("MountAnim.SelectMountVertex"));
             _mountVertexOwner = mesh;
             _mountVertices.Clear();
-            _mountVertices.AddRange(selection.CurrentSelection().Order());
+            _mountVertices.AddRange(vertices.Order());
             SelectedVertexesText.Value = LocalizationManager.Instance.GetFormat("MountAnim.SelectedVertices", _mountVertices.Count, _mountVertices[0]);
             TryReGenerateAnimation();
         }
@@ -293,16 +305,19 @@ namespace AnimationEditor.MountAnimationCreator
 
         public void SaveCurrentAnimationAction() => Execute(() =>
         {
+            AssistantLastSavedPath = null;
             UpdateStates();
             if (!CanSave.Value)
                 return;
             var path = CreateProcessor().SaveSingleAnim(_mount.AnimationClip, _rider.AnimationClip, _rider.AnimationName.Value, IsDeathAnimation);
+            AssistantLastSavedPath = path;
             if (path != null)
                 Status.Value = LocalizationManager.Instance.GetFormat("MountAnim.Saved", path);
         });
 
         public void AddAnimationToFragment() => Execute(() =>
         {
+            AssistantLastSavedPath = null;
             UpdateStates();
             if (!CanAddToFragment.Value)
                 return;
@@ -333,6 +348,7 @@ namespace AnimationEditor.MountAnimationCreator
                 new PackFileWrite(path, bytes),
                 new PackFileWrite(selected.PackFileReference.FileName, AnimationPackSerializer.ConvertToBytes(database))
             ]);
+            AssistantLastSavedPath = path;
             RefreshViewAction();
             Status.Value = LocalizationManager.Instance.GetFormat("MountAnim.Saved", path);
         });
@@ -349,6 +365,19 @@ namespace AnimationEditor.MountAnimationCreator
             if (options != null && CreateProcessor(options).Process(mount, rider))
                 RefreshViewAction();
         });
+
+        internal async Task<(bool Success, IReadOnlyList<string> Paths, ErrorList Diagnostics)> ProcessAssistantBatch(
+            BatchProcessOptions options, Func<bool> canCommit, CancellationToken cancellationToken)
+        {
+            UpdateStates();
+            if (!CanBatchProcess.Value) throw new InvalidOperationException(Text("MountAnim.ProjectRequired"));
+            var mount = MountLinkController.AnimationSetForMount.SelectedItem!;
+            var rider = MountLinkController.AnimationSetForRider.SelectedItem!;
+            var processor = CreateProcessor(options);
+            var success = await Task.Run(() => processor.Process(mount, rider, cancellationToken, canCommit, false), cancellationToken);
+            if (success) RefreshViewAction();
+            return (success, processor.WrittenPaths, processor.Diagnostics);
+        }
 
         public void ViewMountFragmentAction() => ViewAnimationSet(MountLinkController.AnimationSetForMount.SelectedItem);
         public void ViewRiderFragmentAction() => ViewAnimationSet(MountLinkController.AnimationSetForRider.SelectedItem);

@@ -41,6 +41,9 @@ namespace Editors.Audio
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, AudioAssistantAdapter>();
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, AudioProjectAssistantAdapter>();
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantResourceAdapter, VideoAssistantAdapter>();
             // Audio Editor stuff
             serviceCollection.AddScoped<IAudioEditorStateService, AudioEditorStateService>();
             serviceCollection.AddScoped<IAudioEditorFileService, AudioEditorFileService>();

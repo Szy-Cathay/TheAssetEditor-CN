@@ -27,6 +27,12 @@ namespace Editors.AnimationMeta.Presentation
 
         public bool IsModified { get; set; } = false;
         public string PropertyName => _property.Name;
+        internal string AssistantType => _parser.Type.ToString();
+        internal bool AcceptsAssistantText(string text) =>
+            !IsReadOnly && this is not VectorAttributeViewModel && this is not OrientationAttributeViewModel &&
+            _parser.Encode(text, out _) != null &&
+            (_parser.Type != DbTypesEnum.Single || float.TryParse(text, out var value) && float.IsFinite(value)) &&
+            (this is not ChoiceAttributeViewModel choice || choice.Choices.Any(c => c.ValueAsString == text));
         public bool IsStartTime => PropertyName == "StartTime" ||
             _target is Effect_v1 && PropertyName == nameof(Effect_v1.EffectStartTime);
         public bool IsEndTime => PropertyName == "EndTime" ||

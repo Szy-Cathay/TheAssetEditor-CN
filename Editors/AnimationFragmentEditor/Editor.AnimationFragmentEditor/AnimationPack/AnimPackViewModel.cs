@@ -309,6 +309,22 @@ namespace CommonControls.Editors.AnimationPack
             AnimationPackItems.SelectedItem != null &&
             (_activeConverter == null || AnimationPackItems.SelectedItem.IsUnknownFile);
 
+        internal bool AssistantHasTableEdits => TableEditorVM?.IsDirty == true || CampaignEditorVM?.IsDirty == true;
+        internal string AssistantCurrentText => AssistantHasTableEdits
+            ? CampaignEditorVM?.BuildXmlString() ?? TableEditorVM.BuildXmlString()
+            : SelectedItemViewModel?.Text ?? string.Empty;
+        internal void ValidateAssistantText(string text)
+        {
+            if (_activeConverter == null || AnimationPackItems.SelectedItem == null || IsSelectedItemUnsupported)
+                throw new InvalidOperationException(Shared.Core.ModAssistant.AssistantJson.Text("ReadOnly"));
+            using (var reader = System.Xml.XmlReader.Create(new System.IO.StringReader(text),
+                new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Prohibit, XmlResolver = null }))
+                while (reader.Read()) { }
+            var bytes = _activeConverter.ToBytes(text, AnimationPackItems.SelectedItem.FileName, _pfs, out var error);
+            if (bytes == null || error != null) throw new ArgumentException(error?.Text ?? Shared.Core.ModAssistant.AssistantJson.Text("InvalidParameters"));
+            _ = _activeConverter.GetText(bytes);
+        }
+
         public string EditStatusMessage
         {
             get

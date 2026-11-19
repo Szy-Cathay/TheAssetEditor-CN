@@ -238,6 +238,12 @@ namespace Editors.AnimatioReTarget.Editor.BoneHandling
             }
         }
 
+        internal void ApplyAssistantMappings(IReadOnlyDictionary<int, int> mappings)
+        {
+            CreateMappingConfig();
+            ApplyMappings(mappings);
+        }
+
         void ApplyMappings(IReadOnlyDictionary<int, int> mappings)
         {
             foreach (var targetRoot in _activeConfig!.MeshBones)

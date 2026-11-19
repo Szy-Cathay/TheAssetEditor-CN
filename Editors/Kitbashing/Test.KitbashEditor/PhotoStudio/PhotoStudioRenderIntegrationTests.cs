@@ -193,15 +193,23 @@ internal class PhotoStudioRenderIntegrationTests :
         renderEngine.Update(gameTime);
         sceneManager.Draw(gameTime);
         selectionOverlay.Draw(gameTime);
+        string? completedPath = null;
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        renderEngine.SaveNextFrame(new SaveRenderImageSettings("cancelled", false, scale, outputFolder) { CancellationToken = cancelled.Token });
         renderEngine.SaveNextFrame(
             new SaveRenderImageSettings(
                 name,
                 false,
                 scale,
-                outputFolder));
+                outputFolder) { CompletionHandler = path => completedPath = path });
         device.SetRenderTarget(backTarget);
         renderEngine.Draw(gameTime);
         device.SetRenderTarget(null);
+
+        Assert.That(completedPath, Is.Not.Null);
+        Assert.That(File.Exists(completedPath), Is.True);
+        Assert.That(Directory.GetFiles(outputFolder, "cancelled*.png"), Is.Empty);
 
         return Directory.GetFiles(
                 outputFolder,

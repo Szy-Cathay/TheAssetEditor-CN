@@ -272,6 +272,12 @@ public sealed class VfxValueViewModel : ObservableObject, IDataErrorInfo
     public double Minimum { get; }
     public double Maximum { get; }
     public bool HasError => Error.Length > 0;
+    internal bool Accepts(string text) =>
+        (!IsBoolean || bool.TryParse(text, out _)) &&
+        (!IsChoice || Choices.Any(choice => choice.Key == text)) &&
+        (!IsNumber || (VfxCurve.TryNumber(text, out var number) && double.IsFinite(number) && Math.Abs(number) <= float.MaxValue &&
+            (!_integer || (number == Math.Truncate(number) && number >= int.MinValue && number <= int.MaxValue)) &&
+            (_validate == null || _validate(number))));
     public string Error => IsNumber && (!VfxCurve.TryNumber(Text, out var number) || Math.Abs(number) > float.MaxValue
         || (_integer && (number != Math.Truncate(number) || number < int.MinValue || number > int.MaxValue))
         || (_validate != null && !_validate(number))) ? _editor.Localization.Get("Vfx.Number.Invalid") : "";

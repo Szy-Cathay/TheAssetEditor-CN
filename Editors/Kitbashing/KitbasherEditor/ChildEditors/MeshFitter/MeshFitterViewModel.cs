@@ -368,6 +368,12 @@ namespace Editors.KitbasherEditor.ChildEditors.MeshFitter
 
         public bool HasValidTransform => _validPreview && HasValidInputs;
 
+        internal bool ApplyAssistantFitting()
+        {
+            ApplyMeshFittingTransforms();
+            return HasValidTransform && Validate(out _) && OnOkButton();
+        }
+
         private bool HasValidInputs => ValidNumber(ScaleFactor, true) && ValidNumber(BoneScaleFactor, true) &&
             ValidVector(BonePositionOffset) && ValidVector(BoneRotationOffset);
 

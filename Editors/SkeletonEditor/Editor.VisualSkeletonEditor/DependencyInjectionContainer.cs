@@ -11,6 +11,7 @@ namespace Editor.VisualSkeletonEditor
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<Shared.Core.ModAssistant.IAssistantEditorAdapter, SkeletonAssistantAdapter>();
             serviceCollection.AddScoped<SkeletonEditorViewModel>();
 
             RegisterAllAsInterface<IDeveloperConfiguration>(serviceCollection, ServiceLifetime.Transient);

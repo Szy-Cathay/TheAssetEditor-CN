@@ -60,7 +60,8 @@ namespace AssetEditor.ViewModels
                 IEventHub eventHub,
                 ApplicationSettingsService applicationSettingsService,
                 IFolderProjectCloseGuard folderProjectCloseGuard,
-                FolderProjectHistoryWorkspaceViewModel? historyWorkspace = null)
+                FolderProjectHistoryWorkspaceViewModel? historyWorkspace = null,
+                AssetEditor.ModAssistant.AssistantSelectionContext? assistantSelection = null)
         {
             MenuBar = menuViewModel;
 
@@ -77,6 +78,7 @@ namespace AssetEditor.ViewModels
 
             FileTree = packFileBrowserBuilder.Create(ContextMenuType.MainApplication, showCaFiles: true, showFoldersOnly: false, deferCaFiles: true);
             FileTree.FileOpen += OpenFile;
+            if (assistantSelection != null) assistantSelection.Browser = FileTree;
 
             ToolsFactory = toolFactory;
 

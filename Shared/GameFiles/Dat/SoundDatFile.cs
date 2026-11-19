@@ -44,6 +44,11 @@ namespace Shared.GameFormats.Dat
 
         public void DumpToFile(string filePath)
         {
+            File.WriteAllText(filePath, Format());
+        }
+
+        public string Format()
+        {
             var builder = new StringBuilder();
 
             builder.AppendLine($"Section 1 -{EventWithStateGroup.Count}");
@@ -70,9 +75,7 @@ namespace Shared.GameFormats.Dat
             foreach (var item in Unknown)
                 builder.AppendLine($"{item}");
 
-            using var outputFile = File.Open(filePath, FileMode.OpenOrCreate);
-            using var streamWriter = new StreamWriter(outputFile);
-            streamWriter.Write(builder.ToString());
+            return builder.ToString();
         }
 
         public void Merge(SoundDatFile other)

@@ -61,6 +61,28 @@ namespace Test.Shared.Core.Services
             _uiProvider.Verify(x => x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()), Times.Never);
         }
 
+        [TestCase(false)]
+        [TestCase(true)]
+        public void Save_NewFolderProjectFile_ReturnsCanonicalDiskBackedResource(bool saveAs)
+        {
+            var root = Path.Combine(Path.GetTempPath(), "aec-save-handle-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            try
+            {
+                using var project = FolderProjectContainer.Create(root, new FolderProjectSettings { Name = "Save handle" });
+                _pfs.AddEditableFolderProject(project);
+                const string path = "folder\\new.test";
+                _uiProvider.Setup(x => x.DisplaySaveDialog(_pfs, It.IsAny<List<string>>()))
+                    .Returns(new SaveDialogResult(true, null, path));
+                var service = new FileSaveService(_pfs, _uiProvider.Object);
+                var result = saveAs ? service.SaveAs(".test", [3]) : service.Save(path, [3], false);
+                Assert.That(result, Is.SameAs(_pfs.FindFile(path, project)));
+                Assert.That(_pfs.GetFullPath(result!, project), Is.EqualTo(path));
+                Assert.That(File.ReadAllBytes(Path.Combine(root, path)), Is.EqualTo(new byte[] { 3 }));
+            }
+            finally { Directory.Delete(root, true); }
+        }
+
         [Test]
         public void Save_ExistingFile_DontPromptOnConflict()
         {

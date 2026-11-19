@@ -15,6 +15,7 @@ namespace Editors.AnimationVisualEditors
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, AnimationToolsAssistantAdapter>();
             serviceCollection.AddScoped<CampaignAnimationCreatorViewModel>();
             serviceCollection.AddTransient<ConvertCampaignAnimationCommand>();
             serviceCollection.AddTransient<SaveCampaignAnimationCommand>();

@@ -106,7 +106,7 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
             PackFileContainer packFileContainer,
             GameTypeEnum gameType,
             IProgress<OperationProgressUpdate>? progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, Func<bool>? canCommit = null)
         {
             if (!float.IsFinite(AnimationKeysPerSecond) || AnimationKeysPerSecond <= 0)
                 throw new ArgumentOutOfRangeException(nameof(AnimationKeysPerSecond), "动画采样率必须大于 0。");
@@ -127,7 +127,7 @@ namespace Editors.ImportImport.Importing.Presentation.RmvToGltf
                 AutoScaleHumanoid: this.AutoScaleHumanoid,
                 SourceForwardDirection: this.SourceForwardDirection);
 
-            return _Importer.Import(settings, progress, cancellationToken);
+            return _Importer.Import(settings, progress, cancellationToken, canCommit);
         }
 
         partial void OnImportAnimationsChanged(bool value) =>

@@ -117,6 +117,17 @@ namespace Editors.Audio.AudioExplorer
         private CancellationTokenSource _playbackPreparationCancellationTokenSource;
         private CancellationTokenSource _treeBuildCancellationTokenSource;
         private Task _browserOperation = Task.CompletedTask;
+        internal List<string> AssistantExportedPaths { get; } = [];
+        internal int AssistantExportExpectedCount { get; private set; }
+        internal async Task WaitAssistantBrowserAsync(CancellationToken token)
+        {
+            var task = _browserOperation;
+            var cancellation = _treeBuildCancellationTokenSource;
+            using var registration = token.Register(() => cancellation?.Cancel());
+            await task.WaitAsync(token);
+            if (!ReferenceEquals(task, _browserOperation))
+                throw new InvalidOperationException(global::Shared.Core.ModAssistant.AssistantJson.Text("StaleTarget"));
+        }
 
         [ObservableProperty] private ExplorerListSelectionFilter _explorerFilter;
         [ObservableProperty] private ObservableCollection<HircTreeNode> _treeList = [];
@@ -1037,10 +1048,13 @@ namespace Editors.Audio.AudioExplorer
             AudioExportCommandOptions options,
             CancellationToken cancellationToken = default)
         {
+            AssistantExportedPaths.Clear();
+            AssistantExportExpectedCount = 0;
             if (options == null || IsLoading || IsExporting)
                 return;
 
             var plan = CreateExportPlan(options.Scope);
+            AssistantExportExpectedCount = plan.Sources.Count;
             if (plan.Sources.Count == 0)
             {
                 LoadStatus = LocalizationManager.Instance.GetFormat(
@@ -1128,6 +1142,7 @@ namespace Editors.Audio.AudioExplorer
                             outputPath))
                         {
                             exportedCount++;
+                            AssistantExportedPaths.Add(outputPath);
                         }
                         else
                             failedCount++;

@@ -18,11 +18,11 @@ namespace Editors.Reports.Audio
         public DialogueEventInfoPrinter(IAudioRepository audioRepository)
         {
             _audioRepository = audioRepository;
-            _audioRepository.Load(Wh3LanguageInformation.GetAllLanguages());
         }
 
         public void Create()
         {
+            _audioRepository.Load(Wh3LanguageInformation.GetAllLanguages());
             var printer = new DialogueEventInfoPrinter(_audioRepository);
             printer.PrintDialogueEventInfo();
             _audioRepository.Clear();
@@ -37,19 +37,23 @@ namespace Editors.Reports.Audio
 
         private void PrintDialogueEventInfo(ICAkDialogueEvent dialogueEvent)
         {
+            var info = Format(dialogueEvent, _audioRepository.GetNameFromId);
+            Console.WriteLine(info);
+            var filePath = $"{DirectoryHelper.ReportsDirectory}\\dialogue_event_info.txt";
+            File.AppendAllText(filePath, info + Environment.NewLine);
+        }
+
+        public static string Format(ICAkDialogueEvent dialogueEvent, Func<uint, string> resolveName)
+        {
             var hircItem = dialogueEvent as HircItem;
 
             var stateGroups = dialogueEvent.Arguments
-                .Select(argument => _audioRepository.GetNameFromId(argument.GroupId))
+                .Select(argument => resolveName(argument.GroupId))
                 .ToList();
 
             var stateGroupsJoined = string.Join(", ", stateGroups);
 
-            var info = $"{_audioRepository.GetNameFromId(hircItem.Id)} : {stateGroupsJoined}";
-            Console.WriteLine(info);
-
-            var filePath = $"{DirectoryHelper.ReportsDirectory}\\dialogue_event_info.txt";
-            File.AppendAllText(filePath, info + Environment.NewLine);
+            return $"{resolveName(hircItem.Id)} : {stateGroupsJoined}";
         }
     }
 }

@@ -95,6 +95,7 @@ public sealed class FolderProjectContainer :
             () => FileList.ToArray());
 
     internal long NextRevision() => Interlocked.Increment(ref _revision);
+    public long CurrentRevision => Interlocked.Read(ref _revision);
 
     private FolderProjectContainer(
         string projectRoot,

@@ -93,6 +93,7 @@ namespace GameWorld.Core.Components.Rendering
         public bool SquareViewport { get; set; }
         public RenderTarget2D? LastFrame =>
             SquareViewport ? _transparentCaptureTarget : null;
+        public bool CanCapture => _defaultRenderTarget is { IsDisposed: false };
 
         public RenderEngineComponent(IWpfGame wpfGame, ResourceLibrary resourceLibrary, ArcBallCamera camera, IDeviceResolver deviceResolverComponent, ApplicationSettingsService applicationSettingsService, SceneRenderParametersStore sceneLightParametersStore, IEventHub eventHub, GridComponent gridComponent)
         {
@@ -632,7 +633,7 @@ namespace GameWorld.Core.Components.Rendering
             RenderTarget2D target,
             SaveRenderImageSettings settings)
         {
-            DirectoryHelper.EnsureCreated(settings.OutputFolder);
+            settings.CancellationToken.ThrowIfCancellationRequested();
             var name = Path.GetFileName(settings.Name);
             if (string.IsNullOrWhiteSpace(name))
                 name = "Screenshot";
@@ -640,13 +641,17 @@ namespace GameWorld.Core.Components.Rendering
             var outputPath = Path.Combine(
                 settings.OutputFolder,
                 $"{name}_{DateTime.Now:yyyyMMdd_HHmmss_fff}.png");
-            using (var stream = File.Create(outputPath))
+            settings.ValidateOutput?.Invoke(outputPath);
+            DirectoryHelper.EnsureCreated(settings.OutputFolder);
+            using (var stream = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write))
             {
                 target.SaveAsPng(
                     stream,
                     target.Width,
                     target.Height);
             }
+
+            settings.CompletionHandler?.Invoke(outputPath);
 
             if (settings.OpenFolder)
                 DirectoryHelper.OpenFolderAndSelectFile(outputPath);

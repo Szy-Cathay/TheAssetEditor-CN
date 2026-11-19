@@ -25,6 +25,18 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
         string _savedSkeletonPath = "";
         string _savedSourceSkeletonName = "";
 
+        internal GameSkeleton? AssistantSkeleton => _techSkeletonNode?.Skeleton;
+        internal void RestoreAssistantSkeleton(GameSkeleton skeleton)
+        {
+            SelectedBone = null;
+            _techSkeletonNode.Skeleton = skeleton.Clone();
+            _techSkeletonNode.SkeletonSceneNode.Skeleton = _techSkeletonNode.Skeleton;
+            _techSkeletonNode.Player.SetAnimation(null, _techSkeletonNode.Skeleton);
+            RefreshBoneList();
+            _techSkeletonNode.TriggerSkeletonChanged();
+            UpdateDirtyState();
+        }
+
         private readonly IPackFileService _packFileService;
         private readonly CopyPasteManager _copyPasteManager;
         private readonly IStandardDialogs _packFileUiProvider;

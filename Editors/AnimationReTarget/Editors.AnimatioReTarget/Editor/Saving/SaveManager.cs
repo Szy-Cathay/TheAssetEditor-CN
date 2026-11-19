@@ -67,14 +67,14 @@ namespace Editors.AnimatioReTarget.Editor.Saving
         public Task<BatchAnimationRetargetResult> ExecuteBatchAsync(
             BatchAnimationRetargetRequest request,
             IProgress<OperationProgressUpdate>? progress,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken, Func<bool>? canCommit = null) =>
             Task.Run(
-                () => ExecuteBatch(request, progress, cancellationToken));
+                () => ExecuteBatch(request, progress, cancellationToken, canCommit));
 
         private BatchAnimationRetargetResult ExecuteBatch(
             BatchAnimationRetargetRequest request,
             IProgress<OperationProgressUpdate>? progress,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, Func<bool>? canCommit)
         {
             if (!CanBatchRetarget(out var validationError))
                 throw new InvalidOperationException(validationError);
@@ -174,7 +174,7 @@ namespace Editors.AnimatioReTarget.Editor.Saving
                 try
                 {
                     var content = RetargetAnimation(animation);
-                    ApplyBatchWrite(outputProject, outputPath!, content);
+                    ApplyBatchWrite(outputProject, outputPath!, content, request.OverwriteExisting, cancellationToken, canCommit);
                     results.Add(new BatchAnimationRetargetItemResult(
                         animation.AnimationFile,
                         outputPath!,
@@ -202,11 +202,15 @@ namespace Editors.AnimatioReTarget.Editor.Saving
         private void ApplyBatchWrite(
             FolderProjectContainer outputProject,
             string outputPath,
-            byte[] content)
+            byte[] content, bool overwriteExisting, CancellationToken cancellationToken, Func<bool>? canCommit)
         {
-            void Write() => _pfs.ApplyFileWrites(
-                outputProject,
-                [new PackFileWrite(outputPath, content)]);
+            void Write()
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!ReferenceEquals(outputProject, _pfs.GetEditablePack()) || canCommit?.Invoke() == false)
+                    throw new InvalidOperationException(global::Shared.Core.ModAssistant.AssistantJson.Text("StaleTarget"));
+                _pfs.ApplyFileWrites(outputProject, [new PackFileWrite(outputPath, content)], overwriteExisting);
+            }
 
             var dispatcher = System.Windows.Application.Current?.Dispatcher;
             if (dispatcher == null || dispatcher.CheckAccess())
@@ -432,13 +436,13 @@ namespace Editors.AnimatioReTarget.Editor.Saving
             return SaveUtility.EnsureEnding(outputPath, ".anim");
         }
 
-        public void SaveAnimation(bool prompOnConflict = true)
+        public PackFile? SaveAnimation(bool prompOnConflict = true)
         {
             if (_generated?.AnimationClip == null)
             {
                 _standardDialogs.ShowDialogBox(
                     LocalizationManager.Instance.Get("AnimReTarget.Error.GeneratedAnimationRequired"));
-                return;
+                return null;
             }
 
             var clip = _generated.AnimationClip;
@@ -453,7 +457,7 @@ namespace Editors.AnimatioReTarget.Editor.Saving
 
             var newPath = BuildSourcePathOutput(_source.AnimationName.Value);
 
-            _saveService.Save(newPath, AnimationFile.ConvertToBytes(animFile), prompOnConflict);
+            return _saveService.Save(newPath, AnimationFile.ConvertToBytes(animFile), prompOnConflict);
 
         }
         [RelayCommand] void ShowSaveSettings()

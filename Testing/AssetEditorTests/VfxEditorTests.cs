@@ -1529,7 +1529,7 @@ public class VfxEditorTests
         }
     }
 
-    private sealed class Context
+    internal sealed class Context
     {
         public Mock<IPackFileService> Files { get; } = new();
         public Mock<IFileSaveService> Save { get; } = new();

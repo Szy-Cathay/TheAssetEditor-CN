@@ -6,6 +6,7 @@
 | --- | --- | --- |
 | 产品身份、Pack、文件夹工程术语可能混淆 | [`../CONTEXT.md`](../CONTEXT.md) | 统一词义 |
 | 跨模块定位、依赖注入、Pack 生命周期、共享 UI、更新器或测试路由 | [`architecture.md`](architecture.md) | 入口、边界、验证定位 |
+| 模组操作助手、DeepSeek、操作适配、目标校验与数据发送 | [`mod-assistant-coverage.md`](mod-assistant-coverage.md) | 使用方法、实际接入范围与验证限制 |
 | KitbashEditor、模型选择/变换/覆盖层、场景树、保存或 Kitbash 子工具 | [`kitbash-editor.md`](kitbash-editor.md) | 模型编辑架构、状态所有权、实现边界和验证门禁 |
 | 超级视图、SuperView、Animation META 预览、元数据时间/空间编辑或双文档保存 | [`superview.md`](superview.md) | 元数据预览/编辑数据流、双文档所有权和模型编辑隔离 |
 | VFX 编辑器、Effekseer 场内预览、游戏特效语义转换或共享特效节点 | [`vfx-editor.md`](vfx-editor.md) 的硬边界、修改路由、验证门禁及相关语义；跨模块另读 [`architecture.md`](architecture.md)，涉及 Effect 时加读 [`superview.md`](superview.md) | 原始游戏数据权威、编辑/预览状态、连续 trail、材质/模拟适配范围与分层验证 |

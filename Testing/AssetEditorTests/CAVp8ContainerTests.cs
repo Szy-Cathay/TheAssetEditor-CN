@@ -74,7 +74,7 @@ namespace AssetEditorTests
                 () => new IvfFile(caVp8).WriteData());
         }
 
-        private static byte[] CreateCaVp8WithGap()
+        internal static byte[] CreateCaVp8WithGap()
         {
             using var stream = new MemoryStream();
             using var writer = new BinaryWriter(stream);

@@ -95,7 +95,7 @@ public class SkeletonDirtyStateTests
     private const string SkeletonPath = @"animations\skeletons\test.anim";
     private const string MatrixPath = @"animations\skeletons\test.bone_inv_trans_mats";
 
-    private static void WithSkeleton(Action<SkeletonEditorViewModel, ISaveableEditor, Mock<IPackFileService>, Mock<IFileSaveService>> action)
+    internal static void WithSkeleton(Action<SkeletonEditorViewModel, ISaveableEditor, Mock<IPackFileService>, Mock<IFileSaveService>> action)
     {
         var files = new Mock<IPackFileService>();
         files.Setup(item => item.GetAllPackfileContainers()).Returns([]);

@@ -280,6 +280,24 @@ namespace Editors.Audio.AudioEditor.Presentation.Settings
 
         partial void OnContainerTypeChanged(ContainerType value) => SetSettingsUsabilityAndStore();
 
+        partial void OnRandomTypeChanged(RandomType value) => StoreSettings();
+
+        public void ApplySettings(HircSettings settings)
+        {
+            ContainerType = settings.ContainerType;
+            RandomType = settings.RandomType;
+            EnableRepetitionInterval = settings.EnableRepetitionInterval;
+            RepetitionInterval = settings.RepetitionInterval;
+            PlaylistEndBehaviour = settings.PlaylistEndBehaviour;
+            AlwaysResetPlaylist = settings.AlwaysResetPlaylist;
+            PlayMode = settings.PlayMode;
+            LoopingType = settings.LoopingType;
+            NumberOfLoops = settings.NumberOfLoops;
+            TransitionType = settings.TransitionType;
+            TransitionDuration = settings.TransitionDuration;
+            SetSettingsUsabilityAndStore();
+        }
+
         partial void OnPlayModeChanged(PlayMode value) => SetSettingsUsabilityAndStore();
 
         partial void OnLoopingTypeChanged(LoopingType value) => SetSettingsUsabilityAndStore();

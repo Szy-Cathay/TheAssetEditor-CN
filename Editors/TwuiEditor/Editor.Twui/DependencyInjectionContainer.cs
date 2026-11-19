@@ -14,6 +14,7 @@ namespace Editors.Twui
     {
         public override void Register(IServiceCollection serviceCollection)
         {
+            serviceCollection.AddSingleton<global::Shared.Core.ModAssistant.IAssistantEditorAdapter, TwuiAssistantAdapter>();
             serviceCollection.AddScoped<TwuiEditor>();
             serviceCollection.AddScoped<TwuiMainView>();
 

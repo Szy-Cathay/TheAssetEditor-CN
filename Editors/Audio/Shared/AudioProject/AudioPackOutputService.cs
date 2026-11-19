@@ -15,6 +15,7 @@ namespace Editors.Audio.Shared.AudioProject
 
     public interface IAudioPackOutputService
     {
+        IDisposable BeginGuardedWrites(Action validate, Action<IReadOnlyCollection<AudioPackOutput>> committed) => throw new NotSupportedException();
         bool SaveBatch(
             IReadOnlyCollection<AudioPackOutput> outputs,
             bool promptOnConflict = false);
@@ -25,6 +26,15 @@ namespace Editors.Audio.Shared.AudioProject
         IFileSaveService fileSaveService,
         IStandardDialogs standardDialogs) : IAudioPackOutputService
     {
+        private sealed record WriteGuard(Action Validate, Action<IReadOnlyCollection<AudioPackOutput>> Committed);
+        private readonly System.Threading.AsyncLocal<WriteGuard?> _writeGuard = new();
+        private sealed class GuardScope(Action dispose) : IDisposable { public void Dispose() => dispose(); }
+        public IDisposable BeginGuardedWrites(Action validate, Action<IReadOnlyCollection<AudioPackOutput>> committed)
+        {
+            var previous = _writeGuard.Value;
+            _writeGuard.Value = new(validate, committed);
+            return new GuardScope(() => _writeGuard.Value = previous);
+        }
         private sealed record FileBackup(
             string FilePath,
             string FileName,
@@ -42,6 +52,7 @@ namespace Editors.Audio.Shared.AudioProject
             IReadOnlyCollection<AudioPackOutput> outputs,
             bool promptOnConflict = false)
         {
+            _writeGuard.Value?.Validate();
             if (outputs.Count == 0)
                 return true;
 
@@ -81,6 +92,7 @@ namespace Editors.Audio.Shared.AudioProject
                     return false;
                 }
 
+                _writeGuard.Value?.Validate();
                 _packFileService.ApplyFileWrites(
                     editablePack,
                     uniqueOutputs
@@ -88,6 +100,7 @@ namespace Editors.Audio.Shared.AudioProject
                             output.FilePath,
                             output.Data))
                         .ToList());
+                _writeGuard.Value?.Committed(uniqueOutputs);
                 return true;
             }
 
@@ -123,6 +136,7 @@ namespace Editors.Audio.Shared.AudioProject
 
             try
             {
+                _writeGuard.Value?.Validate();
                 foreach (var output in uniqueOutputs)
                 {
                     if (_fileSaveService.Save(
@@ -152,6 +166,7 @@ namespace Editors.Audio.Shared.AudioProject
                 throw;
             }
 
+            _writeGuard.Value?.Committed(uniqueOutputs);
             return true;
         }
 
