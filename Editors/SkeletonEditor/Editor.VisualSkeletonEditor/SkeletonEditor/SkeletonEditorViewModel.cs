@@ -40,7 +40,6 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
         private readonly IPackFileService _packFileService;
         private readonly CopyPasteManager _copyPasteManager;
         private readonly IStandardDialogs _packFileUiProvider;
-        private readonly IFileSaveService _packFileSaveService;
 
         [ObservableProperty] string _skeletonName = "";
         [ObservableProperty] string _refMeshName = "";
@@ -65,7 +64,6 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
             CopyPasteManager copyPasteManager,
             IEditorHostParameters editorHostParameters,
             IStandardDialogs packFileUiProvider,
-            IFileSaveService packFileSaveService,
             ReferenceObjectSelectionComponent objectSelection,
             ReferenceObjectSelectionOutlineComponent selectionOutline)
             : base(editorHostParameters)
@@ -77,7 +75,6 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
             _packFileService = pfs;
             _copyPasteManager = copyPasteManager;
             _packFileUiProvider = packFileUiProvider;
-            _packFileSaveService = packFileSaveService;
             _selectedBoneRotationOffset = new Vector3ViewModel(0, 0, 0, x=> HandleTranslationChanged());
             _selectedBoneTranslationOffset = new Vector3ViewModel(0, 0, 0, x => HandleTranslationChanged());
 
@@ -284,22 +281,32 @@ namespace Editor.VisualSkeletonEditor.SkeletonEditor
                 return false;
             }
 
+            var destination = _packFileService.GetEditablePack();
+            if (destination == null)
+            {
+                _packFileUiProvider.ShowDialogBox(LocalizationManager.Instance.Get("Msg.NoEditableFolderProject"));
+                return false;
+            }
+
             var skeletonClip = AnimationClip.CreateSkeletonAnimation(_techSkeletonNode.Skeleton);
             var animFile = skeletonClip.ConvertToFileFormat(_techSkeletonNode.Skeleton);
             animFile.Header.SkeletonName = SourceSkeletonName;
             var animationBytes = AnimationFile.ConvertToBytes(animFile);
 
-            var result = _packFileSaveService.Save(SkeletonName, animationBytes, false);
-            if (result == null)
+            var invMatrixPath = Path.ChangeExtension(SkeletonName, ".bone_inv_trans_mats");
+            var matrices = _techSkeletonNode.Skeleton.CreateInvMatrixFile().GetBytes();
+            try
+            {
+                _packFileService.ApplyFileWrites(destination,
+                    [new PackFileWrite(SkeletonName, animationBytes), new PackFileWrite(invMatrixPath, matrices)]);
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                _packFileUiProvider.ShowDialogBox(LocalizationManager.Instance.GetFormat("Msg.SavingFailed", error.Message));
                 return false;
-            var savedPath = _packFileService.GetFullPath(result);
-
-            var invMatrixFile = _techSkeletonNode.Skeleton.CreateInvMatrixFile();
-            var invMatrixPath = Path.ChangeExtension(savedPath, ".bone_inv_trans_mats");
-            if (_packFileSaveService.Save(invMatrixPath, invMatrixFile.GetBytes(), false) == null)
-                return false;
-            CurrentFile = result;
-            SkeletonName = savedPath;
+            }
+            CurrentFile = _packFileService.FindFile(SkeletonName, destination)!;
+            SkeletonName = _packFileService.GetFullPath(CurrentFile, destination);
             RecordSavedState();
             return true;
         }

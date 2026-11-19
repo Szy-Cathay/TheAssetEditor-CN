@@ -17,125 +17,128 @@ namespace AssetEditorTests;
 [NonParallelizable]
 public class SkeletonDirtyStateTests
 {
+    private const string SkeletonPath = @"animations\skeletons\tech\test.anim";
+    private const string MatrixPath = @"animations\skeletons\tech\test.bone_inv_trans_mats";
+
     [Test]
     public void LoadingSelectingAndPreviewingStayClean_RealBoneEditsTrackSavedContent()
     {
-        WithSkeleton((editor, saveable, _, _) =>
+        WithSkeleton((editor, files, project) =>
         {
-            Assert.That(saveable.HasUnsavedChanges, Is.False);
+            Assert.That(editor.HasUnsavedChanges, Is.False);
             editor.SelectedBone = editor.Bones[0];
             editor.ShowBonesAsWorldTransform = false;
             editor.ShowSkeleton = false;
             editor.ShowRefMesh = false;
             editor.BoneVisualScale = 2;
-            Assert.That(saveable.HasUnsavedChanges, Is.False);
+            Assert.That(editor.HasUnsavedChanges, Is.False);
             var originalName = editor.SelectedBoneName;
             editor.SelectedBoneName = "changed_root";
-            Assert.That(saveable.HasUnsavedChanges, Is.True);
+            Assert.That(editor.HasUnsavedChanges, Is.True);
             editor.LoadFile(editor.CurrentFile);
-            Assert.That(saveable.HasUnsavedChanges, Is.True, "Re-selecting the same loaded skeleton must not clear pending edits.");
+            Assert.That(editor.HasUnsavedChanges, Is.True);
             editor.SelectedBoneName = originalName;
-            Assert.That(saveable.HasUnsavedChanges, Is.False);
+            Assert.That(editor.HasUnsavedChanges, Is.False);
             editor.SelectedBoneTranslationOffset.X.Value = 2;
-            Assert.That(saveable.HasUnsavedChanges, Is.True);
-            Assert.That(saveable.Save(), Is.True);
-            Assert.That(saveable.HasUnsavedChanges, Is.False);
+            Assert.That(editor.Save(), Is.True);
+            Assert.That(editor.CurrentFile, Is.SameAs(files.FindFile(SkeletonPath, project)));
+            Assert.That(files.GetFullPath(editor.CurrentFile), Is.EqualTo(SkeletonPath));
+            Assert.That(files.FindFile(MatrixPath, project), Is.Not.Null);
+            Assert.That(editor.HasUnsavedChanges, Is.False);
             editor.BoneScale = 1.5f;
-            Assert.That(saveable.HasUnsavedChanges, Is.True);
-            Assert.That(saveable.Save(), Is.False, "Unbaked bone scale must not clear the dirty state.");
-            Assert.That(saveable.HasUnsavedChanges, Is.True);
+            Assert.That(editor.Save(), Is.False);
+            Assert.That(editor.HasUnsavedChanges, Is.True);
             editor.BakeSkeletonAction();
-            Assert.That(saveable.Save(), Is.True);
-            Assert.That(saveable.HasUnsavedChanges, Is.False);
+            Assert.That(editor.Save(), Is.True);
             editor.CreateBoneAction();
-            Assert.That(saveable.HasUnsavedChanges, Is.True);
-            Assert.That(saveable.Save(), Is.True);
-            Assert.That(saveable.HasUnsavedChanges, Is.False);
+            Assert.That(editor.HasUnsavedChanges, Is.True);
+            Assert.That(editor.Save(), Is.True);
+            Assert.That(AnimationFile.Create(editor.CurrentFile).Bones, Has.Length.EqualTo(2));
+            Assert.That(editor.HasUnsavedChanges, Is.False);
         });
     }
 
-    [TestCase("skeleton-cancel")]
-    [TestCase("matrix-cancel")]
-    [TestCase("write-error")]
-    public void SaveFailureKeepsDirtyAndCloseProtection(string failure)
+    [Test]
+    public void BlockedMatrixWritePreservesSkeletonAndDirtyStateUntilRetry()
     {
-        WithSkeleton((editor, saveable, files, save) =>
+        WithSkeleton((editor, files, project) =>
+        {
+            var source = editor.CurrentFile;
+            var originalBytes = source.DataSource.ReadData();
+            editor.SelectedBone = editor.Bones[0];
+            editor.SelectedBoneName = "edited_root";
+            var blockedPath = Path.Combine(project.ProjectRoot, MatrixPath);
+            Directory.CreateDirectory(blockedPath);
+            try
+            {
+                Assert.That(editor.Save(), Is.False);
+                Assert.That(files.FindFile(SkeletonPath, project), Is.Null);
+                Assert.That(File.Exists(Path.Combine(project.ProjectRoot, SkeletonPath)), Is.False);
+                Assert.That(editor.CurrentFile, Is.SameAs(source));
+                Assert.That(source.DataSource.ReadData(), Is.EqualTo(originalBytes));
+                Assert.That(editor.HasUnsavedChanges, Is.True);
+                var manager = new EditorManager(Mock.Of<IGlobalEventHub>(), files, Mock.Of<IEditorDatabase>(),
+                    (_, _, _) => System.Windows.MessageBoxResult.Cancel);
+                manager.CurrentEditorsList.Add(editor);
+                manager.CloseTool(editor);
+                Assert.That(manager.CurrentEditorsList, Does.Contain(editor));
+            }
+            finally { Directory.Delete(blockedPath); }
+            Assert.That(editor.Save(), Is.True);
+            Assert.That(editor.HasUnsavedChanges, Is.False);
+            Assert.That(AnimationFile.Create(editor.CurrentFile).Bones[0].Name, Is.EqualTo("edited_root"));
+            Assert.That(File.Exists(blockedPath), Is.True);
+        });
+    }
+
+    [Test]
+    public void MissingEditableProjectKeepsPendingChangesForRetry()
+    {
+        WithSkeleton((editor, files, project) =>
         {
             editor.SelectedBone = editor.Bones[0];
             editor.SelectedBoneName = "edited_root";
-            if (failure == "write-error")
-                save.Setup(item => item.Save(It.IsAny<string>(), It.IsAny<byte[]>(), false)).Throws(new IOException("Test write failure"));
-            else
-                save.Setup(item => item.Save(failure == "skeleton-cancel" ? SkeletonPath : MatrixPath, It.IsAny<byte[]>(), false))
-                    .Returns((PackFile?)null);
-            if (failure == "write-error")
-                Assert.Throws<IOException>(() => saveable.Save());
-            else
-                Assert.That(saveable.Save(), Is.False);
-            Assert.That(saveable.HasUnsavedChanges, Is.True);
-            var prompts = 0;
-            var manager = new EditorManager(Mock.Of<IGlobalEventHub>(), files.Object, Mock.Of<IEditorDatabase>(), (_, _, _) =>
-            {
-                prompts++;
-                return System.Windows.MessageBoxResult.Cancel;
-            });
-            manager.CurrentEditorsList.Add(editor);
-            manager.CloseTool(editor);
-            Assert.That(prompts, Is.EqualTo(1));
-            Assert.That(manager.CurrentEditorsList, Does.Contain(editor));
-            ConfigureSuccessfulSave(save);
-            Assert.That(saveable.Save(), Is.True);
-            Assert.That(saveable.HasUnsavedChanges, Is.False);
-            manager.CloseTool(editor);
-            Assert.That(prompts, Is.EqualTo(1));
-            Assert.That(manager.CurrentEditorsList, Is.Empty);
+            files.SetEditablePack(null);
+            Assert.That(editor.Save(), Is.False);
+            Assert.That(editor.HasUnsavedChanges, Is.True);
+            files.SetEditablePack(project);
+            Assert.That(editor.Save(), Is.True);
+            Assert.That(editor.HasUnsavedChanges, Is.False);
         });
     }
 
-    private const string SkeletonPath = @"animations\skeletons\test.anim";
-    private const string MatrixPath = @"animations\skeletons\test.bone_inv_trans_mats";
-
-    internal static void WithSkeleton(Action<SkeletonEditorViewModel, ISaveableEditor, Mock<IPackFileService>, Mock<IFileSaveService>> action)
+    internal static void WithSkeleton(Action<SkeletonEditorViewModel, IPackFileService, FolderProjectContainer> action)
     {
-        var files = new Mock<IPackFileService>();
-        files.Setup(item => item.GetAllPackfileContainers()).Returns([]);
-        var save = new Mock<IFileSaveService>();
-        ConfigureSuccessfulSave(save);
-        var skeleton = GameSkeleton.CreateFromAnimationFile(new AnimationFile
+        var root = Directory.CreateTempSubdirectory("ae-skeleton-save-");
+        try
         {
-            Header = new AnimationFile.AnimationHeader { SkeletonName = "test" },
-            Bones = [new AnimationFile.BoneInfo { Id = 0, ParentId = AnimationFile.BoneIndexNoParent, Name = "root" }],
-        }, new AnimationPlayer());
-        var animation = AnimationClip.CreateSkeletonAnimation(skeleton).ConvertToFileFormat(skeleton);
-        var file = PackFile.CreateFromBytes("test.anim", AnimationFile.ConvertToBytes(animation));
-        files.Setup(item => item.GetFullPath(It.IsAny<PackFile>(), It.IsAny<PackFileContainer?>())).Returns(SkeletonPath);
-        files.Setup(item => item.FindFile(SkeletonPath, It.IsAny<PackFileContainer?>())).Returns(file);
-        EditorTabDirtyStateTests.WithServices(services =>
-        {
-            using var scope = services.CreateScope();
-            var editor = scope.ServiceProvider.GetRequiredService<SkeletonEditorViewModel>();
-            try
+            using var project = FolderProjectContainer.Create(root.FullName, new FolderProjectSettings { Name = "Skeleton" });
+            var files = new PackFileService(Mock.Of<IGlobalEventHub>());
+            var sourcePack = new PackFileContainer("Reference") { IsCaPackFile = true, SystemFilePath = "reference.pack" };
+            var skeleton = GameSkeleton.CreateFromAnimationFile(new AnimationFile
             {
-                Assert.That(editor, Is.InstanceOf<ISaveableEditor>(), "Editable skeleton data must participate in save/close protection.");
-                var saveable = (ISaveableEditor)editor;
-                Assert.That(saveable.HasUnsavedChanges, Is.False);
-                editor.LoadFile(file);
-                Assert.That(editor.Bones, Is.Not.Empty);
-                Assert.That(saveable.HasUnsavedChanges, Is.False);
-                action(editor, saveable, files, save);
-            }
-            finally { editor.Close(); }
-        }, registrations =>
-        {
-            registrations.AddSingleton(files.Object);
-            registrations.AddSingleton(save.Object);
-        });
-    }
-
-    private static void ConfigureSuccessfulSave(Mock<IFileSaveService> save)
-    {
-        save.Reset();
-        save.Setup(item => item.Save(It.IsAny<string>(), It.IsAny<byte[]>(), false))
-            .Returns<string, byte[], bool>((path, bytes, _) => PackFile.CreateFromBytes(Path.GetFileName(path), bytes));
+                Header = new AnimationFile.AnimationHeader { SkeletonName = "test" },
+                Bones = [new AnimationFile.BoneInfo { Id = 0, ParentId = AnimationFile.BoneIndexNoParent, Name = "root" }],
+            }, new AnimationPlayer());
+            var animation = AnimationClip.CreateSkeletonAnimation(skeleton).ConvertToFileFormat(skeleton);
+            var file = PackFile.CreateFromBytes("test.anim", AnimationFile.ConvertToBytes(animation));
+            sourcePack.FileList.Add(SkeletonPath, file);
+            files.AddContainer(sourcePack);
+            files.AddEditableFolderProject(project);
+            EditorTabDirtyStateTests.WithServices(services =>
+            {
+                using var scope = services.CreateScope();
+                var editor = scope.ServiceProvider.GetRequiredService<SkeletonEditorViewModel>();
+                try
+                {
+                    editor.LoadFile(file);
+                    Assert.That(editor.IsTechSkeleton, Is.True);
+                    Assert.That(editor.Bones, Is.Not.Empty);
+                    action(editor, files, project);
+                }
+                finally { editor.Close(); }
+            }, registrations => registrations.AddSingleton<IPackFileService>(files));
+        }
+        finally { root.Delete(true); }
     }
 }

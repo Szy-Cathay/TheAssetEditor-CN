@@ -247,7 +247,7 @@ public class ModAssistantDataTests
     [TestMethod]
     public void Assistant_SkeletonEditsUndoRedoAndNativeSaveReadback()
     {
-        SkeletonDirtyStateTests.WithSkeleton((editor, _, _, save) =>
+        SkeletonDirtyStateTests.WithSkeleton((editor, files, project) =>
         {
             var ids = new AssistantIds(); var adapter = new SkeletonAssistantAdapter();
             Run(adapter, editor, ids, "skeleton.edit", new() { ["bone_name"] = "root", ["action"] = "transform", ["translation"] = new JsonObject { ["x"] = 2, ["y"] = 3, ["z"] = 4 } });
@@ -256,11 +256,11 @@ public class ModAssistantDataTests
             Assert.AreEqual(2f, bone["translation"]![0]!.GetValue<float>());
             Run(adapter, editor, ids, "skeleton.undo"); Assert.IsFalse(editor.HasUnsavedChanges);
             Run(adapter, editor, ids, "skeleton.redo"); Assert.IsTrue(editor.HasUnsavedChanges);
-            byte[]? bytes = null;
-            save.Setup(s => s.Save(It.Is<string>(p => p.EndsWith(".anim")), It.IsAny<byte[]>(), false))
-                .Returns<string, byte[], bool>((path, data, _) => { bytes = data; return PackFile.CreateFromBytes(path, data); });
-            Assert.IsTrue(editor.Save()); Assert.IsNotNull(bytes);
-            var parsed = AnimationFile.Create(new ByteChunk(bytes));
+            Assert.IsTrue(editor.Save());
+            var savedPath = Path.Combine(project.ProjectRoot, files.GetFullPath(editor.CurrentFile, project));
+            Assert.IsTrue(File.Exists(savedPath));
+            Assert.IsTrue(File.Exists(Path.ChangeExtension(savedPath, ".bone_inv_trans_mats")));
+            var parsed = AnimationFile.Create(new ByteChunk(File.ReadAllBytes(savedPath)));
             Assert.AreEqual("root", parsed.Bones[0].Name);
             Assert.IsFalse(editor.HasUnsavedChanges);
         });

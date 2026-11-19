@@ -1381,7 +1381,10 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
             ? modelTable.Sample(AppearanceAge(parent, definition, time) * parent.Emitter.TimeScale
                 / (parent.Life * parent.Emitter.TimeScale + .000001), parent.RandomScale.X)
             : definition.Scale.Vector(phase, new(parent.RandomScale.X));
-        return scale * parent.InitialScale * rootScale * EventScale(parent.Emitter, time, currentFrame);
+        // A visible fixed-sector rigid mesh sizes its geometry independently of its tracked event.
+        if (definition.Kind != 1 || !definition.LegacySpreadSpawn || definition.IsEventHelper)
+            scale *= parent.InitialScale;
+        return scale * rootScale * EventScale(parent.Emitter, time, currentFrame);
     }
 
     private Vector4 EventTint(EmitterState state, double time)
@@ -1491,7 +1494,7 @@ internal sealed partial class TotalWarVfxSimulation(VfxConversion conversion)
         particle.SpriteForceInverseRotation = null;
         var correctedSprite = false;
         if (!supported && definition.Kind == 0 && definition.ConstantForceDamping == null
-            && definition.SimulationSpace is 0 or 2 && emitter.Parent == null
+            && definition.SimulationSpace is 0 or 2 && (emitter.Parent == null || definition.VerticalTrailForce)
             && float.IsFinite(emitter.TimeScale) && emitter.TimeScale > 0
             && TryModelForceRoot(basis, out var birthScale, out var birthRotation))
         {

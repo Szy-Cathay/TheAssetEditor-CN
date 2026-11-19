@@ -159,6 +159,8 @@
 
 ### 6.3 每帧更新
 
+带骨骼权重的角色部件若把刚性矩阵编号填写为 0，同时还有顶点实际受其他骨骼驱动，预览按顶点权重随角色变形。VMD 中具名的挂点优先，静态部件和明确的非零刚性矩阵编号继续跟随指定骨骼。
+
 `SceneObject.Update` 以主播放器的当前秒数调用每个 `IMetaDataInstance.Update(currentTimeSeconds)`。动画 Prop 的附属播放器也必须与主时间同步；主播放器暂停时仍要在显式 seek 后刷新附属 pose。
 
 时间单位是秒。不要在 UI、元数据或动画播放器之间隐式混用微秒、帧序号和秒；播放器通过 `CurrentTime` / `Duration` 暴露时间，逐帧窗口通过动画 clip 的 `Timebase.SampleDuration` 取得。

@@ -42,6 +42,25 @@ public class VfxRadialSpawnAreaTests
     }
 
     [Test]
+    public void DistanceEmitter_UsesTheAuthoredHalfRingIndependentlyOfVelocity()
+    {
+        var source = VfxDocument.Read(Source(0, 0, 0, 180));
+        source.Root.Descendants("effect_render_stacks").Remove();
+        Property(source, "SpawnAngle").Remove();
+        Property(source, "SpreadMethod").Remove();
+        Property(source, "ParticleInitialSpeed").Value = VfxLibraryVisibilityTests.Constant("x", 0);
+        source.Root.Descendants("emitter").Single().Add(new XElement("property",
+            new XAttribute("name", "SpawnSpacing"), new XAttribute("value", .1)));
+        var simulation = new TotalWarVfxSimulation(Convert(source.Write()));
+        Matrix Attachment(float time) => Matrix.CreateTranslation(time * 10, 0, 0);
+        simulation.Seek(.5f, Attachment(.5f), Attachment);
+        var positions = Births(simulation).Select(p => p.Position).ToArray();
+        Assert.That(positions, Has.Length.GreaterThan(20));
+        Assert.That(positions.All(p => p.Z <= .000001f && MathF.Abs(p.Y) < .000001f), Is.True);
+        Assert.That(positions.Any(p => p.Z < -.45f), Is.True);
+    }
+
+    [Test]
     public void NarrowArc_ConcentratesBirthsAroundPositiveXWithoutChangingCountLifeAlphaOrLaterRandomFields()
     {
         var bytes = Source(0, 0, -5, 5);

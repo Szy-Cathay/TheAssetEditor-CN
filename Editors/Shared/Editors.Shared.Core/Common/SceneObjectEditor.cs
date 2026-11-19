@@ -263,15 +263,14 @@ namespace Editors.Shared.Core.Common
                         ? new SkeletonBoneAnimationResolver(sceneObject, boneIndex, useBindPoseWhenDisabled: true)
                         : null;
                 }
-                else if (mesh.AnimationMatrixOverride >= 0)
+                else
                 {
+                    // Some skinned character parts also carry a zero rigid-matrix index.
+                    var index = mesh.AnimationMatrixOverride;
                     mesh.AttachmentBoneResolver =
-                        sceneObject.Skeleton != null &&
-                        mesh.AnimationMatrixOverride < sceneObject.Skeleton.BoneCount
-                            ? new SkeletonBoneAnimationResolver(
-                                sceneObject,
-                                mesh.AnimationMatrixOverride,
-                                useBindPoseWhenDisabled: true)
+                        sceneObject.Skeleton != null && index >= 0 && index < sceneObject.Skeleton.BoneCount &&
+                        (index != 0 || mesh.Geometry?.HasNonRootBoneWeights() != true)
+                            ? new SkeletonBoneAnimationResolver(sceneObject, index, useBindPoseWhenDisabled: true)
                             : null;
                 }
             });
