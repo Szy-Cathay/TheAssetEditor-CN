@@ -63,6 +63,24 @@ public class VfxLegacySpawnDirectionTests
         Assert.That(VfxDocument.Read(source).Write(), Is.EqualTo(source));
     }
 
+    [TestCase(-90, 0, 1)]
+    [TestCase(0, 1, 0)]
+    [TestCase(90, 0, -1)]
+    public void RigidModel_FixedHorizontalArc_MovesAlongItsLocalAzimuth(int azimuth, int x, int z)
+    {
+        var document = VfxDocument.Read(VfxModelVariantTests.Source(1));
+        var emitter = document.Root.Descendants("emitter").Single();
+        emitter.Add(new XElement("property", new XAttribute("name", "ParticleInitialSpeed"), new XAttribute("value", 20)),
+            new XElement("ranged_property", new XAttribute("name", "SpawnSpread"), new XAttribute("min", 0), new XAttribute("max", 0)),
+            new XElement("ranged_property", new XAttribute("name", "SpreadArc"), new XAttribute("min", azimuth), new XAttribute("max", azimuth)));
+        var simulation = new TotalWarVfxSimulation(VfxModelVariantTests.Convert(document.Write()));
+        simulation.Seek(.1f, Matrix.Identity);
+        var start = simulation.Frame(Camera).Single().Transform.Translation;
+        simulation.Seek(.4f, Matrix.Identity);
+        var travel = simulation.Frame(Camera).Single().Transform.Translation - start;
+        Assert.That(Vector3.Distance(travel, new Vector3(x, 0, z) * 6), Is.LessThan(.001f));
+    }
+
     [Test]
     public void RangedSpreadArc_StaysInsideTheNativeSectorAndPreservesSeeking()
     {

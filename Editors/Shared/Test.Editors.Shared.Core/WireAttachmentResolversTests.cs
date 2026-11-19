@@ -1,10 +1,12 @@
 using Editors.Shared.Core.Common;
 using GameWorld.Core.Animation;
+using GameWorld.Core.Rendering.Geometry;
 using GameWorld.Core.SceneNodes;
 using GameWorld.Core.Utility;
 using Microsoft.Xna.Framework;
 using Moq;
 using Shared.GameFormats.Animation;
+using Shared.GameFormats.RigidModel;
 using Shared.GameFormats.RigidModel.MaterialHeaders;
 using Shared.GameFormats.RigidModel.Transforms;
 
@@ -71,6 +73,24 @@ namespace Test.Editors.Shared.Core
 
             Assert.That(mesh.AttachmentBoneResolver, Is.Not.Null);
             Assert.That(mesh.AttachmentBoneResolver!.GetWorldTransformIfAnimating().Translation, Is.EqualTo(new Vector3(7, 8, 9)));
+        }
+
+        [TestCase(UiVertexFormat.Cinematic, "", 0, false)]
+        [TestCase(UiVertexFormat.Weighted, "", 0, true)]
+        [TestCase(UiVertexFormat.Cinematic, "hand", 0, true)]
+        [TestCase(UiVertexFormat.Cinematic, "", 1, true)]
+        public void RootMatrixFallback_RespectsActiveVertexWeightsAndExplicitAttachments(
+            UiVertexFormat format, string attachment, int matrixIndex, bool rigid)
+        {
+            var scene = new SceneObject("test") { Skeleton = CreateSkeleton(("root", Vector3.Zero), ("hand", Vector3.Up)) };
+            var mesh = CreateMeshNode(attachment, matrixIndex);
+            var geometry = new MeshObject(Mock.Of<IGraphicsCardGeometry>(), "test");
+            geometry.ChangeVertexType(format, false);
+            geometry.VertexArray = [new() { BlendIndices = new(0, 1, 1, 0), BlendWeights = new(.5f, 0, .5f, 0) }];
+            mesh.Geometry = geometry;
+            scene.ModelNode = mesh;
+            SceneObjectEditor.WireAttachmentResolvers(scene);
+            Assert.That(mesh.AttachmentBoneResolver != null, Is.EqualTo(rigid));
         }
 
         [Test]

@@ -46,6 +46,18 @@ namespace GameWorld.Core.Rendering.Geometry
             _ => throw new Exception("Unknown vertex format for mesh")
         };
 
+        public bool HasNonRootBoneWeights()
+        {
+            if (VertexFormat is not (UiVertexFormat.Weighted or UiVertexFormat.Cinematic))
+                return false;
+            return VertexArray.Any(vertex =>
+                vertex.BlendWeights.X > 0 && vertex.BlendIndices.X > 0 ||
+                vertex.BlendWeights.Y > 0 && vertex.BlendIndices.Y > 0 ||
+                VertexFormat == UiVertexFormat.Cinematic && (
+                    vertex.BlendWeights.Z > 0 && vertex.BlendIndices.Z > 0 ||
+                    vertex.BlendWeights.W > 0 && vertex.BlendIndices.W > 0));
+        }
+
 
         public MeshObject(IGraphicsCardGeometry context, string skeletonName)
         {

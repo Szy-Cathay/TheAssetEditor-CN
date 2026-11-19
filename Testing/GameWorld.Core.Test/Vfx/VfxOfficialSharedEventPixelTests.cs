@@ -37,6 +37,78 @@ public class VfxOfficialSharedEventPixelTests
     }
 
     private static readonly Dictionary<string, OfficialRoot> AffectedRoots = ReadAffectedRoots();
+
+    [TestCase("0")]
+    [TestCase("1")]
+    [TestCase("2")]
+    public void SkulltakerSlash_SweepsAlongTheGroundInAFixedView(string quality)
+    {
+        const string path = @"vfx\wh3_dlc26_entity_lord_skulltaker_slash.xml";
+        byte[]? Read(string key) => (byte[]?)ReadOfficial.Invoke(_official, [key]);
+        var original = Read(path)!;
+        Assert.That(Hash(original), Is.EqualTo(AffectedRoots[path].Hash));
+        var source = new VfxPreviewSnapshot(original, path, Read, quality);
+        var conversion = TotalWarVfxConverter.Convert(source);
+        var simulation = new TotalWarVfxSimulation(conversion);
+        var eye = new Vector3(8.57f, 9.02f, 17.59f);
+        var focus = new Vector3(0, 0, 0);
+        var camera = new CommonShaderParameters(Matrix.CreateLookAt(eye, focus, Vector3.Up),
+            Matrix.CreatePerspectiveFieldOfView(MathHelper.ToRadians(60), 1f, .1f, 300) * Matrix.CreateScale(-1, 1, 1),
+            eye, focus, 0, 0, 0, 1, Vector3.One, [], VfxGroundHeight: 0, VfxWriteGroundDepth: true);
+        var graphics = new GraphicsDeviceServiceMock();
+        try
+        {
+            var device = graphics.GraphicsDevice;
+            using var preview = new EffekseerVfxPreview(device);
+            preview.Reload(source);
+            using var target = new RenderTarget2D(device, 512, 512, false, SurfaceFormat.Color, DepthFormat.Depth24);
+            var background = Color.DarkSlateGray;
+            foreach (var time in new[] { .2f, .4f, .6f, .8f })
+            {
+                simulation.Seek(time, Matrix.Identity);
+                var frame = simulation.Frame(camera);
+                var parents = frame.Where(p => p.Layer is 0 or 1).ToArray();
+                Assert.That(parents, Has.Length.EqualTo(2));
+                foreach (var particle in parents)
+                {
+                    Assert.That(particle.Transform.Translation.Y, Is.EqualTo(0).Within(.001f));
+                    Assert.That(particle.Transform.Translation.Z, Is.GreaterThan(1));
+                }
+                preview.Seek(time, Matrix.Identity);
+                device.SetRenderTarget(target);
+                device.Clear(ClearOptions.Target | ClearOptions.DepthBuffer, background, 1, 0);
+                preview.Draw(camera);
+                device.SetRenderTarget(null);
+                var pixels = new Color[512 * 512];
+                target.GetData(pixels);
+                Assert.That(pixels.Count(p => Difference(p, background) > 8), Is.GreaterThan(5));
+                if (time >= .6f)
+                {
+                    var fireLayers = frame.Where(p => conversion.Emitters[p.Layer].Name.Contains("fire_trailing_spawnspacing_attack_arch")).ToArray();
+                    Assert.That(fireLayers, Is.Not.Empty);
+                    Assert.That(fireLayers.Max(p => p.Transform.Translation.Y), Is.GreaterThan(.1f),
+                        "The original fire trail rises above the travelling slash.");
+                    var center = parents[0].Transform.Translation;
+                    var envelope = new BoundingBox(center - new Vector3(5, 0, 5), center + new Vector3(5, 2, 5));
+                    var viewport = new Viewport(0, 0, 512, 512);
+                    var projected = envelope.GetCorners().Select(p => viewport.Project(p, camera.Projection, camera.View, Matrix.Identity)).ToArray();
+                    var minX = projected.Min(p => p.X); var maxX = projected.Max(p => p.X);
+                    var minY = projected.Min(p => p.Y); var maxY = projected.Max(p => p.Y);
+                    var flame = Enumerable.Range(0, pixels.Length).Where(i => pixels[i].R > 140 && pixels[i].G > 45
+                        && pixels[i].R > pixels[i].G && pixels[i].G > pixels[i].B).ToArray();
+                    Assert.That(flame, Has.Length.GreaterThan(50), "The late stages must show fire together with the slash.");
+                    Assert.That(flame.Count(i => i % 512 >= minX && i % 512 <= maxX && i / 512 >= minY && i / 512 <= maxY),
+                        Is.GreaterThan(flame.Length * .8), "Most of the fire should travel with the arc.");
+                }
+                if (Output() is { } output)
+                {
+                    using var file = File.Create(Path.Combine(output, FormattableString.Invariant($"slash-fixed-{quality}-{time:F1}.png")));
+                    target.SaveAsPng(file, 512, 512);
+                }
+            }
+        }
+        finally { graphics.Release(); }
+    }
     private sealed record OfficialRoot(string Hash, Dictionary<string,string[]> SourceFailures, bool LateChildStages);
 
     private static Dictionary<string, OfficialRoot> ReadAffectedRoots()
